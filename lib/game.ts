@@ -2,11 +2,13 @@ import type {
   AnswerIndex,
   AnswerRecord,
   GamePhase,
+  JoinErrorCode,
   Player,
   PublicGameState,
   Question,
   Quiz,
 } from "./types";
+import { isClean } from "./profanity";
 
 const HARD_CAP = 150;
 const SOFT_CAP_FREE = 10;
@@ -216,11 +218,14 @@ export function joinPlayer(
   nickname: string,
 ):
   | { ok: true; game: GameSession; player: Player; reconnected: boolean }
-  | { ok: false; error: string; code?: string } {
+  | { ok: false; error: string; code?: JoinErrorCode } {
   const game = games.get(pin);
   if (!game) return { ok: false, error: "Game not found" };
   const trimmed = nickname.trim().slice(0, 20);
   if (!trimmed) return { ok: false, error: "Nickname required" };
+  if (!isClean(trimmed)) {
+    return { ok: false, error: "Pick another nickname", code: "nickname-rejected" };
+  }
 
   const lower = trimmed.toLowerCase();
   const existing = Array.from(game.players.values()).find(
@@ -247,7 +252,7 @@ export function joinPlayer(
   if (game.phase !== "lobby") return { ok: false, error: "Game already started" };
   const status = capStatus(game);
   if (status.full) {
-    return { ok: false, error: "Room is full", code: "full" };
+    return { ok: false, error: "Room is full", code: "full" satisfies JoinErrorCode };
   }
   const id = `p_${Math.random().toString(36).slice(2, 9)}`;
   const player: Player = { id, nickname: trimmed, score: 0, streak: 0, connected: true };

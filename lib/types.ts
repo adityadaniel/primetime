@@ -86,8 +86,11 @@ export interface PersonalState {
   total?: number;
 }
 
+export type JoinErrorCode = "full" | "nickname-rejected";
+
 export interface JoinResult {
   ok: boolean;
   error?: string;
+  code?: JoinErrorCode;
   playerId?: string;
 }
