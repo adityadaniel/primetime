@@ -7,11 +7,14 @@ import {
   attachHost,
   createGame,
   detachSocket,
+  endByHostLeft,
   getGame,
   joinPlayer,
   kickPlayer,
+  pauseForHostDisconnect,
   personalState,
   publicState,
+  resumeFromPause,
   startGame,
   submitAnswer,
 } from "./lib/game";
@@ -37,6 +40,10 @@ void app.prepare().then(() => {
     cors: { origin: "*" },
     transports: ["websocket", "polling"],
   });
+
+  const lockTimers = new Map<string, NodeJS.Timeout>();
+  const hostGraceTimers = new Map<string, NodeJS.Timeout>();
+  const HOST_GRACE_MS = 60_000;
 
   function broadcast(pin: string) {
     const game = getGame(pin);
@@ -64,6 +71,17 @@ void app.prepare().then(() => {
       const game = attachHost(pin, socket.id);
       if (!game) return;
       socket.join(`pin:${pin}`);
+      const wasPaused = !!game.pausedAt && game.pauseReason === "host-disconnected";
+      const pendingExit = hostGraceTimers.get(pin);
+      if (pendingExit) {
+        clearTimeout(pendingExit);
+        hostGraceTimers.delete(pin);
+      }
+      if (wasPaused) {
+        const wasInQuestion = game.phase === "question";
+        resumeFromPause(game);
+        if (wasInQuestion) scheduleAutoLock(pin);
+      }
       broadcast(pin);
     });
 
@@ -154,11 +172,32 @@ void app.prepare().then(() => {
     socket.on("disconnect", () => {
       const events = detachSocket(socket.id);
       const pins = new Set(events.map((e) => e.pin));
+      for (const event of events) {
+        if (event.type === "host") {
+          const game = getGame(event.pin);
+          if (!game) continue;
+          if (game.phase === "final") continue;
+          const ok = pauseForHostDisconnect(game);
+          if (!ok) continue;
+          if (lockTimers.has(event.pin)) {
+            clearTimeout(lockTimers.get(event.pin)!);
+            lockTimers.delete(event.pin);
+          }
+          const t = setTimeout(() => {
+            const g = getGame(event.pin);
+            hostGraceTimers.delete(event.pin);
+            if (!g) return;
+            if (g.hostSocketId) return;
+            endByHostLeft(g);
+            broadcast(event.pin);
+          }, HOST_GRACE_MS + 50);
+          hostGraceTimers.set(event.pin, t);
+        }
+      }
       for (const pin of pins) broadcast(pin);
     });
   });
 
-  const lockTimers = new Map<string, NodeJS.Timeout>();
   function scheduleAutoLock(pin: string) {
     const game = getGame(pin);
     if (!game || !game.questionEndsAt) return;

@@ -10,6 +10,7 @@ import type {
 
 const MAX_PLAYERS = 10;
 const RECONNECT_GRACE_MS = 30_000;
+const HOST_GRACE_MS = 60_000;
 const RESULT_BASE = 1000;
 const PIN_RETRY_LIMIT = 50;
 
@@ -26,6 +27,11 @@ export interface GameSession {
   questionStartedAt?: number;
   questionEndsAt?: number;
   questionTimer?: NodeJS.Timeout;
+  pausedAt?: number;
+  pauseReason?: "host-disconnected";
+  pauseResumeBy?: number;
+  pauseRemainingMs?: number;
+  endedReason?: "host-left";
   createdAt: number;
 }
 
@@ -79,6 +85,54 @@ export function attachDisplay(pin: string, socketId: string): GameSession | unde
   if (!game) return;
   game.displaySocketIds.add(socketId);
   return game;
+}
+
+export function pauseForHostDisconnect(game: GameSession): boolean {
+  if (game.pausedAt) return false;
+  if (game.phase === "final") return false;
+  game.pausedAt = Date.now();
+  game.pauseReason = "host-disconnected";
+  game.pauseResumeBy = game.pausedAt + HOST_GRACE_MS;
+  if (game.phase === "question" && game.questionEndsAt) {
+    game.pauseRemainingMs = Math.max(0, game.questionEndsAt - game.pausedAt);
+  } else {
+    game.pauseRemainingMs = undefined;
+  }
+  return true;
+}
+
+export function resumeFromPause(game: GameSession): boolean {
+  if (!game.pausedAt) return false;
+  const now = Date.now();
+  if (game.phase === "question" && game.pauseRemainingMs !== undefined && game.questionStartedAt) {
+    const elapsed = (game.pausedAt - game.questionStartedAt);
+    game.questionStartedAt = now - elapsed;
+    game.questionEndsAt = now + game.pauseRemainingMs;
+  }
+  game.pausedAt = undefined;
+  game.pauseReason = undefined;
+  game.pauseResumeBy = undefined;
+  game.pauseRemainingMs = undefined;
+  return true;
+}
+
+export function endByHostLeft(game: GameSession) {
+  if (game.questionTimer) {
+    clearTimeout(game.questionTimer);
+    game.questionTimer = undefined;
+  }
+  game.phase = "final";
+  game.endedReason = "host-left";
+  game.pausedAt = undefined;
+  game.pauseReason = undefined;
+  game.pauseResumeBy = undefined;
+  game.pauseRemainingMs = undefined;
+  game.questionStartedAt = undefined;
+  game.questionEndsAt = undefined;
+}
+
+export function isPaused(game: GameSession): boolean {
+  return !!game.pausedAt;
 }
 
 export function detachSocket(socketId: string): {
@@ -341,6 +395,11 @@ export function publicState(game: GameSession): PublicGameState {
     startedAt: game.questionStartedAt,
     endsAt: game.questionEndsAt,
     reveal,
+    paused:
+      game.pausedAt && game.pauseReason
+        ? { reason: game.pauseReason, resumeBy: game.pauseResumeBy ?? 0 }
+        : undefined,
+    endedReason: game.endedReason,
     players: Array.from(game.players.values()).map((p) => ({
       id: p.id,
       nickname: p.nickname,

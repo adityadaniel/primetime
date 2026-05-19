@@ -62,6 +62,17 @@ export interface PublicGameState {
     distribution: number[];
     totalAnswers: number;
   };
+  paused?: {
+    reason: "host-disconnected";
+    resumeBy: number;
+  };
+  endedReason?: "host-left";
+  playerCount?: number;
+  cap?: {
+    hard: number;
+    soft: number;
+    upsell: boolean;
+  };
   players: Array<{ id: string; nickname: string; score: number; connected: boolean }>;
   podium?: Array<{ id: string; nickname: string; score: number; rank: number }>;
 }

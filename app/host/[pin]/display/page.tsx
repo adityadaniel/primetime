@@ -52,6 +52,8 @@ export default function DisplayPage({ params }: { params: Promise<{ pin: string 
       </header>
       <SmpteBars className="h-2 mt-3" />
 
+      {state?.paused && <PausedOverlay resumeBy={state.paused.resumeBy} />}
+
       <section className="px-10 pt-8 pb-12 max-w-[1800px] mx-auto">
         {phase === "lobby" && state && <LobbyDisplay state={state} pin={pin} />}
         {(phase === "question" || phase === "reveal") && state && <QuestionDisplay state={state} />}
@@ -279,14 +281,15 @@ function PodiumDisplay({ state }: { state: PublicGameState }) {
 function FinalDisplay({ state }: { state: PublicGameState }) {
   const board = [...state.players].sort((a, b) => b.score - a.score);
   const winner = board[0];
+  const hostLeft = state.endedReason === "host-left";
   return (
     <div className="grid grid-cols-12 gap-6">
       <div className="col-span-12">
         <p className="chyron" style={{ color: "var(--vermilion)" }}>
-          FADE TO BLACK · FINAL TRANSMISSION
+          {hostLeft ? "HOST LEFT · TRANSMISSION ENDED" : "FADE TO BLACK · FINAL TRANSMISSION"}
         </p>
         <p className="display-num" style={{ fontSize: "clamp(80px, 16vw, 240px)", lineHeight: 0.85 }}>
-          THAT'S A WRAP.
+          {hostLeft ? "OFF AIR." : "THAT'S A WRAP."}
         </p>
       </div>
       {winner && (
@@ -319,6 +322,39 @@ function FinalDisplay({ state }: { state: PublicGameState }) {
             </li>
           ))}
         </ol>
+      </div>
+    </div>
+  );
+}
+
+function PausedOverlay({ resumeBy }: { resumeBy: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, []);
+  const remaining = Math.max(0, Math.ceil((resumeBy - now) / 1000));
+  return (
+    <div
+      className="fixed inset-0 z-40 grid place-items-center"
+      style={{ background: "rgba(15,15,15,0.92)" }}
+    >
+      <div className="text-center px-8" style={{ color: "var(--bone)" }}>
+        <p className="chyron mb-3" style={{ color: "var(--marigold)" }}>
+          SIGNAL DROPPED · STAND BY
+        </p>
+        <p className="display-num" style={{ fontSize: "clamp(80px, 14vw, 200px)", lineHeight: 0.85 }}>
+          PAUSED.
+        </p>
+        <p className="font-editorial italic text-2xl mt-3 opacity-80">
+          Host went off-air. Resuming if they reconnect.
+        </p>
+        <p
+          className="display-num ticker tabular-nums mt-6"
+          style={{ fontSize: "clamp(64px, 10vw, 120px)", color: "var(--marigold)" }}
+        >
+          {String(remaining).padStart(2, "0")}s
+        </p>
       </div>
     </div>
   );

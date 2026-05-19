@@ -23,6 +23,39 @@ function flashToast(setToast: (s: string | null) => void, msg: string) {
   window.setTimeout(() => setToast(null), 3500);
 }
 
+function PlayerPausedOverlay({ resumeBy }: { resumeBy: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, []);
+  const remaining = Math.max(0, Math.ceil((resumeBy - now) / 1000));
+  return (
+    <div
+      className="fixed inset-0 z-40 grid place-items-center px-6"
+      style={{ background: "rgba(15,15,15,0.92)" }}
+    >
+      <div className="text-center" style={{ color: "var(--bone)" }}>
+        <p className="chyron mb-3" style={{ color: "var(--marigold)" }}>
+          STAND BY · HOST OFF-AIR
+        </p>
+        <p className="display-num" style={{ fontSize: "clamp(56px, 14vw, 120px)", lineHeight: 0.85 }}>
+          PAUSED.
+        </p>
+        <p className="font-editorial italic text-lg mt-3 opacity-80">
+          Holding for the host. Resuming when they're back.
+        </p>
+        <p
+          className="display-num ticker tabular-nums mt-5"
+          style={{ fontSize: "clamp(48px, 14vw, 96px)", color: "var(--marigold)" }}
+        >
+          {String(remaining).padStart(2, "0")}s
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function PlayPage({ params }: { params: Promise<{ pin: string }> }) {
   const socket = useSocket();
   const [pin, setPin] = useState<string>("");
@@ -152,6 +185,7 @@ export default function PlayPage({ params }: { params: Promise<{ pin: string }> 
   return (
     <main className="relative min-h-screen pb-10 flex flex-col">
       <CornerMarks />
+      {state?.paused && <PlayerPausedOverlay resumeBy={state.paused.resumeBy} />}
       {toast && (
         <div
           className="fixed top-4 left-1/2 -translate-x-1/2 z-50 ink-border stamp ticker text-[11px] tracking-widest px-3 py-2"
@@ -419,13 +453,14 @@ function PlayerFinal({
 }) {
   const rank = personal?.rank ?? 0;
   const podium = rank > 0 && rank <= 3;
+  const hostLeft = state?.endedReason === "host-left";
   return (
     <div className="flex-1 flex flex-col items-center text-center pt-8">
       <p className="chyron mb-3" style={{ color: "var(--vermilion)" }}>
-        TRANSMISSION COMPLETE
+        {hostLeft ? "HOST LEFT · TRANSMISSION ENDED" : "TRANSMISSION COMPLETE"}
       </p>
       <p className="display-num" style={{ fontSize: "clamp(72px, 18vw, 160px)" }}>
-        {podium ? "ON THE PODIUM." : "WRAP IT UP."}
+        {hostLeft ? "OFF AIR." : podium ? "ON THE PODIUM." : "WRAP IT UP."}
       </p>
       <div className="grid grid-cols-2 gap-3 mt-6 w-full max-w-[420px]">
         <div className="ink-border p-4" style={{ background: "var(--marigold)" }}>
