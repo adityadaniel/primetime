@@ -6,7 +6,8 @@
     "dev": "tsx server.ts",
     "build": "next build",
     "start": "NODE_ENV=production tsx server.ts",
-    "lint": "next lint"
+    "lint": "next lint",
+    "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {
     "next": "^15.5.18",

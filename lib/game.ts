@@ -13,8 +13,14 @@ import { isClean } from "./profanity";
 const HARD_CAP = 150;
 const SOFT_CAP_FREE = 10;
 const UPSELL_AT = 8;
-const RECONNECT_GRACE_MS = 30_000;
+let RECONNECT_GRACE_MS = 30_000;
 const HOST_GRACE_MS = 60_000;
+
+// dev-only hatch: smoke tests shrink the grace window so they don't sit
+// idle for 30s. Not wired into any production code path.
+export function setReconnectGraceForTesting(ms: number) {
+  RECONNECT_GRACE_MS = ms;
+}
 const RESULT_BASE = 1000;
 const PIN_RETRY_LIMIT = 50;
 
