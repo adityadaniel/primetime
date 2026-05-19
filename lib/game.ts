@@ -390,6 +390,45 @@ export function leaderboard(game: GameSession) {
     .map((p, i) => ({ id: p.id, nickname: p.nickname, score: p.score, rank: i + 1 }));
 }
 
+function csvEscape(value: string): string {
+  if (/[",\n\r]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+export function exportResultsCsv(game: GameSession): string {
+  const total = game.quiz.questions.length;
+  const board = leaderboard(game);
+  const rows: string[] = ["rank,nickname,score,correct,total,avg_response_ms"];
+  for (const entry of board) {
+    let correct = 0;
+    let answeredCount = 0;
+    let msSum = 0;
+    for (let i = 0; i < total; i++) {
+      const records = game.answers.get(i);
+      if (!records) continue;
+      const mine = records.find((r) => r.playerId === entry.id);
+      if (!mine) continue;
+      answeredCount += 1;
+      msSum += mine.msFromStart;
+      if (mine.correct) correct += 1;
+    }
+    const avg = answeredCount > 0 ? String(Math.round(msSum / answeredCount)) : "";
+    rows.push(
+      [
+        entry.rank,
+        csvEscape(entry.nickname),
+        entry.score,
+        correct,
+        total,
+        avg,
+      ].join(","),
+    );
+  }
+  return rows.join("\r\n") + "\r\n";
+}
+
 export function publicState(game: GameSession): PublicGameState {
   const q = currentQuestion(game);
   const board = leaderboard(game);

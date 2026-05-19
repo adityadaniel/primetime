@@ -191,7 +191,7 @@ export default function ControlPanel({ params }: { params: Promise<{ pin: string
               <LeaderboardStage state={state} />
             )}
             {phase === "final" && state && (
-              <FinalStage state={state} />
+              <FinalStage state={state} pin={pin} />
             )}
           </div>
         </div>
@@ -461,16 +461,30 @@ function LeaderboardStage({ state }: { state: PublicGameState }) {
   );
 }
 
-function FinalStage({ state }: { state: PublicGameState }) {
+function FinalStage({ state, pin }: { state: PublicGameState; pin: string }) {
   const board = [...state.players].sort((a, b) => b.score - a.score);
   return (
     <div>
-      <p className="chyron mb-2" style={{ color: "var(--vermilion)" }}>
-        TRANSMISSION COMPLETE
-      </p>
-      <p className="display-num" style={{ fontSize: "clamp(40px, 6vw, 96px)" }}>
-        FADE OUT.
-      </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <p className="chyron mb-2" style={{ color: "var(--vermilion)" }}>
+            TRANSMISSION COMPLETE
+          </p>
+          <p className="display-num" style={{ fontSize: "clamp(40px, 6vw, 96px)" }}>
+            FADE OUT.
+          </p>
+        </div>
+        {pin && (
+          <a
+            href={`/host/${pin}/results.csv`}
+            download
+            className="ink-border stamp px-4 py-3 ticker tracking-widest text-[12px] self-end"
+            style={{ background: "var(--ink)", color: "var(--bone)" }}
+          >
+            ⬇ DOWNLOAD RESULTS
+          </a>
+        )}
+      </div>
       <ol className="mt-6 divide-y-2" style={{ borderColor: "var(--ink)" }}>
         {board.map((p, i) => (
           <li
