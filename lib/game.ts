@@ -9,6 +9,7 @@ import type {
 } from "./types";
 
 const MAX_PLAYERS = 10;
+const RECONNECT_GRACE_MS = 30_000;
 const RESULT_BASE = 1000;
 const PIN_RETRY_LIMIT = 50;
 
@@ -80,39 +81,99 @@ export function attachDisplay(pin: string, socketId: string): GameSession | unde
   return game;
 }
 
-export function detachSocket(socketId: string) {
+export function detachSocket(socketId: string): {
+  pin: string;
+  type: "host" | "display" | "player";
+  playerId?: string;
+}[] {
+  const events: { pin: string; type: "host" | "display" | "player"; playerId?: string }[] = [];
   for (const game of games.values()) {
-    if (game.hostSocketId === socketId) game.hostSocketId = undefined;
-    if (game.displaySocketIds.has(socketId)) game.displaySocketIds.delete(socketId);
+    if (game.hostSocketId === socketId) {
+      game.hostSocketId = undefined;
+      events.push({ pin: game.pin, type: "host" });
+    }
+    if (game.displaySocketIds.has(socketId)) {
+      game.displaySocketIds.delete(socketId);
+      events.push({ pin: game.pin, type: "display" });
+    }
     const playerId = game.socketToPlayer.get(socketId);
     if (playerId) {
       const player = game.players.get(playerId);
-      if (player) player.connected = false;
+      if (player) {
+        player.connected = false;
+        player.disconnectedAt = Date.now();
+      }
       game.socketToPlayer.delete(socketId);
+      events.push({ pin: game.pin, type: "player", playerId });
     }
   }
+  return events;
+}
+
+export function isWithinReconnectGrace(player: Player): boolean {
+  if (player.connected) return false;
+  if (!player.disconnectedAt) return false;
+  return Date.now() - player.disconnectedAt <= RECONNECT_GRACE_MS;
+}
+
+export function reapStalePlayers(game: GameSession): string[] {
+  const dropped: string[] = [];
+  const cutoff = Date.now() - RECONNECT_GRACE_MS;
+  for (const [id, player] of game.players) {
+    if (!player.connected && player.disconnectedAt && player.disconnectedAt < cutoff) {
+      game.players.delete(id);
+      dropped.push(id);
+    }
+  }
+  return dropped;
 }
 
 export function joinPlayer(
   pin: string,
   socketId: string,
   nickname: string,
-): { ok: true; game: GameSession; player: Player } | { ok: false; error: string } {
+):
+  | { ok: true; game: GameSession; player: Player; reconnected: boolean }
+  | { ok: false; error: string; code?: string } {
   const game = games.get(pin);
   if (!game) return { ok: false, error: "Game not found" };
-  if (game.phase !== "lobby") return { ok: false, error: "Game already started" };
   const trimmed = nickname.trim().slice(0, 20);
   if (!trimmed) return { ok: false, error: "Nickname required" };
-  const exists = Array.from(game.players.values()).some(
-    (p) => p.nickname.toLowerCase() === trimmed.toLowerCase() && p.connected,
+
+  const lower = trimmed.toLowerCase();
+  const existing = Array.from(game.players.values()).find(
+    (p) => p.nickname.toLowerCase() === lower,
   );
-  if (exists) return { ok: false, error: "Nickname taken" };
-  if (game.players.size >= MAX_PLAYERS) return { ok: false, error: "Game is full (10 max)" };
+
+  if (existing) {
+    if (existing.connected) {
+      return { ok: false, error: "Nickname taken" };
+    }
+    if (!isWithinReconnectGrace(existing)) {
+      game.players.delete(existing.id);
+    } else {
+      existing.connected = true;
+      existing.disconnectedAt = undefined;
+      for (const [sock, pid] of game.socketToPlayer) {
+        if (pid === existing.id) game.socketToPlayer.delete(sock);
+      }
+      game.socketToPlayer.set(socketId, existing.id);
+      return { ok: true, game, player: existing, reconnected: true };
+    }
+  }
+
+  if (game.phase !== "lobby") return { ok: false, error: "Game already started" };
+  const activeCount = Array.from(game.players.values()).filter(
+    (p) => p.connected || isWithinReconnectGrace(p),
+  ).length;
+  if (activeCount >= MAX_PLAYERS) {
+    return { ok: false, error: "Room is full", code: "full" };
+  }
   const id = `p_${Math.random().toString(36).slice(2, 9)}`;
   const player: Player = { id, nickname: trimmed, score: 0, streak: 0, connected: true };
   game.players.set(id, player);
   game.socketToPlayer.set(socketId, id);
-  return { ok: true, game, player };
+  return { ok: true, game, player, reconnected: false };
 }
 
 export function kickPlayer(pin: string, playerId: string) {

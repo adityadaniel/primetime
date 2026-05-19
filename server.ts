@@ -103,15 +103,27 @@ void app.prepare().then(() => {
       (
         pin: string,
         nickname: string,
-        ack: (res: { ok: boolean; error?: string; playerId?: string }) => void,
+        ack: (res: {
+          ok: boolean;
+          error?: string;
+          code?: string;
+          playerId?: string;
+          reconnected?: boolean;
+        }) => void,
       ) => {
         const result = joinPlayer(pin, socket.id, nickname);
         if (!result.ok) {
-          ack({ ok: false, error: result.error });
+          ack({ ok: false, error: result.error, code: result.code });
           return;
         }
         socket.join(`pin:${pin}`);
-        ack({ ok: true, playerId: result.player.id });
+        ack({ ok: true, playerId: result.player.id, reconnected: result.reconnected });
+        if (result.reconnected) {
+          io.to(`pin:${pin}`).emit("event:reconnected", {
+            playerId: result.player.id,
+            nickname: result.player.nickname,
+          });
+        }
         broadcast(pin);
       },
     );
@@ -140,7 +152,9 @@ void app.prepare().then(() => {
     );
 
     socket.on("disconnect", () => {
-      detachSocket(socket.id);
+      const events = detachSocket(socket.id);
+      const pins = new Set(events.map((e) => e.pin));
+      for (const pin of pins) broadcast(pin);
     });
   });
 

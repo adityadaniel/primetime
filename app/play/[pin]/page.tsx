@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSocket } from "@/lib/socket";
 import { CHANNELS, Shape } from "@/components/Shape";
@@ -18,6 +18,11 @@ interface Personal {
   score?: number;
 }
 
+function flashToast(setToast: (s: string | null) => void, msg: string) {
+  setToast(msg);
+  window.setTimeout(() => setToast(null), 3500);
+}
+
 export default function PlayPage({ params }: { params: Promise<{ pin: string }> }) {
   const socket = useSocket();
   const [pin, setPin] = useState<string>("");
@@ -26,6 +31,8 @@ export default function PlayPage({ params }: { params: Promise<{ pin: string }> 
   const [me, setMe] = useState<{ id: string; nickname: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [evicted, setEvicted] = useState<string | null>(null);
 
   useEffect(() => {
     params.then((p) => setPin(p.pin));
@@ -39,18 +46,45 @@ export default function PlayPage({ params }: { params: Promise<{ pin: string }> 
   }, [pin]);
 
   useEffect(() => {
-    if (!socket || !pin) return;
+    if (!socket || !pin || !me) return;
     const onState = (s: PublicGameState) => {
       if (s.pin === pin) setState(s);
     };
     const onPersonal = (p: Personal) => setPersonal(p);
+    const onReconnected = (e: { nickname: string }) => {
+      if (e.nickname.toLowerCase() === me.nickname.toLowerCase()) {
+        flashToast(setToast, "Reconnected — score restored");
+      }
+    };
     socket.on("state", onState);
     socket.on("personal", onPersonal);
+    socket.on("event:reconnected", onReconnected);
+
+    const rejoin = () => {
+      socket.emit(
+        "player:join",
+        pin,
+        me.nickname,
+        (res: { ok: boolean; error?: string; code?: string; playerId?: string; reconnected?: boolean }) => {
+          if (!res.ok) {
+            setEvicted(res.error ?? "You're no longer in this game.");
+            return;
+          }
+          if (res.playerId) {
+            sessionStorage.setItem(`bc:player:${pin}`, res.playerId);
+          }
+        },
+      );
+    };
+    if (socket.connected) rejoin();
+    socket.on("connect", rejoin);
     return () => {
       socket.off("state", onState);
       socket.off("personal", onPersonal);
+      socket.off("event:reconnected", onReconnected);
+      socket.off("connect", rejoin);
     };
-  }, [socket, pin]);
+  }, [socket, pin, me]);
 
   function submit(i: AnswerIndex) {
     if (!socket || !pin) return;
@@ -95,9 +129,37 @@ export default function PlayPage({ params }: { params: Promise<{ pin: string }> 
     );
   }
 
+  if (evicted) {
+    return (
+      <main className="min-h-screen grid place-items-center px-6">
+        <div className="max-w-md text-center">
+          <p className="chyron mb-3" style={{ color: "var(--vermilion)" }}>
+            SIGNAL LOST
+          </p>
+          <p className="font-editorial text-xl mb-4">{evicted}</p>
+          <Link
+            href="/join"
+            className="ink-border stamp ticker text-[12px] tracking-widest px-4 py-3 inline-block"
+            style={{ background: "var(--vermilion)", color: "var(--bone)" }}
+          >
+            ↩ REJOIN
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="relative min-h-screen pb-10 flex flex-col">
       <CornerMarks />
+      {toast && (
+        <div
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 ink-border stamp ticker text-[11px] tracking-widest px-3 py-2"
+          style={{ background: "var(--ivy)", color: "var(--bone)" }}
+        >
+          ✓ {toast}
+        </div>
+      )}
       <header className="px-5 pt-4 flex items-center justify-between gap-3">
         <Chyron label="ON AIR · TALENT" number="B" />
         <div className="flex items-center gap-4">

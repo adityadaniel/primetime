@@ -12,6 +12,7 @@ export default function ControlPanel({ params }: { params: Promise<{ pin: string
   const socket = useSocket();
   const [pin, setPin] = useState<string>("");
   const [state, setState] = useState<PublicGameState | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     params.then((p) => setPin(p.pin));
@@ -23,9 +24,20 @@ export default function ControlPanel({ params }: { params: Promise<{ pin: string
     const onState = (s: PublicGameState) => {
       if (s.pin === pin) setState(s);
     };
+    const onReconnected = (e: { nickname: string }) => {
+      setToast(`${e.nickname} reconnected`);
+      window.setTimeout(() => setToast(null), 3500);
+    };
+    const onConnect = () => {
+      socket.emit("host:attach", pin);
+    };
     socket.on("state", onState);
+    socket.on("event:reconnected", onReconnected);
+    socket.on("connect", onConnect);
     return () => {
       socket.off("state", onState);
+      socket.off("event:reconnected", onReconnected);
+      socket.off("connect", onConnect);
     };
   }, [socket, pin]);
 
@@ -58,6 +70,14 @@ export default function ControlPanel({ params }: { params: Promise<{ pin: string
   return (
     <main className="relative min-h-screen pb-20">
       <CornerMarks />
+      {toast && (
+        <div
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 ink-border stamp ticker text-[11px] tracking-widest px-3 py-2"
+          style={{ background: "var(--ivy)", color: "var(--bone)" }}
+        >
+          ✓ {toast}
+        </div>
+      )}
       <header className="px-6 pt-4 flex items-center justify-between">
         <Chyron label="DIRECTOR · CONTROL ROOM" number="C" />
         <div className="flex items-center gap-6">

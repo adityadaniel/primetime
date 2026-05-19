@@ -2,5 +2,7 @@
 .DS_Store
 .env*.local
 .next/
+.claude/
 build.log
 node_modules/
+tsconfig.tsbuildinfo

@@ -24,6 +24,7 @@ export interface Player {
   score: number;
   streak: number;
   connected: boolean;
+  disconnectedAt?: number;
 }
 
 export type GamePhase =
