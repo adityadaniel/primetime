@@ -1,0 +1,104 @@
+# BROADCAST — Kahoot-style live quiz (M1)
+
+A real-time quiz game with a vintage broadcast-graphics aesthetic. Built end-to-end as the **M1 — Core Loop** described in `PRD.md` and `CLAUDE.md`.
+
+> See **`DESIGN.md`** for the visual identity, palette, type stack, and motion principles.
+
+## Quick start
+
+```bash
+npm install
+npm run dev
+```
+
+Single command boots Next.js + the WebSocket server on the **same port**: <http://localhost:4321>.
+
+> Port 3000 is intentionally avoided because another local dev app on this machine occupies it. To override:
+> ```bash
+> PORT=4000 npm run dev
+> ```
+
+## Live demo flow
+
+Open three browser windows on the same machine (or use Chrome profiles):
+
+1. **Host / Builder** — <http://localhost:4321/host> · build a quiz, click **GO LIVE**.
+   - This auto-opens the projection display in a new tab and routes you to the control panel.
+2. **Projection display** (auto-opened) — <http://localhost:4321/host/[PIN]/display> · drag this to a second monitor or fullscreen it on the projector.
+3. **Players** — <http://localhost:4321/join> · enter the 6-digit PIN + a nickname. Repeat in another window for a second player.
+
+In the **control panel** (`/host/[PIN]/control`) the host clicks the right-rail button to advance:
+`ROLL TAPE → LOCK ANSWERS → SHOW LEADERBOARD → NEXT QUESTION → … → FADE OUT`
+
+The timer auto-locks when it hits zero, and locks early once every connected player has answered.
+
+## Surfaces
+
+| Route | Who | Purpose |
+|------|-----|---------|
+| `/` | Anyone | Studio master · landing |
+| `/host` | Host | Quiz builder (anonymous, in-memory) |
+| `/host/[pin]/control` | Host | Director's console — PIN, players, timer, distribution, advance controls |
+| `/host/[pin]/display` | Audience | On-air feed (fullscreen on projector) — PIN, question, shapes-only, podium |
+| `/join` | Player | PIN + nickname |
+| `/play/[pin]` | Player | Lobby → answer → reveal → final |
+
+## What's done (M1)
+
+- Next.js 15 App Router + TypeScript + Tailwind, single `npm run dev`
+- Custom Node server in `server.ts` colocates Next + Socket.IO on one port
+- Anonymous quiz builder (multiple choice + true/false, 10/20/30/60/90/120 s, double points)
+- 6-digit PIN game session, in-memory state in `lib/game.ts`
+- Server-authoritative scoring: `1000 × (½ + ½ × t_left/t_limit) × {1|2}`
+- Lobby → question → reveal → leaderboard → final state machine
+- Real-time WS: host, display, and player views all kept in sync
+- Auto-lock at timer expiry **or** when all connected players have answered
+- Live answer distribution + correct-answer reveal
+- Top-3 podium between questions, full leaderboard at the end
+- Player feedback: locked-in confirmation, correct/incorrect, points awarded, current rank
+- Up to 10 players per session (M1 cap)
+- Distinct **BROADCAST** visual identity executed across all five surfaces
+- Smoke test: `npx tsx scripts/smoke.ts` (host + 2 players + display, full game)
+
+## What's stubbed / deferred (M2+)
+
+- **No persistence.** Quizzes and game results live in process memory; a restart wipes everything.
+- **No auth, no Pro tier, no quiz library.** Anonymous one-shot only.
+- **No reconnect grace window.** Disconnected players are flagged `offline` but don't get re-bound on rejoin yet.
+- **No CSV export.** Final leaderboard is on-screen only.
+- **No Redis / pub-sub.** Single-node only — fine for M1's 10 players, would need Redis adapter for multi-instance scale.
+- **No profanity filter** beyond the 20-char nickname trim.
+- **No image uploads** in questions.
+- **No host disconnect grace pause** — game continues without auto-pause/resume.
+- **Browser tested:** Chrome on macOS. Should work in modern Safari/Firefox but not exhaustively verified.
+
+## Project layout
+
+```
+app/
+  page.tsx                       landing
+  host/page.tsx                  builder
+  host/[pin]/control/page.tsx    director's console
+  host/[pin]/display/page.tsx    on-air feed
+  join/page.tsx                  player entry
+  play/[pin]/page.tsx            player live view
+components/
+  Broadcast.tsx                  chyron, frame counter, on-air, smpte bars, clock
+  Countdown.tsx                  ring countdown
+  Shape.tsx                      4 answer shapes (triangle / diamond / circle / square)
+lib/
+  game.ts                        in-memory game state + scoring
+  socket.ts                      browser socket singleton hook
+  types.ts                       shared types
+server.ts                        Next.js + Socket.IO on one port
+DESIGN.md                        visual identity rationale
+```
+
+## Scripts
+
+```bash
+npm run dev      # start everything on http://localhost:4321
+npm run build    # next build
+npm start        # production-ish start (still tsx-driven)
+npx tsx scripts/smoke.ts   # end-to-end ws smoke test (server must be running)
+```

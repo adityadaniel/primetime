@@ -1,0 +1,210 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bone: #f2ebdc;
+  --ink: #0f0f0f;
+  --vermilion: #e5341f;
+  --marigold: #f2a900;
+  --cobalt: #1b3a6b;
+  --ivy: #1f4d3a;
+  --ash: #b7b0a1;
+}
+
+html,
+body {
+  background: var(--bone);
+  color: var(--ink);
+  font-family: "Newsreader", ui-serif, Georgia, serif;
+  font-feature-settings: "kern" 1, "liga" 1, "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 23px,
+      rgba(15, 15, 15, 0.04) 23px,
+      rgba(15, 15, 15, 0.04) 24px
+    );
+}
+
+@layer components {
+  .display-num {
+    font-family: "Big Shoulders Display", ui-sans-serif, system-ui;
+    font-weight: 900;
+    font-stretch: condensed;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    letter-spacing: -0.02em;
+    line-height: 0.85;
+  }
+
+  .ticker {
+    font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    font-feature-settings: "tnum" 1, "zero" 1;
+    letter-spacing: 0;
+  }
+
+  .chyron {
+    font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--ink);
+  }
+
+  .ink-border {
+    border: 2px solid var(--ink);
+  }
+
+  .stamp {
+    box-shadow: 4px 4px 0 0 var(--ink);
+  }
+
+  .stamp-lg {
+    box-shadow: 8px 8px 0 0 var(--ink);
+  }
+
+  .smpte-bars {
+    background: linear-gradient(
+      to right,
+      var(--ash) 0 14.28%,
+      var(--marigold) 14.28% 28.56%,
+      #4ea1c4 28.56% 42.84%,
+      var(--ivy) 42.84% 57.12%,
+      #a06ba8 57.12% 71.4%,
+      var(--vermilion) 71.4% 85.68%,
+      var(--cobalt) 85.68% 100%
+    );
+  }
+
+  .corner-mark {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-color: var(--ink);
+  }
+
+  .live-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: var(--vermilion);
+    box-shadow: 0 0 0 0 rgba(229, 52, 31, 0.6);
+    animation: live-pulse 1.4s ease-out infinite;
+  }
+
+  @keyframes live-pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(229, 52, 31, 0.6);
+    }
+    70% {
+      box-shadow: 0 0 0 12px rgba(229, 52, 31, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(229, 52, 31, 0);
+    }
+  }
+
+  .teleprompter {
+    animation: teleprompter 380ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  @keyframes teleprompter {
+    from {
+      transform: translateY(40px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .flash-cut {
+    animation: flash-cut 220ms ease-out both;
+  }
+
+  @keyframes flash-cut {
+    0% {
+      background-color: #ffffff;
+    }
+    60% {
+      background-color: #ffffff;
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+
+  .stamp-in {
+    animation: stamp-in 200ms cubic-bezier(0.2, 0.9, 0.4, 1.2) both;
+  }
+
+  @keyframes stamp-in {
+    from {
+      transform: scale(1.4) rotate(0deg);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1) rotate(-4deg);
+      opacity: 1;
+    }
+  }
+
+  .answer-tile {
+    transition: transform 90ms ease-out;
+  }
+
+  .answer-tile:active {
+    transform: translate(2px, 2px);
+  }
+
+  .halftone {
+    background-image: radial-gradient(rgba(15, 15, 15, 0.18) 1px, transparent 1.4px);
+    background-size: 6px 6px;
+  }
+
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.06;
+    mix-blend-mode: multiply;
+    background-image: radial-gradient(rgba(0, 0, 0, 0.6) 1px, transparent 1.2px);
+    background-size: 3px 3px;
+  }
+
+  .ink-bg {
+    background: var(--ink);
+    color: var(--bone);
+  }
+  .ink-bg body,
+  body.ink-bg {
+    background: var(--ink);
+  }
+}
+
+::selection {
+  background: var(--vermilion);
+  color: var(--bone);
+}
+
+input,
+button,
+select,
+textarea {
+  font-family: inherit;
+}
+
+input:focus-visible,
+button:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--vermilion);
+  outline-offset: 2px;
+}
