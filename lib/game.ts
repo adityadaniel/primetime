@@ -8,14 +8,19 @@ import type {
   Quiz,
 } from "./types";
 
-const MAX_PLAYERS = 10;
+const HARD_CAP = 150;
+const SOFT_CAP_FREE = 10;
+const UPSELL_AT = 8;
 const RECONNECT_GRACE_MS = 30_000;
 const HOST_GRACE_MS = 60_000;
 const RESULT_BASE = 1000;
 const PIN_RETRY_LIMIT = 50;
 
+export type Tier = "free" | "pro";
+
 export interface GameSession {
   pin: string;
+  tier: Tier;
   hostSocketId?: string;
   displaySocketIds: Set<string>;
   quiz: Quiz;
@@ -49,13 +54,14 @@ function generatePin(): string {
   throw new Error("Could not allocate PIN");
 }
 
-export function createGame(quiz: Quiz): GameSession {
+export function createGame(quiz: Quiz, tier: Tier = "free"): GameSession {
   if (!quiz.questions.length) {
     throw new Error("Quiz must have at least one question");
   }
   const pin = generatePin();
   const session: GameSession = {
     pin,
+    tier,
     displaySocketIds: new Set(),
     quiz,
     phase: "lobby",
@@ -182,6 +188,28 @@ export function reapStalePlayers(game: GameSession): string[] {
   return dropped;
 }
 
+export interface CapStatus {
+  hard: number;
+  soft: number;
+  current: number;
+  upsell: boolean;
+  full: boolean;
+}
+
+export function capStatus(game: GameSession): CapStatus {
+  const current = Array.from(game.players.values()).filter(
+    (p) => p.connected || isWithinReconnectGrace(p),
+  ).length;
+  const soft = game.tier === "pro" ? HARD_CAP : SOFT_CAP_FREE;
+  return {
+    hard: HARD_CAP,
+    soft,
+    current,
+    upsell: game.tier === "free" && current >= UPSELL_AT,
+    full: current >= soft,
+  };
+}
+
 export function joinPlayer(
   pin: string,
   socketId: string,
@@ -217,10 +245,8 @@ export function joinPlayer(
   }
 
   if (game.phase !== "lobby") return { ok: false, error: "Game already started" };
-  const activeCount = Array.from(game.players.values()).filter(
-    (p) => p.connected || isWithinReconnectGrace(p),
-  ).length;
-  if (activeCount >= MAX_PLAYERS) {
+  const status = capStatus(game);
+  if (status.full) {
     return { ok: false, error: "Room is full", code: "full" };
   }
   const id = `p_${Math.random().toString(36).slice(2, 9)}`;
@@ -367,6 +393,7 @@ export function leaderboard(game: GameSession) {
 export function publicState(game: GameSession): PublicGameState {
   const q = currentQuestion(game);
   const board = leaderboard(game);
+  const cap = capStatus(game);
   const reveal =
     game.phase === "reveal" || game.phase === "leaderboard"
       ? q
@@ -400,6 +427,8 @@ export function publicState(game: GameSession): PublicGameState {
         ? { reason: game.pauseReason, resumeBy: game.pauseResumeBy ?? 0 }
         : undefined,
     endedReason: game.endedReason,
+    playerCount: cap.current,
+    cap: { hard: cap.hard, soft: cap.soft, upsell: cap.upsell },
     players: Array.from(game.players.values()).map((p) => ({
       id: p.id,
       nickname: p.nickname,
@@ -428,4 +457,4 @@ export function personalState(game: GameSession, playerId: string) {
   };
 }
 
-export const config = { MAX_PLAYERS };
+export const config = { HARD_CAP, SOFT_CAP_FREE, UPSELL_AT };

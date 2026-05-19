@@ -19,6 +19,7 @@ import {
   submitAnswer,
 } from "./lib/game";
 import type { Quiz, AnswerIndex } from "./lib/types";
+import type { Tier } from "./lib/game";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = Number(process.env.PORT ?? 4321);
@@ -58,11 +59,17 @@ void app.prepare().then(() => {
   io.on("connection", (socket: Socket) => {
     socket.on(
       "host:create",
-      (quiz: Quiz, ack: (res: { pin: string }) => void) => {
-        const game = createGame(quiz);
+      (
+        quiz: Quiz,
+        tierOrAck: Tier | ((res: { pin: string }) => void),
+        maybeAck?: (res: { pin: string }) => void,
+      ) => {
+        const tier: Tier = typeof tierOrAck === "string" ? tierOrAck : "free";
+        const ack = typeof tierOrAck === "function" ? tierOrAck : maybeAck;
+        const game = createGame(quiz, tier);
         attachHost(game.pin, socket.id);
         socket.join(`pin:${game.pin}`);
-        ack({ pin: game.pin });
+        ack?.({ pin: game.pin });
         broadcast(game.pin);
       },
     );

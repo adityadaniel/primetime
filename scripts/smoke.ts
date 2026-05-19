@@ -131,6 +131,66 @@ async function main() {
   display.disconnect();
   a.disconnect();
   b.disconnect();
+
+  await assertCapEnforcement();
+}
+
+async function assertCapEnforcement() {
+  console.log("\n--- cap enforcement: free tier 10-player limit ---");
+  const capHost = io(URL, { transports: ["websocket"] });
+  await new Promise<void>((r) => capHost.on("connect", () => r()));
+
+  const { pin } = await new Promise<{ pin: string }>((r) =>
+    capHost.emit("host:create", quiz, "free", r),
+  );
+  console.log("cap-test pin:", pin);
+
+  const players: ReturnType<typeof io>[] = [];
+  for (let i = 0; i < 10; i++) {
+    const p = io(URL, { transports: ["websocket"] });
+    await new Promise<void>((r) => p.on("connect", () => r()));
+    const res = await new Promise<{ ok: boolean; error?: string; code?: string }>((r) =>
+      p.emit("player:join", pin, `Player${i + 1}`, r),
+    );
+    if (!res.ok) throw new Error(`player ${i + 1} unexpectedly rejected: ${res.error}`);
+    players.push(p);
+  }
+  console.log("10 players joined OK");
+
+  const overflow = io(URL, { transports: ["websocket"] });
+  await new Promise<void>((r) => overflow.on("connect", () => r()));
+  const rej = await new Promise<{ ok: boolean; error?: string; code?: string }>((r) =>
+    overflow.emit("player:join", pin, "Eleventh", r),
+  );
+
+  if (rej.ok) throw new Error("11th join should have been rejected");
+  if (rej.code !== "full") {
+    throw new Error(`expected code "full", got "${rej.code}" (error: ${rej.error})`);
+  }
+  console.log("11th rejected with code:", rej.code, "·", rej.error);
+
+  await sleep(50);
+  const capState = await new Promise<{ playerCount?: number; cap?: { soft: number; hard: number; upsell: boolean } }>(
+    (r) => {
+      capHost.once("state", (s) => r(s));
+      capHost.emit("host:attach", pin);
+    },
+  );
+  if (capState.playerCount !== 10) {
+    throw new Error(`expected playerCount=10, got ${capState.playerCount}`);
+  }
+  if (capState.cap?.soft !== 10 || capState.cap?.hard !== 150) {
+    throw new Error(`expected cap {soft:10, hard:150}, got ${JSON.stringify(capState.cap)}`);
+  }
+  if (!capState.cap.upsell) {
+    throw new Error("expected upsell=true at 10/10 free tier");
+  }
+  console.log("publicState cap:", capState.cap, "playerCount:", capState.playerCount);
+  console.log("cap enforcement: PASS");
+
+  capHost.disconnect();
+  overflow.disconnect();
+  for (const p of players) p.disconnect();
 }
 
 main().catch((e) => {
@@ -139,6 +199,6 @@ main().catch((e) => {
 });
 
 setTimeout(() => {
-  console.error("[smoke] hard timeout 20s");
+  console.error("[smoke] hard timeout 30s");
   process.exit(2);
-}, 20000).unref();
+}, 30000).unref();

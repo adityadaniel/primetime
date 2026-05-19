@@ -12,12 +12,14 @@ export default function JoinPage() {
   const [pin, setPin] = useState("");
   const [nickname, setNickname] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!socket) return;
     setError(null);
+    setErrorCode(null);
     if (pin.length !== 6 || !/^\d{6}$/.test(pin)) {
       setError("PIN must be 6 digits");
       return;
@@ -31,10 +33,11 @@ export default function JoinPage() {
       "player:join",
       pin,
       nickname.trim(),
-      (res: { ok: boolean; error?: string; playerId?: string }) => {
+      (res: { ok: boolean; error?: string; code?: string; playerId?: string }) => {
         setPending(false);
         if (!res.ok) {
           setError(res.error ?? "Could not join");
+          setErrorCode(res.code ?? null);
           return;
         }
         if (typeof window !== "undefined") {
@@ -107,9 +110,34 @@ export default function JoinPage() {
               />
             </label>
 
-            {error && (
+            {error && errorCode === "full" && (
+              <div
+                className="ink-border halftone px-4 py-4"
+                role="alert"
+                style={{ background: "var(--ink)", color: "var(--bone)" }}
+              >
+                <span
+                  className="ticker text-[11px] tracking-widest px-2 py-[2px] ink-border"
+                  style={{ background: "var(--vermilion)", color: "var(--bone)" }}
+                >
+                  SIGNAL · AT CAPACITY
+                </span>
+                <p
+                  className="display-num mt-3"
+                  style={{ fontSize: "clamp(28px, 5vw, 44px)", lineHeight: 0.95 }}
+                >
+                  ROOM IS FULL
+                </p>
+                <p className="ticker text-[11px] tracking-widest mt-2 opacity-80">
+                  TRY AGAIN LATER · ASK YOUR HOST FOR A NEW PIN
+                </p>
+              </div>
+            )}
+
+            {error && errorCode !== "full" && (
               <div
                 className="ink-border px-4 py-3 ticker text-[12px] tracking-widest"
+                role="alert"
                 style={{ background: "var(--vermilion)", color: "var(--bone)" }}
               >
                 ⚠ {error}
