@@ -1,8 +1,10 @@
-# BROADCAST — Kahoot-style live quiz (M1)
+# BROADCAST — Kahoot-style live quiz (M1 + M2)
 
-A real-time quiz game with a vintage broadcast-graphics aesthetic. Built end-to-end as the **M1 — Core Loop** described in `PRD.md` and `CLAUDE.md`.
+A real-time quiz game with a vintage broadcast-graphics aesthetic. Built end-to-end as the **M1 — Core Loop** and **M2 — Resilience & Scale** milestones described in `PRD.md` and `CLAUDE.md`.
 
 > See **`DESIGN.md`** for the visual identity, palette, type stack, and motion principles.
+>
+> M3 issues tracked in Linear: <https://linear.app/midnight-labs/project/kahoot-clone-broadcast-4a50abefef00>
 
 ## Quick start
 
@@ -43,7 +45,7 @@ The timer auto-locks when it hits zero, and locks early once every connected pla
 | `/join` | Player | PIN + nickname |
 | `/play/[pin]` | Player | Lobby → answer → reveal → final |
 
-## What's done (M1)
+## What's done (M1 + M2)
 
 - Next.js 15 App Router + TypeScript + Tailwind, single `npm run dev`
 - Custom Node server in `server.ts` colocates Next + Socket.IO on one port
@@ -56,20 +58,24 @@ The timer auto-locks when it hits zero, and locks early once every connected pla
 - Live answer distribution + correct-answer reveal
 - Top-3 podium between questions, full leaderboard at the end
 - Player feedback: locked-in confirmation, correct/incorrect, points awarded, current rank
-- Up to 10 players per session (M1 cap)
 - Distinct **BROADCAST** visual identity executed across all five surfaces
-- Smoke test: `npx tsx scripts/smoke.ts` (host + 2 players + display, full game)
+- **Player reconnect grace window** — disconnected players have 30 s to rejoin and reclaim their score, nickname, and socket binding
+- **Host disconnect grace pause** — game pauses for 60 s on host drop; resumes seamlessly if the host returns, otherwise ends with `host-left`
+- **Player cap enforcement** — 10-player soft cap on free tier (upsell banner from 8), 150-player hard cap on pro tier
+- **CSV export of session results** — `GET /host/[pin]/results.csv` once the game is in `final`; includes rank, nickname, score, correct count, total questions, average response time
+- **Light profanity filter** for nicknames — rejects with `nickname-rejected` code so the join page can show a friendly retry
+- Smoke test extended to cover reconnect, host pause, cap enforcement, CSV export, and profanity rejection: `npm run smoke`
 
-## What's stubbed / deferred (M2+)
+## What's stubbed / deferred (M3)
 
-- **No persistence.** Quizzes and game results live in process memory; a restart wipes everything.
-- **No auth, no Pro tier, no quiz library.** Anonymous one-shot only.
-- **No reconnect grace window.** Disconnected players are flagged `offline` but don't get re-bound on rejoin yet.
-- **No CSV export.** Final leaderboard is on-screen only.
-- **No Redis / pub-sub.** Single-node only — fine for M1's 10 players, would need Redis adapter for multi-instance scale.
-- **No profanity filter** beyond the 20-char nickname trim.
-- **No image uploads** in questions.
-- **No host disconnect grace pause** — game continues without auto-pause/resume.
+- **Postgres + Prisma persistence** — quizzes and session history still live in process memory
+- **Auth.js v5 + Google OAuth** — anonymous host only
+- **Quiz library** — no saved quizzes per host yet
+- **Stripe billing + Pro tier upgrade** — tier flag exists in `createGame`, billing flow does not
+- **Session history & analytics** — results vanish at process exit
+- **Redis pub/sub for multi-node** — single-node only; would need the Socket.IO Redis adapter to scale horizontally
+- **Image uploads in questions** — text-only questions for now
+- **Playwright E2E** — coverage today is the headless smoke test
 - **Browser tested:** Chrome on macOS. Should work in modern Safari/Firefox but not exhaustively verified.
 
 ## Project layout
@@ -100,5 +106,5 @@ DESIGN.md                        visual identity rationale
 npm run dev      # start everything on http://localhost:4321
 npm run build    # next build
 npm start        # production-ish start (still tsx-driven)
-npx tsx scripts/smoke.ts   # end-to-end ws smoke test (server must be running)
+npm run smoke    # end-to-end ws smoke test (server must be running)
 ```
