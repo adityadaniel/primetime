@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSocket } from "@/lib/socket";
-import { CHANNELS, Shape } from "@/components/Shape";
+import { CHANNELS, Checkmark, Shape } from "@/components/Shape";
 import { Chyron, Clock, FrameCounter, OnAir, SmpteBars } from "@/components/Broadcast";
 import { Countdown } from "@/components/Countdown";
 import type { PublicGameState } from "@/lib/types";
@@ -204,7 +204,7 @@ function QuestionDisplay({ state }: { state: PublicGameState }) {
               key={i}
               className="relative ink-border overflow-hidden"
               style={{
-                background: ch.color,
+                background: isCorrect ? "var(--ivy)" : ch.color,
                 opacity: isWrong ? 0.35 : 1,
                 aspectRatio: "1.05 / 1",
               }}
@@ -212,6 +212,11 @@ function QuestionDisplay({ state }: { state: PublicGameState }) {
               <div className="absolute inset-0 grid place-items-center">
                 <Shape kind={ch.key} fill="var(--bone)" stroke="var(--ink)" size={150} strokeWidth={3} />
               </div>
+              {isCorrect && (
+                <div className="absolute inset-0 grid place-items-center">
+                  <Checkmark size={160} stroke="var(--bone)" strokeWidth={8} />
+                </div>
+              )}
               <div className="absolute top-2 left-2 ticker text-[11px] tracking-widest" style={{ color: "var(--bone)" }}>
                 CH.{String(i + 1).padStart(2, "0")}
               </div>
@@ -224,14 +229,6 @@ function QuestionDisplay({ state }: { state: PublicGameState }) {
                     {pct}%
                   </span>
                 </div>
-              )}
-              {isCorrect && (
-                <span
-                  className="absolute -top-2 -right-2 ticker text-[12px] tracking-widest px-2 py-[3px] stamp"
-                  style={{ background: "var(--ivy)", color: "var(--bone)", transform: "rotate(-4deg)" }}
-                >
-                  ✓ CORRECT
-                </span>
               )}
             </div>
           );

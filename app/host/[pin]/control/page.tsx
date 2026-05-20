@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSocket } from "@/lib/socket";
-import { CHANNELS, Shape } from "@/components/Shape";
+import { CHANNELS, Checkmark, Shape } from "@/components/Shape";
 import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from "@/components/Broadcast";
 import { Countdown } from "@/components/Countdown";
 import type { PublicGameState } from "@/lib/types";
@@ -378,7 +378,7 @@ function QuestionStage({ state }: { state: PublicGameState }) {
               key={i}
               className="ink-border relative overflow-hidden"
               style={{
-                background: "var(--bone)",
+                background: isCorrect ? "var(--ivy)" : "var(--bone)",
                 opacity: isWrong ? 0.5 : 1,
               }}
             >
@@ -393,29 +393,26 @@ function QuestionStage({ state }: { state: PublicGameState }) {
               />
               <div className="relative flex items-center gap-3 p-3">
                 <div
-                  className="grid place-items-center w-12 h-12 shrink-0 border-r-2"
+                  className="relative grid place-items-center w-12 h-12 shrink-0 border-r-2"
                   style={{ borderColor: "var(--ink)", background: ch.color }}
                 >
                   <Shape kind={ch.key} fill="var(--bone)" stroke="var(--ink)" size={28} />
+                  {isCorrect && (
+                    <div className="absolute inset-0 grid place-items-center">
+                      <Checkmark size={28} stroke="var(--bone)" strokeWidth={10} />
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1">
-                  <span className="chyron opacity-70">CH.{String(i + 1).padStart(2, "0")}</span>
-                  <p className="font-editorial text-lg">{opt}</p>
+                  <span className="chyron opacity-70" style={{ color: isCorrect ? "var(--bone)" : undefined }}>CH.{String(i + 1).padStart(2, "0")}</span>
+                  <p className="font-editorial text-lg" style={{ color: isCorrect ? "var(--bone)" : undefined }}>{opt}</p>
                 </div>
-                <div className="ticker tabular-nums text-right">
+                <div className="ticker tabular-nums text-right" style={{ color: isCorrect ? "var(--bone)" : undefined }}>
                   <div className="text-2xl">{dist[i]}</div>
                   <div className="text-[10px] tracking-widest opacity-60">
                     {state.phase === "reveal" ? `${pct}%` : "·"}
                   </div>
                 </div>
-                {isCorrect && (
-                  <span
-                    className="absolute -top-2 right-2 ticker text-[10px] tracking-widest px-2 py-[2px]"
-                    style={{ background: "var(--ivy)", color: "var(--bone)" }}
-                  >
-                    ✓ CORRECT
-                  </span>
-                )}
               </div>
             </div>
           );
