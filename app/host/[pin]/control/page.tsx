@@ -1,18 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSocket } from "@/lib/socket";
 import { CHANNELS, Checkmark, Shape } from "@/components/Shape";
 import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from "@/components/Broadcast";
 import { Countdown } from "@/components/Countdown";
+import { useSfx } from "@/lib/use-sfx";
 import type { PublicGameState } from "@/lib/types";
 
 export default function ControlPanel({ params }: { params: Promise<{ pin: string }> }) {
   const socket = useSocket();
+  const sfx = useSfx();
   const [pin, setPin] = useState<string>("");
   const [state, setState] = useState<PublicGameState | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [muted, setMutedState] = useState<boolean>(true);
+
+  const prevPhaseRef = useRef<string>("");
+  const lastTickSecRef = useRef(-1);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (localStorage.getItem("bc:sfx:muted-host") === null) {
+      localStorage.setItem("bc:sfx:muted-host", "1");
+      sfx.setMuted(true);
+    }
+    setMutedState(sfx.isMuted());
+  }, [sfx]);
 
   useEffect(() => {
     params.then((p) => setPin(p.pin));
@@ -40,6 +55,53 @@ export default function ControlPanel({ params }: { params: Promise<{ pin: string
       socket.off("connect", onConnect);
     };
   }, [socket, pin]);
+
+  useEffect(() => {
+    if (!state) return;
+    const phase = state.phase;
+    if (phase === prevPhaseRef.current) return;
+
+    sfx.stopAllLoops();
+
+    if (phase === "lobby") sfx.startLobbyAmbience();
+    if (phase === "question") sfx.startQuestionTension();
+    if (phase === "reveal") sfx.sfxCorrect();
+    if (phase === "leaderboard") sfx.sfxLeaderboardSweep();
+    if (phase === "final") {
+      sfx.sfxFinalFanfare();
+      setTimeout(() => sfx.startFinalLoop(), 700);
+    }
+
+    prevPhaseRef.current = phase;
+  }, [state, state?.phase, sfx]);
+
+  useEffect(() => {
+    if (state?.phase !== "question" || !state?.endsAt) return;
+    const id = window.setInterval(() => {
+      const msLeft = Math.max(0, (state.endsAt ?? 0) - Date.now());
+      const sec = Math.ceil(msLeft / 1000);
+      if (sec !== lastTickSecRef.current && sec > 0 && sec <= 3) {
+        sfx.sfxTick(true);
+      }
+      lastTickSecRef.current = sec;
+    }, 100);
+    return () => clearInterval(id);
+  }, [state?.phase, state?.endsAt, sfx]);
+
+  useEffect(() => {
+    return () => {
+      sfx.stopAllLoops();
+    };
+  }, [sfx]);
+
+  function toggleMute() {
+    const next = !sfx.isMuted();
+    sfx.setMuted(next);
+    try {
+      localStorage.setItem("bc:sfx:muted-host", next ? "1" : "0");
+    } catch {}
+    setMutedState(next);
+  }
 
   function startGame() {
     if (!socket || !pin) return;
@@ -89,6 +151,18 @@ export default function ControlPanel({ params }: { params: Promise<{ pin: string
           <FrameCounter index={currentNo} />
           <Clock />
           <OnAir live={live} />
+          <button
+            onClick={toggleMute}
+            aria-label={muted ? "Unmute audio" : "Mute audio"}
+            aria-pressed={muted}
+            className="ink-border ticker text-[11px] tracking-widest px-3 py-2"
+            style={{
+              background: muted ? "var(--ash)" : "var(--bone)",
+              color: "var(--ink)",
+            }}
+          >
+            {muted ? "● SND OFF" : "○ SND ON"}
+          </button>
         </div>
       </header>
       <SmpteBars className="h-1.5 mt-3" />

@@ -1,16 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSocket } from "@/lib/socket";
 import { CHANNELS, Checkmark, Shape } from "@/components/Shape";
 import { Chyron, Clock, FrameCounter, OnAir, SmpteBars } from "@/components/Broadcast";
 import { Countdown } from "@/components/Countdown";
+import { useSfx } from "@/lib/use-sfx";
 import type { PublicGameState } from "@/lib/types";
 
 export default function DisplayPage({ params }: { params: Promise<{ pin: string }> }) {
   const socket = useSocket();
+  const sfx = useSfx();
   const [pin, setPin] = useState<string>("");
   const [state, setState] = useState<PublicGameState | null>(null);
+  const [needsUnlock, setNeedsUnlock] = useState(false);
+
+  const prevPhaseRef = useRef<string>("");
+  const lastTickSecRef = useRef(-1);
 
   useEffect(() => {
     params.then((p) => setPin(p.pin));
@@ -31,6 +37,54 @@ export default function DisplayPage({ params }: { params: Promise<{ pin: string 
     };
   }, [socket, pin]);
 
+  useEffect(() => {
+    const check = () => setNeedsUnlock(!sfx.isUnlocked());
+    check();
+    const id = window.setInterval(check, 500);
+    return () => clearInterval(id);
+  }, [sfx]);
+
+  useEffect(() => {
+    if (!state) return;
+    const phase = state.phase;
+    if (phase === prevPhaseRef.current) return;
+
+    sfx.stopAllLoops();
+
+    if (phase === "lobby") sfx.startLobbyAmbience();
+    if (phase === "question") sfx.startQuestionTension();
+    if (phase === "reveal") sfx.sfxCorrect();
+    if (phase === "leaderboard") sfx.sfxLeaderboardSweep();
+    if (phase === "final") {
+      sfx.sfxFinalFanfare();
+      setTimeout(() => sfx.startFinalLoop(), 700);
+    }
+
+    prevPhaseRef.current = phase;
+  }, [state, state?.phase, sfx]);
+
+  useEffect(() => {
+    if (state?.phase !== "question" || !state?.endsAt) return;
+    const id = window.setInterval(() => {
+      const msLeft = Math.max(0, (state.endsAt ?? 0) - Date.now());
+      const sec = Math.ceil(msLeft / 1000);
+      if (sec !== lastTickSecRef.current && sec > 0 && sec <= 3) {
+        sfx.sfxTick(true);
+      }
+      if (sec === 0 && lastTickSecRef.current !== 0) {
+        sfx.sfxTimeUp();
+      }
+      lastTickSecRef.current = sec;
+    }, 100);
+    return () => clearInterval(id);
+  }, [state?.phase, state?.endsAt, sfx]);
+
+  useEffect(() => {
+    return () => {
+      sfx.stopAllLoops();
+    };
+  }, [sfx]);
+
   const phase = state?.phase ?? "lobby";
   const dark = phase === "question" || phase === "reveal";
   const live = phase !== "lobby" && phase !== "final";
@@ -45,6 +99,18 @@ export default function DisplayPage({ params }: { params: Promise<{ pin: string 
       }}
     >
       <CornerMarksDark dark={dark} />
+      {needsUnlock && (
+        <button
+          onClick={() => sfx.unlockAudio().then(() => setNeedsUnlock(false))}
+          className="fixed inset-0 z-50 grid place-items-center"
+          style={{ background: "rgba(15,15,15,0.55)", color: "var(--bone)" }}
+          aria-label="Enable sound"
+        >
+          <span className="ink-border ticker text-[14px] tracking-widest px-6 py-4" style={{ background: "var(--ink)" }}>
+            CLICK ANYWHERE TO ENABLE SOUND
+          </span>
+        </button>
+      )}
       <header className="px-8 pt-5 flex items-center justify-between">
         <Chyron label="LIVE FEED · STUDIO 4" number="A" dark={dark} />
         <div className="flex items-center gap-7">
