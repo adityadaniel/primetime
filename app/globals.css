@@ -125,7 +125,7 @@ body {
   }
 
   .flash-cut {
-    animation: flash-cut 220ms ease-out both;
+    animation: flash-cut 220ms ease-out;
   }
 
   @keyframes flash-cut {
@@ -134,9 +134,6 @@ body {
     }
     60% {
       background-color: #ffffff;
-    }
-    100% {
-      background-color: transparent;
     }
   }
 
