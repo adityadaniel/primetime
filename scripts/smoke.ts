@@ -46,10 +46,12 @@ interface State {
 }
 
 async function main() {
-  const host = io(URL, { transports: ["websocket"] });
-  const display = io(URL, { transports: ["websocket"] });
-  const a = io(URL, { transports: ["websocket"] });
-  const b = io(URL, { transports: ["websocket"] });
+  const [host, display, a, b] = await Promise.all([
+    connectSock(),
+    connectSock(),
+    connectSock(),
+    connectSock(),
+  ]);
 
   const states = new Map<string, State>();
   for (const [name, s] of [
@@ -61,15 +63,10 @@ async function main() {
     s.on("state", (st: State) => {
       states.set(name, st);
     });
-    s.on("personal", (p: any) => {
-      // optional: console.log(name, "personal", p);
+    s.on("personal", (_p: any) => {
+      // optional: console.log(name, "personal", _p);
     });
   }
-
-  await new Promise<void>((r) => host.on("connect", () => r()));
-  await new Promise<void>((r) => display.on("connect", () => r()));
-  await new Promise<void>((r) => a.on("connect", () => r()));
-  await new Promise<void>((r) => b.on("connect", () => r()));
 
   const { pin } = await new Promise<{ pin: string }>((r) =>
     host.emit("host:create", quiz, r),
