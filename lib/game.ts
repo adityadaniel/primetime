@@ -234,6 +234,16 @@ export function joinPlayer(
   }
 
   const lower = trimmed.toLowerCase();
+
+  const existingPlayerId = game.socketToPlayer.get(socketId);
+  if (existingPlayerId) {
+    const owned = game.players.get(existingPlayerId);
+    if (owned && owned.nickname.toLowerCase() === lower) {
+      console.warn(`[joinPlayer] duplicate emit from same socket (pin=${pin}, nickname=${trimmed})`);
+      return { ok: true, game, player: owned, reconnected: false };
+    }
+  }
+
   const existing = Array.from(game.players.values()).find(
     (p) => p.nickname.toLowerCase() === lower,
   );

@@ -146,6 +146,7 @@ async function main() {
   await assertHostDisconnectAndReconnect();
   await assertProfanityFilter();
   await assertCsvExport();
+  await assertSameSocketDoubleSubmitIdempotent();
 }
 
 async function assertCapEnforcement() {
@@ -518,6 +519,31 @@ main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
+
+async function assertSameSocketDoubleSubmitIdempotent() {
+  console.log("\n--- scenario: same-socket double submit is idempotent ---");
+  const host = await connectSock();
+  const player = await connectSock();
+  const { pin } = await createGameOverSocket(host, quiz);
+
+  const j1 = await joinPlayerOverSocket(player, pin, "Alice");
+  const j2 = await joinPlayerOverSocket(player, pin, "Alice");
+
+  if (!j1.ok) throw new Error(`first join failed: ${j1.error}`);
+  if (!j2.ok) throw new Error(`second join (duplicate) failed: ${j2.error}`);
+  if (j1.playerId !== j2.playerId) {
+    throw new Error(`expected same playerId on duplicate, got ${j1.playerId} vs ${j2.playerId}`);
+  }
+
+  const otherSocket = await connectSock();
+  const j3 = await joinPlayerOverSocket(otherSocket, pin, "Alice");
+  if (j3.ok) throw new Error("different socket with same nickname should fail");
+
+  console.log("✓ same-socket double submit is idempotent");
+  host.disconnect();
+  player.disconnect();
+  otherSocket.disconnect();
+}
 
 setTimeout(() => {
   console.error("[smoke] hard timeout 60s");

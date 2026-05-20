@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSocket } from "@/lib/socket";
@@ -14,10 +14,12 @@ export default function JoinPage() {
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const inFlight = useRef(false);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!socket) return;
+    if (inFlight.current) return;
     setError(null);
     setErrorCode(null);
     if (pin.length !== 6 || !/^\d{6}$/.test(pin)) {
@@ -28,12 +30,14 @@ export default function JoinPage() {
       setError("Pick a name");
       return;
     }
+    inFlight.current = true;
     setPending(true);
     socket.emit(
       "player:join",
       pin,
       nickname.trim(),
       (res: { ok: boolean; error?: string; code?: string; playerId?: string }) => {
+        inFlight.current = false;
         setPending(false);
         if (!res.ok) {
           setError(res.error ?? "Could not join");
