@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSocket } from "@/lib/socket";
@@ -58,6 +58,7 @@ export default function HostBuilder() {
   const [savedId, setSavedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -223,6 +224,22 @@ export default function HostBuilder() {
     }
   }
 
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/quiz/import", { method: "POST", body: form });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(`Import failed: ${err.error ?? res.statusText}`);
+      return;
+    }
+    const { id } = await res.json();
+    window.location.href = `/host?quiz=${id}`;
+  }
+
   return (
     <main className="relative min-h-screen pb-24">
       <CornerMarks />
@@ -263,6 +280,31 @@ export default function HostBuilder() {
               style={{ background: "var(--ink)", color: "var(--bone)" }}
             >
               {saving ? "SAVING…" : savedFlash ? "SAVED ✓" : "SAVE"}
+            </button>
+            {savedId && (
+              <a
+                href={`/api/quiz/${savedId}/export`}
+                download
+                className="ink-border stamp px-6 py-3 ticker tracking-widest text-[12px]"
+                style={{ background: "var(--bone)", color: "var(--ink)" }}
+              >
+                EXPORT
+              </a>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={handleImport}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="ink-border stamp px-6 py-3 ticker tracking-widest text-[12px]"
+              style={{ background: "var(--bone)", color: "var(--ink)" }}
+            >
+              IMPORT
             </button>
             <button
               type="button"
