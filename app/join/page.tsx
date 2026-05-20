@@ -2,9 +2,8 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useSocket } from "@/lib/socket";
-import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from "@/components/Broadcast";
+import { CornerMarks, DateStamp, OnAir, SmpteBars } from "@/components/Broadcast";
 
 export default function JoinPage() {
   const router = useRouter();
@@ -57,20 +56,13 @@ export default function JoinPage() {
     <main className="relative min-h-screen flex flex-col">
       <CornerMarks />
       <header className="px-6 pt-5 flex items-center justify-between">
-        <Chyron label="STUDIO ENTRY" number="B" />
-        <div className="flex items-center gap-5">
-          <FrameCounter index={0} />
-          <Clock />
-          <OnAir live={false} />
-        </div>
+        <DateStamp />
+        <OnAir live={false} />
       </header>
       <SmpteBars className="h-1.5 mt-3" />
 
       <section className="px-6 pt-10 pb-10 flex-1 flex items-center">
         <div className="max-w-[640px] mx-auto w-full">
-          <p className="chyron mb-3" style={{ color: "var(--vermilion)" }}>
-            CONFIDENCE MONITOR · TALENT ENTRY
-          </p>
           <h1
             className="display-num"
             style={{ fontSize: "clamp(72px, 16vw, 160px)", lineHeight: 0.85 }}
@@ -107,7 +99,7 @@ export default function JoinPage() {
               <input
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value.slice(0, 20))}
-                placeholder="As it'll appear on the leaderboard"
+                placeholder="Your name"
                 aria-label="Nickname"
                 className="w-full mt-2 ink-border bg-transparent font-editorial text-2xl px-4 py-4"
                 style={{ background: "var(--bone)", minHeight: 64 }}
@@ -161,17 +153,8 @@ export default function JoinPage() {
               {pending ? "JOINING…" : "▶  GO ON AIR"}
             </button>
           </form>
-
-          <p className="mt-6 ticker text-[11px] tracking-widest opacity-60">
-            No account. No app. One tap and you're in.
-          </p>
         </div>
       </section>
-
-      <footer className="px-6 pb-6 flex justify-between items-center border-t-2 pt-3" style={{ borderColor: "var(--ink)" }}>
-        <Link href="/" className="ticker text-[11px] tracking-widest">← studio master</Link>
-        <span className="ticker text-[11px] tracking-widest opacity-60">PLAYER · CONFIDENCE</span>
-      </footer>
     </main>
   );
 }

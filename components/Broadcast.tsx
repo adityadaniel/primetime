@@ -85,6 +85,27 @@ export function Clock({ dark = false }: { dark?: boolean }) {
   );
 }
 
+export function DateStamp({ dark = false }: { dark?: boolean }) {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  if (!now) return null;
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return (
+    <span
+      className="ticker tracking-widest text-[11px]"
+      style={{ color: dark ? "var(--bone)" : "var(--ink)" }}
+    >
+      {yyyy}.{mm}.{dd}
+    </span>
+  );
+}
+
 export function SmpteBars({ className = "" }: { className?: string }) {
   return <div className={`smpte-bars ${className}`} aria-hidden />;
 }
