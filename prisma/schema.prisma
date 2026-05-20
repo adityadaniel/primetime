@@ -6,3 +6,27 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model Quiz {
+  id        String     @id @default(cuid())
+  title     String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  questions Question[]
+}
+
+model Question {
+  id           String   @id @default(cuid())
+  quizId       String
+  quiz         Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  ordinal      Int
+  type         String
+  text         String
+  options      String[]
+  correct      Int
+  timeLimit    Int
+  doublePoints Boolean  @default(false)
+
+  @@unique([quizId, ordinal])
+  @@index([quizId])
+}
