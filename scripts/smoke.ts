@@ -148,6 +148,10 @@ async function main() {
   await assertQ1AutoLockNoAnswers();
   await assertPausedQuestionRejectsAnswers();
   await assertLateAnswerRejected();
+  await assertMalformedHostCreateRejected();
+  await assertMalformedPlayerJoinRejected();
+  await assertMalformedPlayerAnswerRejected();
+  await assertCsvFormulaNeutralized();
 }
 
 async function assertCapEnforcement() {
@@ -785,6 +789,153 @@ async function assertLateAnswerRejected() {
     throw new Error(`expected reason='expired', got '${ack.reason}' (error: ${ack.error})`);
   }
   console.log("✓ late answer rejected with reason=expired (F4)");
+
+  host.disconnect();
+  a.disconnect();
+  b.disconnect();
+}
+
+// --- scenario 11 (F5): malformed host:create rejected, server still alive ---
+
+async function assertMalformedHostCreateRejected() {
+  console.log("\n--- scenario 11 (F5): malformed host:create rejected ---");
+  const host = await connectSock();
+
+  // questions is not an array → must ack with reason: "invalid-quiz" and not crash
+  const bad = await new Promise<{ ok?: boolean; pin?: string; reason?: string }>((r) =>
+    host.emit(
+      "host:create",
+      { title: "Bad", questions: "not-an-array" },
+      r,
+    ),
+  );
+  if (bad.ok) throw new Error(`expected malformed host:create to be rejected, got ${JSON.stringify(bad)}`);
+  if (bad.reason !== "invalid-quiz") {
+    throw new Error(`expected reason='invalid-quiz', got '${bad.reason}'`);
+  }
+
+  // server must still be alive — a well-formed create on the same socket should succeed
+  const good = await new Promise<{ ok?: boolean; pin?: string; reason?: string }>((r) =>
+    host.emit("host:create", quiz, r),
+  );
+  if (!good.ok || !good.pin) {
+    throw new Error(`server unhealthy after malformed payload: ${JSON.stringify(good)}`);
+  }
+  console.log("✓ malformed host:create rejected, server alive (F5)");
+
+  host.disconnect();
+}
+
+// --- scenario 12 (F5): malformed player:join rejected ---
+
+async function assertMalformedPlayerJoinRejected() {
+  console.log("\n--- scenario 12 (F5): malformed player:join rejected ---");
+  const host = await connectSock();
+  const player = await connectSock();
+  const { pin } = await createGameOverSocket(host, quiz);
+
+  const longNick = "x".repeat(100);
+  const ack = await new Promise<{ ok: boolean; reason?: string; error?: string }>((r) =>
+    player.emit("player:join", pin, longNick, r),
+  );
+  if (ack.ok) throw new Error("100-char nickname should have been rejected");
+  if (ack.reason !== "invalid-nickname") {
+    throw new Error(`expected reason='invalid-nickname', got '${ack.reason}' (error: ${ack.error})`);
+  }
+
+  // a clean follow-up join still works
+  const good = await joinPlayerOverSocket(player, pin, "Alice");
+  if (!good.ok) throw new Error(`clean join failed after rejection: ${good.error}`);
+
+  console.log("✓ malformed player:join rejected (F5)");
+
+  host.disconnect();
+  player.disconnect();
+}
+
+// --- scenario 13 (F5): malformed player:answer rejected ---
+
+async function assertMalformedPlayerAnswerRejected() {
+  console.log("\n--- scenario 13 (F5): malformed player:answer rejected ---");
+  const host = await connectSock();
+  const a = await connectSock();
+  const b = await connectSock();
+  const { pin } = await createGameOverSocket(host, quiz);
+
+  await joinPlayerOverSocket(a, pin, "Alice");
+  await joinPlayerOverSocket(b, pin, "Bob");
+  host.emit("host:start", pin);
+  await sleep(200);
+
+  // answerIndex=99 must be rejected with reason="invalid-answer"
+  const ack = await new Promise<{ ok: boolean; reason?: string; error?: string }>((r) =>
+    a.emit("player:answer", pin, 99, r),
+  );
+  if (ack.ok) throw new Error("answerIndex=99 should have been rejected");
+  if (ack.reason !== "invalid-answer") {
+    throw new Error(`expected reason='invalid-answer', got '${ack.reason}' (error: ${ack.error})`);
+  }
+
+  // valid answer still works after the rejection
+  const ok = await new Promise<{ ok: boolean; error?: string }>((r) =>
+    a.emit("player:answer", pin, 1, r),
+  );
+  if (!ok.ok) throw new Error(`valid answer rejected after malformed: ${ok.error}`);
+
+  console.log("✓ malformed player:answer rejected (F5)");
+
+  host.disconnect();
+  a.disconnect();
+  b.disconnect();
+}
+
+// --- scenario 14 (F10): CSV formula injection neutralized ---
+
+async function assertCsvFormulaNeutralized() {
+  console.log("\n--- scenario 14 (F10): CSV formula injection neutralized ---");
+  const host = await connectSock();
+  const a = await connectSock();
+  const b = await connectSock();
+  const { pin } = await createGameOverSocket(host, oneQuestionQuiz);
+
+  const ja = await joinPlayerOverSocket(a, pin, "=cmd");
+  if (!ja.ok) throw new Error(`join '=cmd' failed: ${ja.error}`);
+  const jb = await joinPlayerOverSocket(b, pin, "+1+1");
+  if (!jb.ok) throw new Error(`join '+1+1' failed: ${jb.error}`);
+
+  host.emit("host:start", pin);
+  await sleep(150);
+  await new Promise<void>((r) => a.emit("player:answer", pin, 1, () => r()));
+  await new Promise<void>((r) => b.emit("player:answer", pin, 1, () => r()));
+  await sleep(200);
+  // question → reveal → final
+  host.emit("host:advance", pin);
+  await sleep(100);
+  host.emit("host:advance", pin);
+  await sleep(200);
+
+  const final = await fetch(`${URL}/host/${pin}/results.csv`);
+  if (final.status !== 200) {
+    throw new Error(`expected 200 at final, got ${final.status}`);
+  }
+  const body = await final.text();
+  // Neutralized cells start with a leading single-quote. None of the test
+  // values contain CSV-special chars (",\n\r), so the cells appear bare —
+  // not wrapped in double quotes.
+  if (!body.includes(`'=cmd`)) {
+    throw new Error(`CSV missing neutralized '=cmd:\n${body}`);
+  }
+  if (!body.includes(`'+1+1`)) {
+    throw new Error(`CSV missing neutralized '+1+1:\n${body}`);
+  }
+  // sanity: the bare formula must NOT appear at the start of any cell.
+  if (/(^|,)=cmd/.test(body)) {
+    throw new Error(`CSV exposes raw =cmd at cell start:\n${body}`);
+  }
+  if (/(^|,)\+1\+1/.test(body)) {
+    throw new Error(`CSV exposes raw +1+1 at cell start:\n${body}`);
+  }
+  console.log("✓ CSV formula injection neutralized (F10)");
 
   host.disconnect();
   a.disconnect();
