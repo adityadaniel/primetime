@@ -36,30 +36,15 @@ export function OnAir({ live = true, dark = false }: { live?: boolean; dark?: bo
   );
 }
 
-export function CornerMarks({ dark = false }: { dark?: boolean }) {
+export function CornerMarks({ dark = false, fixed = false }: { dark?: boolean; fixed?: boolean }) {
   const color = dark ? "var(--bone)" : "var(--ink)";
+  const base = fixed ? "fixed" : "absolute";
   return (
     <>
-      <span
-        className="absolute top-3 left-3 w-3 h-3 border-t-2 border-l-2"
-        style={{ borderColor: color }}
-        aria-hidden
-      />
-      <span
-        className="absolute top-3 right-3 w-3 h-3 border-t-2 border-r-2"
-        style={{ borderColor: color }}
-        aria-hidden
-      />
-      <span
-        className="absolute bottom-3 left-3 w-3 h-3 border-b-2 border-l-2"
-        style={{ borderColor: color }}
-        aria-hidden
-      />
-      <span
-        className="absolute bottom-3 right-3 w-3 h-3 border-b-2 border-r-2"
-        style={{ borderColor: color }}
-        aria-hidden
-      />
+      <span className={`${base} top-3 left-3 w-3 h-3 border-t-2 border-l-2`} style={{ borderColor: color }} aria-hidden />
+      <span className={`${base} top-3 right-3 w-3 h-3 border-t-2 border-r-2`} style={{ borderColor: color }} aria-hidden />
+      <span className={`${base} bottom-3 left-3 w-3 h-3 border-b-2 border-l-2`} style={{ borderColor: color }} aria-hidden />
+      <span className={`${base} bottom-3 right-3 w-3 h-3 border-b-2 border-r-2`} style={{ borderColor: color }} aria-hidden />
     </>
   );
 }
