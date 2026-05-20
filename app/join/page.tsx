@@ -53,7 +53,7 @@ export default function JoinPage() {
   }
 
   return (
-    <main className="relative flex flex-col">
+    <main className="relative flex flex-col h-[100dvh] overflow-hidden">
       <CornerMarks fixed />
       <header className="px-6 pt-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -65,7 +65,7 @@ export default function JoinPage() {
       </header>
       <SmpteBars className="h-1.5 mt-2" />
 
-      <section className="px-6 pt-5 pb-4">
+      <section className="px-6 pt-5 pb-4 flex-1 min-h-0 overflow-y-auto">
         <div className="max-w-[640px] mx-auto w-full">
           <h1
             className="display-num"
