@@ -433,11 +433,31 @@ export function leaderboard(game: GameSession) {
     .map((p, i) => ({ id: p.id, nickname: p.nickname, score: p.score, rank: i + 1 }));
 }
 
-function csvEscape(value: string): string {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
+// Prefix values that begin with a spreadsheet-formula trigger char with a
+// single quote so Excel/Sheets render the literal text instead of evaluating
+// it. Covers `=`, `+`, `-`, `@`, tab, and CR.
+export function neutralizeFormulaPrefix(value: string): string {
+  if (!value) return value;
+  const first = value.charCodeAt(0);
+  if (
+    first === 0x3d /* = */ ||
+    first === 0x2b /* + */ ||
+    first === 0x2d /* - */ ||
+    first === 0x40 /* @ */ ||
+    first === 0x09 /* tab */ ||
+    first === 0x0d /* CR */
+  ) {
+    return `'${value}`;
   }
   return value;
+}
+
+function csvEscape(value: string): string {
+  const safe = neutralizeFormulaPrefix(value);
+  if (/[",\n\r]/.test(safe)) {
+    return `"${safe.replace(/"/g, '""')}"`;
+  }
+  return safe;
 }
 
 export function exportResultsCsv(game: GameSession): string {
