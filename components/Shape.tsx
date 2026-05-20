@@ -1,5 +1,38 @@
 import type { CSSProperties } from "react";
 
+export function Checkmark({
+  size = 40,
+  fill = "none",
+  stroke = "var(--ink)",
+  strokeWidth = 8,
+  style,
+}: {
+  size?: number;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  style?: CSSProperties;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      style={style}
+      aria-hidden
+    >
+      <polyline
+        points="20,52 42,74 82,28"
+        fill={fill}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        strokeLinecap="square"
+        strokeLinejoin="miter"
+      />
+    </svg>
+  );
+}
+
 export type ShapeKind = "triangle" | "diamond" | "circle" | "square";
 
 export const CHANNELS: Array<{
