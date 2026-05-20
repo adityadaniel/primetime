@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSocket } from "@/lib/socket";
-import { CornerMarks, DateStamp, OnAir, SmpteBars } from "@/components/Broadcast";
+import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from "@/components/Broadcast";
 
 export default function JoinPage() {
   const router = useRouter();
@@ -55,25 +55,29 @@ export default function JoinPage() {
   return (
     <main className="relative min-h-screen flex flex-col">
       <CornerMarks />
-      <header className="px-6 pt-5 flex items-center justify-between">
-        <DateStamp />
+      <header className="px-6 pt-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <DateStamp />
+          <span className="ticker text-[11px] opacity-40">·</span>
+          <Clock />
+        </div>
         <OnAir live={false} />
       </header>
-      <SmpteBars className="h-1.5 mt-3" />
+      <SmpteBars className="h-1.5 mt-2" />
 
-      <section className="px-6 pt-10 pb-10 flex-1 flex items-center">
+      <section className="px-6 pt-5 pb-4 flex-1 flex items-center">
         <div className="max-w-[640px] mx-auto w-full">
           <h1
             className="display-num"
-            style={{ fontSize: "clamp(72px, 16vw, 160px)", lineHeight: 0.85 }}
+            style={{ fontSize: "clamp(56px, 13vw, 140px)", lineHeight: 0.9 }}
           >
             JOIN
           </h1>
-          <p className="font-editorial italic text-xl mt-2 opacity-80">
+          <p className="font-editorial italic text-base mt-1 opacity-80">
             Tap in with the 6-digit PIN your host is showing.
           </p>
 
-          <form onSubmit={submit} className="mt-8 space-y-5">
+          <form onSubmit={submit} className="mt-5 space-y-3">
             <label className="block">
               <span className="chyron">GAME PIN</span>
               <input
@@ -84,12 +88,12 @@ export default function JoinPage() {
                 onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
                 placeholder="000 000"
                 aria-label="6 digit PIN"
-                className="w-full mt-2 ink-border bg-transparent display-num ticker tabular-nums text-center px-3 py-4"
+                className="w-full mt-1 ink-border bg-transparent display-num ticker tabular-nums text-center px-3 py-3"
                 style={{
-                  fontSize: "clamp(56px, 14vw, 120px)",
+                  fontSize: "clamp(44px, 11vw, 96px)",
                   letterSpacing: "0.12em",
                   background: "var(--bone)",
-                  minHeight: 84,
+                  minHeight: 70,
                 }}
               />
             </label>
@@ -101,8 +105,8 @@ export default function JoinPage() {
                 onChange={(e) => setNickname(e.target.value.slice(0, 20))}
                 placeholder="Your name"
                 aria-label="Nickname"
-                className="w-full mt-2 ink-border bg-transparent font-editorial text-2xl px-4 py-4"
-                style={{ background: "var(--bone)", minHeight: 64 }}
+                className="w-full mt-1 ink-border bg-transparent font-editorial text-xl px-4 py-3"
+                style={{ background: "var(--bone)", minHeight: 56 }}
               />
             </label>
 
@@ -143,11 +147,11 @@ export default function JoinPage() {
             <button
               type="submit"
               disabled={pending}
-              className="w-full ink-border stamp-lg ticker tracking-widest text-[14px] py-5"
+              className="w-full ink-border stamp-lg ticker tracking-widest text-[14px] py-4"
               style={{
                 background: "var(--vermilion)",
                 color: "var(--bone)",
-                minHeight: 64,
+                minHeight: 56,
               }}
             >
               {pending ? "JOINING…" : "▶  GO ON AIR"}
