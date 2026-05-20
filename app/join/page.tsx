@@ -65,7 +65,7 @@ export default function JoinPage() {
       </header>
       <SmpteBars className="h-1.5 mt-2" />
 
-      <section className="px-6 pt-5 pb-4 flex-1 flex items-center">
+      <section className="px-6 pt-5 pb-4">
         <div className="max-w-[640px] mx-auto w-full">
           <h1
             className="display-num"
