@@ -147,6 +147,7 @@ async function main() {
   await assertProfanityFilter();
   await assertCsvExport();
   await assertSameSocketDoubleSubmitIdempotent();
+  await assertDisplayReconnectRejoinsRoom();
 }
 
 async function assertCapEnforcement() {
@@ -545,3 +546,47 @@ setTimeout(() => {
   console.error("[smoke] hard timeout 180s");
   process.exit(2);
 }, 180000).unref();
+
+// --- scenario 7: display reconnect rejoins room ---
+
+async function assertDisplayReconnectRejoinsRoom() {
+  console.log("\n--- scenario 7: display reconnect rejoins room ---");
+  const host = await connectSock();
+  const { pin } = await createGameOverSocket(host, quiz);
+
+  const display = await connectSock();
+  // mirror the F3 client fix: re-emit display:attach on every connect so a
+  // fresh socket (post-reconnect) rejoins pin:${pin} and receives broadcasts.
+  display.on("connect", () => display.emit("display:attach", pin));
+  display.emit("display:attach", pin);
+
+  const firstState = await new Promise<State>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("no initial state on display")), 3000);
+    display.once("state", (s: State) => {
+      clearTimeout(t);
+      resolve(s);
+    });
+  });
+  if (firstState.pin !== pin) throw new Error(`initial state pin mismatch: ${firstState.pin}`);
+
+  display.disconnect();
+  await sleep(100);
+  const reconnected = new Promise<void>((resolve) => display.once("connect", () => resolve()));
+  display.connect();
+  await reconnected;
+
+  const got = await new Promise<State>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("no state after reconnect")), 3000);
+    display.once("state", (s: State) => {
+      clearTimeout(t);
+      resolve(s);
+    });
+  });
+  if (!got || got.pin !== pin) {
+    throw new Error("display did not receive state after reconnect");
+  }
+  console.log("✓ display reconnect rejoins room");
+
+  display.disconnect();
+  host.disconnect();
+}

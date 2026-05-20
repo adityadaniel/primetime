@@ -18,12 +18,15 @@ export default function DisplayPage({ params }: { params: Promise<{ pin: string 
 
   useEffect(() => {
     if (!socket || !pin) return;
-    socket.emit("display:attach", pin);
+    const attach = () => socket.emit("display:attach", pin);
     const onState = (s: PublicGameState) => {
       if (s.pin === pin) setState(s);
     };
+    if (socket.connected) attach();
+    socket.on("connect", attach);
     socket.on("state", onState);
     return () => {
+      socket.off("connect", attach);
       socket.off("state", onState);
     };
   }, [socket, pin]);
@@ -126,7 +129,7 @@ function LobbyDisplay({ state, pin }: { state: PublicGameState; pin: string }) {
           <div className="flex items-center justify-between">
             <span className="chyron">CHECK-IN</span>
             <span className="ticker text-[12px] tracking-widest">
-              {String(state.players.length).padStart(2, "0")} / 10
+              {String(state.players.length).padStart(2, "0")} / {String(state.cap?.soft ?? 150).padStart(2, "0")}
             </span>
           </div>
           <ul className="mt-4 grid grid-cols-2 gap-2">
