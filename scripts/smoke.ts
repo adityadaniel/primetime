@@ -148,6 +148,9 @@ async function main() {
   await assertCsvExport();
   await assertSameSocketDoubleSubmitIdempotent();
   await assertDisplayReconnectRejoinsRoom();
+  await assertQ1AutoLockNoAnswers();
+  await assertPausedQuestionRejectsAnswers();
+  await assertLateAnswerRejected();
 }
 
 async function assertCapEnforcement() {
@@ -589,4 +592,204 @@ async function assertDisplayReconnectRejoinsRoom() {
 
   display.disconnect();
   host.disconnect();
+}
+
+// --- scenario 8 (F1): Q1 auto-lock with no answers ---
+
+const shortQuiz: Quiz = {
+  title: "Short Quiz",
+  questions: [
+    {
+      id: "q1",
+      type: "multiple",
+      text: "Pick A",
+      options: ["A", "B", "C", "D"],
+      correct: 0,
+      timeLimit: 3,
+      doublePoints: false,
+    },
+  ],
+};
+
+async function assertQ1AutoLockNoAnswers() {
+  console.log("\n--- scenario 8 (F1): Q1 auto-lock with no answers ---");
+  const host = await connectSock();
+  const a = await connectSock();
+  const b = await connectSock();
+  const { pin } = await createGameOverSocket(host, shortQuiz);
+
+  await joinPlayerOverSocket(a, pin, "Alice");
+  await joinPlayerOverSocket(b, pin, "Bob");
+
+  // listen for the reveal-phase state on the host socket
+  const revealed = new Promise<State>((resolve) => {
+    host.on("state", function onState(s: State) {
+      if (s.phase === "reveal") {
+        host.off("state", onState);
+        resolve(s);
+      }
+    });
+  });
+
+  host.emit("host:start", pin);
+
+  // timeLimit 3s + 50ms server slack + buffer
+  const result = (await Promise.race([
+    revealed,
+    sleep(4500).then(() => null),
+  ])) as State | null;
+
+  if (!result) {
+    throw new Error("Q1 never auto-locked — host:start did not schedule auto-lock");
+  }
+  if (result.phase !== "reveal") {
+    throw new Error(`expected phase=reveal after timeout, got ${result.phase}`);
+  }
+  console.log("✓ Q1 auto-locks with no answers (F1)");
+
+  host.disconnect();
+  a.disconnect();
+  b.disconnect();
+}
+
+// --- scenario 9 (F2): paused question rejects answers ---
+
+async function assertPausedQuestionRejectsAnswers() {
+  console.log("\n--- scenario 9 (F2): paused question rejects answers ---");
+  const host = await connectSock();
+  const a = await connectSock();
+  const b = await connectSock();
+  const { pin } = await createGameOverSocket(host, quiz);
+
+  await joinPlayerOverSocket(a, pin, "Alice");
+  await joinPlayerOverSocket(b, pin, "Bob");
+
+  host.emit("host:start", pin);
+  await sleep(200);
+
+  // wait for player a to see paused state
+  const pausedSeen = new Promise<State>((resolve) => {
+    a.on("state", function onState(s: State) {
+      if (s.paused) {
+        a.off("state", onState);
+        resolve(s);
+      }
+    });
+  });
+
+  host.disconnect();
+
+  const paused = (await Promise.race([
+    pausedSeen,
+    sleep(2000).then(() => null),
+  ])) as State | null;
+  if (!paused) throw new Error("paused state never propagated to player");
+  if (paused.phase !== "question") {
+    throw new Error(`expected phase to remain 'question' while paused, got ${paused.phase}`);
+  }
+
+  // remaining player tries to answer while paused
+  const ack = await new Promise<{ ok: boolean; error?: string; reason?: string }>((r) =>
+    a.emit("player:answer", pin, 1, r),
+  );
+  if (ack.ok) throw new Error("paused answer should have been rejected");
+  if (ack.reason !== "paused") {
+    throw new Error(`expected reason='paused', got '${ack.reason}' (error: ${ack.error})`);
+  }
+
+  // the same is true for player b — and the phase must still be 'question'
+  const ack2 = await new Promise<{ ok: boolean; reason?: string }>((r) =>
+    b.emit("player:answer", pin, 1, r),
+  );
+  if (ack2.ok || ack2.reason !== "paused") {
+    throw new Error(`second paused answer not rejected as paused: ${JSON.stringify(ack2)}`);
+  }
+
+  // host returns and the question can resume normally
+  const host2 = await connectSock();
+  const resumed = new Promise<State>((resolve) => {
+    a.on("state", function onState(s: State) {
+      if (!s.paused && s.phase === "question") {
+        a.off("state", onState);
+        resolve(s);
+      }
+    });
+  });
+  host2.emit("host:attach", pin);
+  const after = (await Promise.race([
+    resumed,
+    sleep(2000).then(() => null),
+  ])) as State | null;
+  if (!after) throw new Error("question did not resume after host reattach");
+
+  console.log("✓ paused question rejects answers (F2)");
+
+  host2.disconnect();
+  a.disconnect();
+  b.disconnect();
+}
+
+// --- scenario 10 (F4): late answer rejected after deadline ---
+
+const veryShortQuiz: Quiz = {
+  title: "Very Short Quiz",
+  questions: [
+    {
+      id: "q1",
+      type: "multiple",
+      text: "Pick A",
+      options: ["A", "B", "C", "D"],
+      correct: 0,
+      timeLimit: 3,
+      doublePoints: false,
+    },
+  ],
+};
+
+interface StateWithEndsAt extends State {
+  endsAt?: number;
+}
+
+async function assertLateAnswerRejected() {
+  console.log("\n--- scenario 10 (F4): late answer rejected ---");
+  const host = await connectSock();
+  const a = await connectSock();
+  const b = await connectSock();
+  const { pin } = await createGameOverSocket(host, veryShortQuiz);
+
+  await joinPlayerOverSocket(a, pin, "Alice");
+  await joinPlayerOverSocket(b, pin, "Bob");
+
+  // capture endsAt from the question-phase state broadcast
+  const endsAtPromise = new Promise<number>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("never saw question state")), 2000);
+    a.on("state", function onState(s: StateWithEndsAt) {
+      if (s.phase === "question" && typeof s.endsAt === "number") {
+        a.off("state", onState);
+        clearTimeout(t);
+        resolve(s.endsAt);
+      }
+    });
+  });
+
+  host.emit("host:start", pin);
+  const endsAt = await endsAtPromise;
+
+  // land in the 50ms window between endsAt and the server-side auto-lock
+  // (scheduled at endsAt + 50ms). Aim 10ms past the deadline.
+  const wait = Math.max(0, endsAt - Date.now() + 10);
+  await sleep(wait);
+
+  const ack = await new Promise<{ ok: boolean; error?: string; reason?: string }>((r) =>
+    a.emit("player:answer", pin, 0, r),
+  );
+  if (ack.ok) throw new Error("late answer should have been rejected");
+  if (ack.reason !== "expired") {
+    throw new Error(`expected reason='expired', got '${ack.reason}' (error: ${ack.error})`);
+  }
+  console.log("✓ late answer rejected with reason=expired (F4)");
+
+  host.disconnect();
+  a.disconnect();
+  b.disconnect();
 }

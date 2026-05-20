@@ -295,6 +295,7 @@ export function currentQuestion(game: GameSession): Question | undefined {
 
 export function startGame(game: GameSession) {
   if (game.phase !== "lobby") return;
+  if (isPaused(game)) return;
   if (!game.players.size) return;
   advanceToQuestion(game, 0);
 }
@@ -329,7 +330,16 @@ export function lockQuestion(game: GameSession) {
   game.phase = "reveal";
 }
 
+export function maybeExpireQuestion(game: GameSession): boolean {
+  if (game.phase !== "question") return false;
+  if (!game.questionEndsAt) return false;
+  if (Date.now() <= game.questionEndsAt) return false;
+  lockQuestion(game);
+  return true;
+}
+
 export function advance(game: GameSession): GamePhase {
+  if (isPaused(game)) return game.phase;
   switch (game.phase) {
     case "lobby":
       if (game.players.size > 0) startGame(game);
@@ -358,8 +368,18 @@ export function submitAnswer(
   game: GameSession,
   playerId: string,
   optionIndex: AnswerIndex,
-): { ok: boolean; error?: string; awarded?: number; correct?: boolean } {
+): {
+  ok: boolean;
+  error?: string;
+  reason?: "paused" | "expired";
+  awarded?: number;
+  correct?: boolean;
+} {
+  if (isPaused(game)) return { ok: false, reason: "paused", error: "Game is paused" };
   if (game.phase !== "question") return { ok: false, error: "Not accepting answers" };
+  if (maybeExpireQuestion(game)) {
+    return { ok: false, reason: "expired", error: "Time is up" };
+  }
   const q = currentQuestion(game);
   if (!q) return { ok: false, error: "No active question" };
   if (optionIndex < 0 || optionIndex >= q.options.length) {
