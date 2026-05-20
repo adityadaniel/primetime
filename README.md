@@ -111,3 +111,49 @@ npm run build    # next build
 npm start        # production-ish start (still tsx-driven)
 npm run smoke    # end-to-end ws smoke test (server must be running)
 ```
+
+## Database setup
+
+Local Postgres 16 required.
+
+### Recommended: Postgres.app (one-click on macOS)
+1. Download from <https://postgresapp.com> (already installed if `/Applications/Postgres.app` exists).
+2. Open the app, click "Initialize" on first run.
+3. Add to your shell: `export PATH="/Applications/Postgres.app/Contents/Versions/latest/bin:$PATH"`
+4. Create the dev database: `createdb broadcast_dev`
+
+### Docker Compose
+
+```yaml
+# docker-compose.yml
+services:
+  db:
+    image: postgres:16
+    ports: ["5432:5432"]
+    environment:
+      POSTGRES_DB: broadcast_dev
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes: { pgdata: {} }
+```
+
+Then `docker compose up -d`.
+
+### Homebrew
+
+```bash
+brew install postgresql@16
+brew services start postgresql@16
+createdb broadcast_dev
+```
+
+### After install
+
+Set `DATABASE_URL` in `.env` (copy from `.env.example`), then:
+
+```bash
+npm run db:migrate    # creates schema + applies migrations
+npm run db:reset      # nuke and rebuild (no seed yet)
+npm run db:studio     # browse data at localhost:5555
+```
