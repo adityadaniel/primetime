@@ -19,6 +19,7 @@ import {
   listGames,
   lockQuestion,
   maybeExpireQuestion,
+  neutralizeFormulaPrefix,
   pauseForHostDisconnect,
   personalState,
   publicState,
@@ -950,5 +951,39 @@ describe("phase/timer integrity (F2/F4 guards)", () => {
     const ok = submitAnswer(game, a.player.id, 0);
     expect(ok.ok).toBe(true);
     expect(ok.correct).toBe(true);
+  });
+});
+
+describe("neutralizeFormulaPrefix (F10 CSV injection)", () => {
+  it("prefixes single-quote on dangerous leading characters", () => {
+    expect(neutralizeFormulaPrefix("=cmd")).toBe("'=cmd");
+    expect(neutralizeFormulaPrefix("+1+1")).toBe("'+1+1");
+    expect(neutralizeFormulaPrefix("-2-3")).toBe("'-2-3");
+    expect(neutralizeFormulaPrefix("@SUM(A1)")).toBe("'@SUM(A1)");
+    expect(neutralizeFormulaPrefix("\tinjection")).toBe("'\tinjection");
+    expect(neutralizeFormulaPrefix("\rinjection")).toBe("'\rinjection");
+  });
+
+  it("passes innocuous values through unchanged", () => {
+    expect(neutralizeFormulaPrefix("Alice")).toBe("Alice");
+    expect(neutralizeFormulaPrefix("Bob123")).toBe("Bob123");
+    expect(neutralizeFormulaPrefix("O'Brien")).toBe("O'Brien");
+    expect(neutralizeFormulaPrefix("")).toBe("");
+    expect(neutralizeFormulaPrefix("a=b+c")).toBe("a=b+c");
+    expect(neutralizeFormulaPrefix(" =leading-space")).toBe(" =leading-space");
+  });
+
+  it("exportResultsCsv neutralizes nicknames that start with formula triggers", () => {
+    const game = setupGame();
+    mustJoin(game.pin, "s1", "=cmd|calc");
+    mustJoin(game.pin, "s2", "+1+1");
+    mustJoin(game.pin, "s3", "@SUM");
+    const csv = exportResultsCsv(game);
+    // = and @ trigger CSV quoting only after neutralization adds the leading
+    // quote; +/- alone don't trip the quote regex, so they appear bare with
+    // the leading single-quote.
+    expect(csv).toContain("'=cmd|calc");
+    expect(csv).toContain("'+1+1");
+    expect(csv).toContain("'@SUM");
   });
 });
