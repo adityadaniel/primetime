@@ -55,6 +55,40 @@ export default function HostBuilder() {
   const [draft, setDraft] = useState<Draft>(STARTER);
   const [activeIdx, setActiveIdx] = useState(0);
   const [launching, setLaunching] = useState(false);
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const quizId = params.get("quiz");
+    if (!quizId) return;
+    fetch(`/api/quiz/${quizId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        setDraft({
+          title: data.title,
+          questions: data.questions.map((qq: {
+            type: "multiple" | "truefalse";
+            text: string;
+            options: string[];
+            correct: AnswerIndex;
+            timeLimit: number;
+            doublePoints: boolean;
+          }) => ({
+            id: q(),
+            type: qq.type,
+            text: qq.text,
+            options: qq.options,
+            correct: qq.correct,
+            timeLimit: qq.timeLimit,
+            doublePoints: qq.doublePoints,
+          })),
+        });
+        setSavedId(quizId);
+      });
+  }, []);
 
   const active = draft.questions[activeIdx];
   const totalSeconds = useMemo(
@@ -143,6 +177,52 @@ export default function HostBuilder() {
     });
   }
 
+  async function save() {
+    const err = validate();
+    if (err) {
+      alert(err);
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        title: draft.title,
+        questions: draft.questions.map((qq) => ({
+          type: qq.type,
+          text: qq.text,
+          options: qq.options,
+          correct: qq.correct,
+          timeLimit: qq.timeLimit,
+          doublePoints: qq.doublePoints,
+        })),
+      };
+      const url = savedId ? `/api/quiz/${savedId}` : `/api/quiz`;
+      const method = savedId ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        alert(`Save failed: ${e.error ?? res.statusText}`);
+        return;
+      }
+      const { id } = await res.json();
+      const wasNew = !savedId;
+      setSavedId(id);
+      if (wasNew) {
+        const next = new URL(window.location.href);
+        next.searchParams.set("quiz", id);
+        window.history.replaceState({}, "", next.toString());
+      }
+      setSavedFlash(true);
+      window.setTimeout(() => setSavedFlash(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <main className="relative min-h-screen pb-24">
       <CornerMarks />
@@ -175,6 +255,15 @@ export default function HostBuilder() {
           >
             <Stat label="QUESTIONS" value={String(draft.questions.length).padStart(2, "0")} />
             <Stat label="RUNTIME" value={`${totalSeconds}s`} />
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving}
+              className="ink-border stamp px-6 py-3 ticker tracking-widest text-[12px]"
+              style={{ background: "var(--ink)", color: "var(--bone)" }}
+            >
+              {saving ? "SAVING…" : savedFlash ? "SAVED ✓" : "SAVE"}
+            </button>
             <button
               type="button"
               onClick={launch}

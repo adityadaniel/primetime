@@ -94,3 +94,19 @@ export interface JoinResult {
   code?: JoinErrorCode;
   playerId?: string;
 }
+
+export interface QuestionInput {
+  type: QuestionType;
+  text: string;
+  options: string[];
+  correct: AnswerIndex;
+  timeLimit: number;
+  doublePoints: boolean;
+}
+
+export interface QuizSummary {
+  id: string;
+  title: string;
+  questionCount: number;
+  updatedAt: string;
+}
