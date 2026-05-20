@@ -1,3 +1,6 @@
+[![PR](https://github.com/adityadaniel/broadcast/actions/workflows/pr.yml/badge.svg)](https://github.com/adityadaniel/broadcast/actions/workflows/pr.yml)
+[![Main](https://github.com/adityadaniel/broadcast/actions/workflows/main.yml/badge.svg)](https://github.com/adityadaniel/broadcast/actions/workflows/main.yml)
+
 # BROADCAST — Kahoot-style live quiz (M1 + M2)
 
 A real-time quiz game with a vintage broadcast-graphics aesthetic. Built end-to-end as the **M1 — Core Loop** and **M2 — Resilience & Scale** milestones described in `PRD.md` and `CLAUDE.md`.

@@ -1,0 +1,36 @@
+name: Main
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Unit tests + coverage
+        run: npm run test:coverage
+      - name: Boot dev server
+        run: |
+          nohup npm run dev > /tmp/dev.log 2>&1 &
+          echo $! > /tmp/dev.pid
+      - name: Wait for dev server
+        run: npx wait-on http://localhost:4321 --timeout 60000
+      - name: Smoke test
+        run: npx tsx scripts/smoke.ts
+      - name: Teardown dev server
+        if: always()
+        run: |
+          if [ -f /tmp/dev.pid ]; then
+            kill $(cat /tmp/dev.pid) || true
+          fi
+          tail -50 /tmp/dev.log || true
