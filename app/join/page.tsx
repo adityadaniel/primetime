@@ -53,7 +53,7 @@ export default function JoinPage() {
   }
 
   return (
-    <main className="relative flex flex-col">
+    <main className="relative min-h-screen flex flex-col">
       <CornerMarks />
       <header className="px-6 pt-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
