@@ -150,7 +150,7 @@ async function main() {
 }
 
 async function assertCapEnforcement() {
-  console.log("\n--- cap enforcement: free tier 10-player limit ---");
+  console.log("\n--- cap enforcement: hardcoded 150-player limit ---");
   const capHost = io(URL, { transports: ["websocket"] });
   await new Promise<void>((r) => capHost.on("connect", () => r()));
 
@@ -160,7 +160,7 @@ async function assertCapEnforcement() {
   console.log("cap-test pin:", pin);
 
   const players: ReturnType<typeof io>[] = [];
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 150; i++) {
     const p = io(URL, { transports: ["websocket"] });
     await new Promise<void>((r) => p.on("connect", () => r()));
     const res = await new Promise<{ ok: boolean; error?: string; code?: string }>((r) =>
@@ -169,19 +169,19 @@ async function assertCapEnforcement() {
     if (!res.ok) throw new Error(`player ${i + 1} unexpectedly rejected: ${res.error}`);
     players.push(p);
   }
-  console.log("10 players joined OK");
+  console.log("150 players joined OK");
 
   const overflow = io(URL, { transports: ["websocket"] });
   await new Promise<void>((r) => overflow.on("connect", () => r()));
   const rej = await new Promise<{ ok: boolean; error?: string; code?: string }>((r) =>
-    overflow.emit("player:join", pin, "Eleventh", r),
+    overflow.emit("player:join", pin, "OneFiftyFirst", r),
   );
 
-  if (rej.ok) throw new Error("11th join should have been rejected");
+  if (rej.ok) throw new Error("151st join should have been rejected");
   if (rej.code !== "full") {
     throw new Error(`expected code "full", got "${rej.code}" (error: ${rej.error})`);
   }
-  console.log("11th rejected with code:", rej.code, "·", rej.error);
+  console.log("151st rejected with code:", rej.code, "·", rej.error);
 
   await sleep(50);
   const capState = await new Promise<{ playerCount?: number; cap?: { soft: number; hard: number; upsell: boolean } }>(
@@ -190,16 +190,12 @@ async function assertCapEnforcement() {
       capHost.emit("host:attach", pin);
     },
   );
-  if (capState.playerCount !== 10) {
-    throw new Error(`expected playerCount=10, got ${capState.playerCount}`);
+  if (capState.cap?.hard !== 150 || capState.cap?.soft !== 150 || capState.cap?.upsell !== false) {
+    throw new Error(
+      `expected cap {hard:150, soft:150, upsell:false}, got ${JSON.stringify(capState.cap)}`,
+    );
   }
-  if (capState.cap?.soft !== 10 || capState.cap?.hard !== 150) {
-    throw new Error(`expected cap {soft:10, hard:150}, got ${JSON.stringify(capState.cap)}`);
-  }
-  if (!capState.cap.upsell) {
-    throw new Error("expected upsell=true at 10/10 free tier");
-  }
-  console.log("publicState cap:", capState.cap, "playerCount:", capState.playerCount);
+  console.log("publicState cap:", capState.cap);
   console.log("cap enforcement: PASS");
 
   capHost.disconnect();
@@ -546,6 +542,6 @@ async function assertSameSocketDoubleSubmitIdempotent() {
 }
 
 setTimeout(() => {
-  console.error("[smoke] hard timeout 60s");
+  console.error("[smoke] hard timeout 180s");
   process.exit(2);
-}, 60000).unref();
+}, 180000).unref();

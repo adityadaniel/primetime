@@ -93,7 +93,8 @@ export default function ControlPanel({ params }: { params: Promise<{ pin: string
       </header>
       <SmpteBars className="h-1.5 mt-3" />
 
-      {upsell && (
+      {/* TODO M3-MID-75: restore upsell banner once tier-aware cap is back */}
+      {false && upsell && (
         <div
           className="px-6 mt-3"
           role="status"

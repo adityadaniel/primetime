@@ -11,7 +11,9 @@ import type {
 import { isClean } from "./profanity";
 
 const HARD_CAP = 150;
+// TEMP M2.5 unused: MID-75 restores tier-aware cap
 const SOFT_CAP_FREE = 10;
+// TEMP M2.5 unused: MID-75 restores tier-aware cap
 const UPSELL_AT = 8;
 let RECONNECT_GRACE_MS = 30_000;
 const HOST_GRACE_MS = 60_000;
@@ -205,16 +207,16 @@ export interface CapStatus {
 }
 
 export function capStatus(game: GameSession): CapStatus {
+  // TEMP M2.5: hardcoded 150 until MID-75 ships tier-aware cap
   const current = Array.from(game.players.values()).filter(
     (p) => p.connected || isWithinReconnectGrace(p),
   ).length;
-  const soft = game.tier === "pro" ? HARD_CAP : SOFT_CAP_FREE;
   return {
     hard: HARD_CAP,
-    soft,
+    soft: HARD_CAP,
     current,
-    upsell: game.tier === "free" && current >= UPSELL_AT,
-    full: current >= soft,
+    upsell: false,
+    full: current >= HARD_CAP,
   };
 }
 
