@@ -103,6 +103,9 @@ void app.prepare().then(() => {
       if (!game || game.hostSocketId !== socket.id) return;
       startGame(game);
       broadcast(pin);
+      if (game.phase === "question") {
+        scheduleAutoLock(pin);
+      }
     });
 
     socket.on("host:advance", (pin: string) => {
@@ -164,7 +167,11 @@ void app.prepare().then(() => {
       (
         pin: string,
         optionIndex: AnswerIndex,
-        ack: (res: { ok: boolean; error?: string }) => void,
+        ack: (res: {
+          ok: boolean;
+          error?: string;
+          reason?: "paused" | "expired";
+        }) => void,
       ) => {
         const game = getGame(pin);
         if (!game) {
@@ -177,7 +184,12 @@ void app.prepare().then(() => {
           return;
         }
         const r = submitAnswer(game, playerId, optionIndex);
-        ack({ ok: r.ok, error: r.error });
+        if (!r.ok) {
+          ack({ ok: false, error: r.error, reason: r.reason });
+          if (r.reason === "expired") broadcast(pin);
+          return;
+        }
+        ack({ ok: true });
         broadcast(pin);
       },
     );

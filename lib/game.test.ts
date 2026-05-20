@@ -18,6 +18,7 @@ import {
   leaderboard,
   listGames,
   lockQuestion,
+  maybeExpireQuestion,
   pauseForHostDisconnect,
   personalState,
   publicState,
@@ -863,5 +864,91 @@ describe("misc surfaces (coverage)", () => {
     mustJoin(game.pin, "s1", "Alice");
     pauseForHostDisconnect(game);
     expect(isPaused(game)).toBe(true);
+  });
+});
+
+describe("phase/timer integrity (F2/F4 guards)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 0, 1, 12, 0, 0));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("submitAnswer rejects with reason 'paused' while paused", () => {
+    const game = setupGame();
+    const a = mustJoin(game.pin, "s1", "Alice");
+    mustJoin(game.pin, "s2", "Bob");
+    startGame(game);
+    pauseForHostDisconnect(game);
+    const res = submitAnswer(game, a.player.id, 0);
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe("paused");
+    // phase preserved, no scoring side-effect
+    expect(game.phase).toBe("question");
+    expect(a.player.score).toBe(0);
+    expect(game.answers.get(game.questionIndex) ?? []).toHaveLength(0);
+  });
+
+  it("submitAnswer rejects with reason 'expired' once Date.now() > questionEndsAt", () => {
+    const game = setupGame();
+    const a = mustJoin(game.pin, "s1", "Alice");
+    mustJoin(game.pin, "s2", "Bob");
+    startGame(game);
+    // q1 timeLimit is 10s; jump just past it
+    vi.advanceTimersByTime(10_001);
+    const res = submitAnswer(game, a.player.id, 0);
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe("expired");
+    // expired path locks the question synchronously
+    expect(game.phase).toBe("reveal");
+    expect(a.player.score).toBe(0);
+  });
+
+  it("advance is a no-op while paused (preserves phase + index)", () => {
+    const game = setupGame();
+    mustJoin(game.pin, "s1", "Alice");
+    startGame(game);
+    pauseForHostDisconnect(game);
+    const beforePhase = game.phase;
+    const beforeIndex = game.questionIndex;
+    const after = advance(game);
+    expect(after).toBe(beforePhase);
+    expect(game.phase).toBe(beforePhase);
+    expect(game.questionIndex).toBe(beforeIndex);
+  });
+
+  it("startGame is a no-op while paused (lobby stays lobby)", () => {
+    const game = setupGame();
+    mustJoin(game.pin, "s1", "Alice");
+    pauseForHostDisconnect(game);
+    startGame(game);
+    expect(game.phase).toBe("lobby");
+  });
+
+  it("maybeExpireQuestion: false before deadline, true and locks after", () => {
+    const game = setupGame();
+    mustJoin(game.pin, "s1", "Alice");
+    startGame(game);
+    expect(maybeExpireQuestion(game)).toBe(false);
+    expect(game.phase).toBe("question");
+    vi.advanceTimersByTime(10_001);
+    expect(maybeExpireQuestion(game)).toBe(true);
+    expect(game.phase).toBe("reveal");
+  });
+
+  it("after resume, submitAnswer accepts again with normal scoring", () => {
+    const game = setupGame();
+    const a = mustJoin(game.pin, "s1", "Alice");
+    mustJoin(game.pin, "s2", "Bob");
+    startGame(game);
+    pauseForHostDisconnect(game);
+    const blocked = submitAnswer(game, a.player.id, 0);
+    expect(blocked.reason).toBe("paused");
+    resumeFromPause(game);
+    const ok = submitAnswer(game, a.player.id, 0);
+    expect(ok.ok).toBe(true);
+    expect(ok.correct).toBe(true);
   });
 });
