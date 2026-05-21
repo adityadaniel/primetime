@@ -492,6 +492,50 @@ export function exportResultsCsv(game: GameSession): string {
   return rows.join("\r\n") + "\r\n";
 }
 
+export function exportAnswersCsv(game: GameSession): string {
+  const questions = game.quiz.questions;
+  const rows: string[] = [
+    "question_no,question,player,choice_index,choice_text,correct,ms_from_start,awarded",
+  ];
+  for (let qi = 0; qi < questions.length; qi++) {
+    const q = questions[qi];
+    const records = game.answers.get(qi) ?? [];
+    const answeredIds = new Set(records.map((r) => r.playerId));
+    for (const r of records) {
+      const player = game.players.get(r.playerId);
+      if (!player) continue;
+      rows.push(
+        [
+          qi + 1,
+          csvEscape(q.text),
+          csvEscape(player.nickname),
+          r.optionIndex,
+          csvEscape(q.options[r.optionIndex] ?? ""),
+          r.correct ? "true" : "false",
+          r.msFromStart,
+          r.awarded,
+        ].join(","),
+      );
+    }
+    for (const player of game.players.values()) {
+      if (answeredIds.has(player.id)) continue;
+      rows.push(
+        [
+          qi + 1,
+          csvEscape(q.text),
+          csvEscape(player.nickname),
+          "",
+          "",
+          "false",
+          "",
+          0,
+        ].join(","),
+      );
+    }
+  }
+  return rows.join("\r\n") + "\r\n";
+}
+
 export function publicState(game: GameSession): PublicGameState {
   const q = currentQuestion(game);
   const board = leaderboard(game);
