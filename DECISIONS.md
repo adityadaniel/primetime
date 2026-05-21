@@ -8,6 +8,79 @@ and add a new entry below.
 
 ---
 
+## 2026-05-21 · M3 scope back to full — real Stripe + Google + Apple
+
+**Status:** Accepted (supersedes 2026-05-20 mock-billing decision for new tickets; mock decision stays valid for academy testing window only)
+
+**Context:** M2.5 shipped; academy session tested cleanly. User now wants the full M3 scope back — real Stripe, Google OAuth, and Sign in with Apple. Apple Developer account is available.
+
+**Decision:** Bring back original M3 scope. Real Stripe (test mode for M3, live keys before public launch). Google + Apple OAuth via Auth.js v5 alongside the credentials provider. The mock-billing decision from 2026-05-20 is preserved as a fallback if Stripe integration runs into trouble, but the default path is real Stripe end-to-end.
+
+**Trade-off accepted:** more external services to provision (Stripe, Google Cloud, Apple Developer, Resend). Each is documented in `docs/m3-setup.md` with step-by-step setup. Apple Sign-In is gated on `ENABLE_APPLE_SIGNIN=true` and requires real domain DNS verification — wired up in code (MID-67) and rendered in UI (MID-68), activated post-domain.
+
+**Implication:** MID-67/68 expanded scope to include Google + Apple providers (architecture-only for Apple until domain). MID-69 reactivated for Resend email. MID-73/74 rewritten as real Stripe integration. MID-75 unchanged. Subscriber sees real Stripe Checkout and a real subscription record.
+
+---
+
+## 2026-05-21 · Pricing tiers — Free 50 / Pro \$9 (200 players)
+
+**Status:** Accepted
+
+**Context:** BROADCAST needs a tier shape that drives mock-then-real billing without rework. Competitive pricing research (`docs/competitive-pricing-reference.md`) showed Kahoot Go free=40 players, Kahoot Silver \$7=100 players, Kahoot Gold \$12=200 players. Mentimeter Pro €28, Wayground individual paid is gone.
+
+**Decision:** Two tiers only.
+
+- **Free:** 50 players, 5 saved quizzes, full CSV export, BROADCAST watermark on display, 7-day session retention.
+- **Pro \$9/mo or \$90/yr (2 months free):** 200 players, unlimited quizzes, image upload, custom logo, no watermark, full session-history retention.
+
+Single price for academy and business — no separate education tier in MVP.
+
+**Trade-off accepted:** \$9 is below Kahoot Gold (\$12) and beats Mentimeter (€28); the spread funds Stripe fees + R2 + Upstash + Vercel hosting per active user but isn't margin-heavy. Two-tier (vs three) keeps upgrade flow simple and lets us watch where users actually want more.
+
+**Implication:** MID-73 (Stripe), MID-74 (pricing page), MID-75 (tier caps) all consume `CAP_FREE=50`, `CAP_PRO=200` constants. The hardcoded `HARD_CAP=150` from MID-84 gets replaced when MID-75 lands.
+
+---
+
+## 2026-05-21 · Single-domain architecture, marketing on `/`, app routes nested
+
+**Status:** Accepted
+
+**Context:** Public-launch question — should the marketing site and the app live on the same domain, or split via subdomain (`app.broadcast.x` for the app, apex for marketing)? Industry split: Notion/Linear/Cal.com use subdomain split; smaller-stage SaaS often start single-domain to ship faster.
+
+**Decision:** Single domain, route-based separation. Marketing landing on `/`, app routes nested under `/host`, public player on `/play/[pin]` and `/join`. Reasons:
+
+- One Vercel project, one DB, one CDN — simpler ops at this stage
+- Sub-tld split can be added later once we have a real domain and traffic justifies it
+- Marketing-vs-app SEO and caching can be handled with route-level config
+
+**Trade-off accepted:** marketing and app share the same Next.js bundle and middleware. If marketing pages get heavy (analytics, A/B testing), they'll bloat the app bundle. Migration to a separate marketing site (e.g. Astro on a sub-tld) is straightforward when the time comes.
+
+**Implication:** new MID ticket for "marketing landing + route reorg + noindex on app routes" (see Linear). `app/page.tsx` becomes the marketing landing. `app/host/page.tsx` becomes the auth-gated builder.
+
+---
+
+## 2026-05-21 · Cloudflare R2 for object storage, Upstash for Redis
+
+**Status:** Accepted (supersedes implicit "Vercel Blob + Vercel KV" assumption from `docs/m3-setup.md` v1)
+
+**Context:** User uncomfortable with full Vercel lock-in. Options reviewed:
+
+- Vercel Blob + Vercel KV: native integration, but pricier on egress and storage; tied to Vercel
+- Cloudflare R2 + Upstash Redis: multi-vendor, S3-compatible storage, generous free tiers, no egress fees on R2
+- Cloudflare R2 + Cloudflare Workers KV: KV is eventually consistent, no pub/sub — wrong tool for socket sync
+
+**Decision:**
+
+- **Object storage:** Cloudflare R2. S3-compatible, $0.015/GB/mo storage, 10 GB free, **zero egress fees**. Used for quiz cover images (MID-72) and any future user-uploaded assets.
+- **Redis (pub/sub for socket sync, MID-78):** Upstash Redis. Real Redis protocol over HTTP, 10K commands/day free, native Vercel integration but works equally from Cloudflare Workers, supports pub/sub.
+- **Postgres:** stays Vercel Postgres (Neon-backed) for now — not worth the migration cost yet.
+
+**Trade-off accepted:** multi-vendor (CF + Upstash + Vercel) means more accounts to manage. In exchange we get zero egress costs on images, no Vercel lock-in for the storage layer, and a clean S3 SDK boundary that lets us swap providers later.
+
+**Implication:** `docs/m3-setup.md` rewritten to drop Vercel Blob/KV in favor of R2 + Upstash. MID-72 (image upload) uses `@aws-sdk/client-s3` against R2 endpoint. MID-78 (pub/sub) uses Upstash Redis URL. MID-79 (file upload prod) becomes "R2 bucket + presigned URL pattern". Cost projection added to `docs/m3-setup.md` for typical usage scenarios.
+
+---
+
 ## 2026-05-20 · Postgres for academy + production
 
 **Status:** Accepted
