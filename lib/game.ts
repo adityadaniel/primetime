@@ -9,6 +9,12 @@ import type {
   Quiz,
 } from "./types";
 import { isClean } from "./profanity";
+import {
+  createSessionRecord,
+  finalizeSession,
+  recordAnswer,
+  recordPlayerJoin,
+} from "./session-repo";
 
 const HARD_CAP = 150;
 // TEMP M2.5 unused: MID-75 restores tier-aware cap
@@ -48,6 +54,8 @@ export interface GameSession {
   pauseRemainingMs?: number;
   endedReason?: "host-left";
   createdAt: number;
+  sessionDbId: string | null;
+  finalized?: boolean;
 }
 
 const games = new Map<string, GameSession>();
@@ -64,10 +72,20 @@ function generatePin(): string {
   throw new Error("Could not allocate PIN");
 }
 
-export function createGame(quiz: Quiz, tier: Tier = "free"): GameSession {
+export function createGame(
+  quiz: Quiz,
+  tierOrOpts: Tier | { tier?: Tier; hostUserId?: string | null } = "free",
+  legacyOpts?: { hostUserId?: string | null },
+): GameSession {
   if (!quiz.questions.length) {
     throw new Error("Quiz must have at least one question");
   }
+  const tier: Tier =
+    typeof tierOrOpts === "string" ? tierOrOpts : tierOrOpts.tier ?? "free";
+  const hostUserId =
+    typeof tierOrOpts === "string"
+      ? legacyOpts?.hostUserId ?? null
+      : tierOrOpts.hostUserId ?? null;
   const pin = generatePin();
   const session: GameSession = {
     pin,
@@ -80,8 +98,14 @@ export function createGame(quiz: Quiz, tier: Tier = "free"): GameSession {
     socketToPlayer: new Map(),
     answers: new Map(),
     createdAt: Date.now(),
+    sessionDbId: null,
   };
   games.set(pin, session);
+  createSessionRecord({ pin, hostUserId, quizSnapshot: quiz })
+    .then((row) => {
+      if (row) session.sessionDbId = row.id;
+    })
+    .catch((err) => console.error("[session-repo]", err));
   return session;
 }
 
@@ -145,6 +169,32 @@ export function endByHostLeft(game: GameSession) {
   game.pauseRemainingMs = undefined;
   game.questionStartedAt = undefined;
   game.questionEndsAt = undefined;
+  finalizePersist(game, "abandoned");
+}
+
+function finalizePersist(
+  game: GameSession,
+  status: "finished" | "abandoned",
+): void {
+  if (!game.sessionDbId) return;
+  if (game.finalized) return;
+  game.finalized = true;
+  const board = leaderboard(game);
+  finalizeSession({
+    sessionId: game.sessionDbId,
+    status,
+    finalLeaderboard: board.map((p) => ({
+      playerId: p.id,
+      nickname: p.nickname,
+      score: p.score,
+      rank: p.rank,
+    })),
+    playerFinalScores: board.map((p) => ({
+      inGameId: p.id,
+      finalScore: p.score,
+      finalRank: p.rank,
+    })),
+  }).catch((err) => console.error("[session-repo]", err));
 }
 
 export function isPaused(game: GameSession): boolean {
@@ -276,6 +326,13 @@ export function joinPlayer(
   const player: Player = { id, nickname: trimmed, score: 0, streak: 0, connected: true };
   game.players.set(id, player);
   game.socketToPlayer.set(socketId, id);
+  if (game.sessionDbId) {
+    recordPlayerJoin({
+      sessionId: game.sessionDbId,
+      inGameId: id,
+      nickname: trimmed,
+    }).catch((err) => console.error("[session-repo]", err));
+  }
   return { ok: true, game, player, reconnected: false };
 }
 
@@ -313,6 +370,7 @@ export function advanceToQuestion(game: GameSession, index: number) {
     game.phase = "final";
     game.questionStartedAt = undefined;
     game.questionEndsAt = undefined;
+    finalizePersist(game, "finished");
     return;
   }
   game.questionIndex = index;
@@ -352,6 +410,7 @@ export function advance(game: GameSession): GamePhase {
         game.phase = "leaderboard";
       } else {
         game.phase = "final";
+        finalizePersist(game, "finished");
       }
       return game.phase;
     case "leaderboard":
@@ -409,6 +468,17 @@ export function submitAnswer(
   }
   records.push({ playerId, optionIndex, msFromStart, awarded, correct });
   game.answers.set(game.questionIndex, records);
+  if (game.sessionDbId) {
+    recordAnswer({
+      sessionId: game.sessionDbId,
+      questionIndex: game.questionIndex,
+      playerInGameId: playerId,
+      optionIndex,
+      correct,
+      msFromStart,
+      awarded,
+    }).catch((err) => console.error("[session-repo]", err));
+  }
 
   const allAnswered = records.length >= Array.from(game.players.values()).filter((p) => p.connected).length;
   if (allAnswered) {

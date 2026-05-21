@@ -1,4 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("./session-repo", () => ({
+  createSessionRecord: vi.fn(async () => null),
+  recordPlayerJoin: vi.fn(async () => undefined),
+  recordAnswer: vi.fn(async () => undefined),
+  finalizeSession: vi.fn(async () => undefined),
+}));
+
+import * as sessionRepo from "./session-repo";
 import {
   advance,
   advanceToQuestion,
@@ -10,6 +19,7 @@ import {
   detachSocket,
   distribution,
   endByHostLeft,
+  exportAnswersCsv,
   exportResultsCsv,
   isPaused,
   isWithinReconnectGrace,
@@ -31,6 +41,10 @@ import {
   type GameSession,
 } from "./game";
 import type { AnswerIndex, Player, Quiz } from "./types";
+
+const mockedRepo = vi.mocked(sessionRepo);
+const flushMicrotasks = () =>
+  new Promise<void>((resolve) => setImmediate(resolve));
 
 function makeQuiz(overrides?: Partial<Quiz>): Quiz {
   return {
@@ -985,5 +999,304 @@ describe("neutralizeFormulaPrefix (F10 CSV injection)", () => {
     expect(csv).toContain("'=cmd|calc");
     expect(csv).toContain("'+1+1");
     expect(csv).toContain("'@SUM");
+  });
+});
+
+describe("exportAnswersCsv", () => {
+  it("emits one row per answered record plus a blank row for non-answerers per question", () => {
+    const game = setupGame();
+    const a = mustJoin(game.pin, "s1", "Alice");
+    const b = mustJoin(game.pin, "s2", "Bob");
+    startGame(game);
+    submitAnswer(game, a.player.id, 0); // Alice correct on q1
+    // Bob never answers q1 → exercises the unanswered branch in exportAnswersCsv.
+    // Auto-lock only fires when ALL connected players have answered, so we
+    // need to lock manually here before advancing to the next question.
+    lockQuestion(game);
+    advance(game); // → leaderboard
+    advance(game); // → q2
+    submitAnswer(game, a.player.id, 1); // Alice correct
+    submitAnswer(game, b.player.id, 0); // Bob wrong; both answered → auto-lock
+    const csv = exportAnswersCsv(game);
+    const lines = csv.trim().split(/\r\n/);
+    expect(lines[0]).toBe(
+      "question_no,question,player,choice_index,choice_text,correct,ms_from_start,awarded",
+    );
+    // q1: 1 answered (Alice) + 1 unanswered (Bob) = 2 rows
+    // q2: 2 answered = 2 rows
+    expect(lines).toHaveLength(1 + 2 + 2);
+    // unanswered row signature: trailing ",,false,,0"
+    expect(lines.some((l) => l.includes(",Bob,,,false,,0"))).toBe(true);
+  });
+
+  it("skips answered rows whose player has been kicked between answer + export", () => {
+    const game = setupGame();
+    const a = mustJoin(game.pin, "s1", "Alice");
+    const b = mustJoin(game.pin, "s2", "Bob");
+    startGame(game);
+    submitAnswer(game, a.player.id, 0);
+    submitAnswer(game, b.player.id, 0);
+    kickPlayer(game.pin, b.player.id);
+    const csv = exportAnswersCsv(game);
+    const lines = csv.trim().split(/\r\n/);
+    // Header + Alice answered row only (Bob's record is skipped because the
+    // player was removed; no unanswered row either since he's gone)
+    expect(lines.some((l) => l.includes(",Bob,"))).toBe(false);
+    expect(lines.some((l) => l.includes(",Alice,"))).toBe(true);
+  });
+
+  it("escapes question/option text containing commas and quotes", () => {
+    const game = createGame({
+      title: "weird",
+      questions: [
+        {
+          id: "q1",
+          type: "multiple",
+          text: 'Q, with "quotes"',
+          options: ["a,b", 'c"d', "e", "f"],
+          correct: 0,
+          timeLimit: 10,
+          doublePoints: false,
+        },
+      ],
+    });
+    const a = mustJoin(game.pin, "s1", "Alice");
+    startGame(game);
+    submitAnswer(game, a.player.id, 0);
+    const csv = exportAnswersCsv(game);
+    expect(csv).toContain('"Q, with ""quotes"""');
+    expect(csv).toContain('"a,b"');
+  });
+});
+
+describe("session persistence hooks", () => {
+  let errSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockedRepo.createSessionRecord.mockReset().mockResolvedValue(null);
+    mockedRepo.recordPlayerJoin.mockReset().mockResolvedValue(undefined);
+    mockedRepo.recordAnswer.mockReset().mockResolvedValue(undefined);
+    mockedRepo.finalizeSession.mockReset().mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    errSpy.mockRestore();
+  });
+
+  it("createGame calls createSessionRecord with pin, hostUserId, and quiz snapshot", async () => {
+    mockedRepo.createSessionRecord.mockResolvedValueOnce({ id: "sess-1" });
+    const quiz = makeQuiz();
+    const game = createGame(quiz, { tier: "free", hostUserId: "user-42" });
+    expect(mockedRepo.createSessionRecord).toHaveBeenCalledTimes(1);
+    expect(mockedRepo.createSessionRecord).toHaveBeenCalledWith({
+      pin: game.pin,
+      hostUserId: "user-42",
+      quizSnapshot: quiz,
+    });
+    await flushMicrotasks();
+    expect(game.sessionDbId).toBe("sess-1");
+  });
+
+  it("createGame defaults hostUserId to null when not supplied", () => {
+    createGame(makeQuiz());
+    expect(mockedRepo.createSessionRecord).toHaveBeenCalledWith(
+      expect.objectContaining({ hostUserId: null }),
+    );
+  });
+
+  it("createGame supports the legacy positional opts signature", () => {
+    createGame(makeQuiz(), "free", { hostUserId: "legacy-user" });
+    expect(mockedRepo.createSessionRecord).toHaveBeenCalledWith(
+      expect.objectContaining({ hostUserId: "legacy-user" }),
+    );
+  });
+
+  it("createGame does not crash if createSessionRecord rejects; logs the error", async () => {
+    mockedRepo.createSessionRecord.mockRejectedValueOnce(new Error("db down"));
+    const game = createGame(makeQuiz());
+    await flushMicrotasks();
+    expect(game.sessionDbId).toBeNull();
+    expect(errSpy).toHaveBeenCalledWith(
+      "[session-repo]",
+      expect.any(Error),
+    );
+  });
+
+  it("createGame leaves sessionDbId null when persistence is disabled (returns null row)", async () => {
+    mockedRepo.createSessionRecord.mockResolvedValueOnce(null);
+    const game = createGame(makeQuiz());
+    await flushMicrotasks();
+    expect(game.sessionDbId).toBeNull();
+  });
+
+  it("joinPlayer calls recordPlayerJoin with sessionId, in-game id, and nickname", async () => {
+    mockedRepo.createSessionRecord.mockResolvedValueOnce({ id: "sess-2" });
+    const game = createGame(makeQuiz());
+    await flushMicrotasks();
+    const r = joinPlayer(game.pin, "s1", "Alice");
+    if (!r.ok) throw new Error("expected join ok");
+    expect(mockedRepo.recordPlayerJoin).toHaveBeenCalledWith({
+      sessionId: "sess-2",
+      inGameId: r.player.id,
+      nickname: "Alice",
+    });
+  });
+
+  it("joinPlayer skips recordPlayerJoin when sessionDbId is null", () => {
+    // Default mock resolves to null, so sessionDbId stays null
+    const game = createGame(makeQuiz());
+    const r = joinPlayer(game.pin, "s1", "Alice");
+    expect(r.ok).toBe(true);
+    expect(mockedRepo.recordPlayerJoin).not.toHaveBeenCalled();
+  });
+
+  it("joinPlayer reconnect path does NOT re-call recordPlayerJoin", async () => {
+    mockedRepo.createSessionRecord.mockResolvedValueOnce({ id: "sess-3" });
+    const game = createGame(makeQuiz());
+    await flushMicrotasks();
+    mustJoin(game.pin, "s1", "Alice");
+    expect(mockedRepo.recordPlayerJoin).toHaveBeenCalledTimes(1);
+    detachSocket("s1");
+    joinPlayer(game.pin, "s2", "Alice"); // reconnect
+    expect(mockedRepo.recordPlayerJoin).toHaveBeenCalledTimes(1);
+  });
+
+  it("joinPlayer logs error if recordPlayerJoin rejects but still admits the player", async () => {
+    mockedRepo.createSessionRecord.mockResolvedValueOnce({ id: "sess-4" });
+    mockedRepo.recordPlayerJoin.mockRejectedValueOnce(new Error("write fail"));
+    const game = createGame(makeQuiz());
+    await flushMicrotasks();
+    const r = joinPlayer(game.pin, "s1", "Alice");
+    expect(r.ok).toBe(true);
+    expect(game.players.size).toBe(1);
+    await flushMicrotasks();
+    expect(errSpy).toHaveBeenCalledWith("[session-repo]", expect.any(Error));
+  });
+
+  it("submitAnswer calls recordAnswer with full answer record fields", async () => {
+    mockedRepo.createSessionRecord.mockResolvedValueOnce({ id: "sess-5" });
+    const game = createGame(makeQuiz());
+    await flushMicrotasks();
+    const a = mustJoin(game.pin, "s1", "Alice");
+    startGame(game);
+    submitAnswer(game, a.player.id, 0);
+    expect(mockedRepo.recordAnswer).toHaveBeenCalledTimes(1);
+    expect(mockedRepo.recordAnswer).toHaveBeenCalledWith({
+      sessionId: "sess-5",
+      questionIndex: 0,
+      playerInGameId: a.player.id,
+      optionIndex: 0,
+      correct: true,
+      msFromStart: expect.any(Number),
+      awarded: expect.any(Number),
+    });
+  });
+
+  it("submitAnswer skips recordAnswer when sessionDbId is null", () => {
+    const game = createGame(makeQuiz());
+    const a = mustJoin(game.pin, "s1", "Alice");
+    startGame(game);
+    submitAnswer(game, a.player.id, 0);
+    expect(mockedRepo.recordAnswer).not.toHaveBeenCalled();
+  });
+
+  it("submitAnswer logs error if recordAnswer rejects but in-memory state stands", async () => {
+    mockedRepo.createSessionRecord.mockResolvedValueOnce({ id: "sess-6" });
+    mockedRepo.recordAnswer.mockRejectedValueOnce(new Error("answer fail"));
+    const game = createGame(makeQuiz());
+    await flushMicrotasks();
+    const a = mustJoin(game.pin, "s1", "Alice");
+    startGame(game);
+    const res = submitAnswer(game, a.player.id, 0);
+    expect(res.ok).toBe(true);
+    expect(a.player.score).toBe(1000);
+    await flushMicrotasks();
+    expect(errSpy).toHaveBeenCalledWith("[session-repo]", expect.any(Error));
+  });
+
+  it("endByHostLeft finalizes the session with status 'abandoned' and a leaderboard payload", async () => {
+    mockedRepo.createSessionRecord.mockResolvedValueOnce({ id: "sess-7" });
+    const game = createGame(makeQuiz());
+    await flushMicrotasks();
+    const a = mustJoin(game.pin, "s1", "Alice");
+    a.player.score = 750;
+    endByHostLeft(game);
+    expect(mockedRepo.finalizeSession).toHaveBeenCalledTimes(1);
+    expect(mockedRepo.finalizeSession).toHaveBeenCalledWith({
+      sessionId: "sess-7",
+      status: "abandoned",
+      finalLeaderboard: [
+        { playerId: a.player.id, nickname: "Alice", score: 750, rank: 1 },
+      ],
+      playerFinalScores: [
+        { inGameId: a.player.id, finalScore: 750, finalRank: 1 },
+      ],
+    });
+    expect(game.finalized).toBe(true);
+  });
+
+  it("normal game completion finalizes with status 'finished'", async () => {
+    mockedRepo.createSessionRecord.mockResolvedValueOnce({ id: "sess-8" });
+    const game = createGame(makeQuiz());
+    await flushMicrotasks();
+    const a = mustJoin(game.pin, "s1", "Alice");
+    startGame(game);
+    submitAnswer(game, a.player.id, 0); // q1 → auto reveal
+    advance(game); // → leaderboard
+    advance(game); // → q2
+    submitAnswer(game, a.player.id, 1); // q2 correct
+    advance(game); // reveal → final (last question)
+    expect(game.phase).toBe("final");
+    expect(mockedRepo.finalizeSession).toHaveBeenCalledTimes(1);
+    expect(mockedRepo.finalizeSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "sess-8",
+        status: "finished",
+      }),
+    );
+  });
+
+  it("advanceToQuestion past the last index also triggers 'finished' finalize", async () => {
+    mockedRepo.createSessionRecord.mockResolvedValueOnce({ id: "sess-9" });
+    const game = createGame(makeQuiz());
+    await flushMicrotasks();
+    mustJoin(game.pin, "s1", "Alice");
+    advanceToQuestion(game, 99);
+    expect(game.phase).toBe("final");
+    expect(mockedRepo.finalizeSession).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "finished" }),
+    );
+  });
+
+  it("finalizePersist runs only once even if both end paths trigger", async () => {
+    mockedRepo.createSessionRecord.mockResolvedValueOnce({ id: "sess-10" });
+    const game = createGame(makeQuiz());
+    await flushMicrotasks();
+    mustJoin(game.pin, "s1", "Alice");
+    endByHostLeft(game);
+    expect(mockedRepo.finalizeSession).toHaveBeenCalledTimes(1);
+    // a second finalize attempt (e.g., advance from final) is a no-op
+    advance(game);
+    expect(mockedRepo.finalizeSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("finalize is skipped when sessionDbId is null", () => {
+    const game = createGame(makeQuiz());
+    mustJoin(game.pin, "s1", "Alice");
+    endByHostLeft(game);
+    expect(mockedRepo.finalizeSession).not.toHaveBeenCalled();
+  });
+
+  it("logs error if finalizeSession rejects but local game still ends", async () => {
+    mockedRepo.createSessionRecord.mockResolvedValueOnce({ id: "sess-11" });
+    mockedRepo.finalizeSession.mockRejectedValueOnce(new Error("finalize fail"));
+    const game = createGame(makeQuiz());
+    await flushMicrotasks();
+    mustJoin(game.pin, "s1", "Alice");
+    endByHostLeft(game);
+    expect(game.phase).toBe("final");
+    await flushMicrotasks();
+    expect(errSpy).toHaveBeenCalledWith("[session-repo]", expect.any(Error));
   });
 });

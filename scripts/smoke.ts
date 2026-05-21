@@ -1,5 +1,6 @@
 // quick smoke test: 1 host + 2 players + 1 display, full game loop
 import { io } from "socket.io-client";
+import { PrismaClient } from "@prisma/client";
 import {
   createGame,
   detachSocket,
@@ -152,6 +153,8 @@ async function main() {
   await assertMalformedPlayerJoinRejected();
   await assertMalformedPlayerAnswerRejected();
   await assertCsvFormulaNeutralized();
+
+  await assertPersistenceRowsWritten();
 }
 
 async function assertCapEnforcement() {
@@ -520,6 +523,32 @@ main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
+
+async function assertPersistenceRowsWritten() {
+  const flag = process.env.ENABLE_SESSION_PERSISTENCE;
+  if (flag === "false" || flag === "0") {
+    console.log("\n--- persistence: disabled (ENABLE_SESSION_PERSISTENCE=false), skipping DB count check ---");
+    return;
+  }
+  console.log("\n--- persistence: post-run DB row counts ---");
+  // give fire-and-forget writes a moment to flush
+  await sleep(500);
+  const prisma = new PrismaClient();
+  try {
+    const [sessions, players, answers] = await Promise.all([
+      prisma.gameSession.count(),
+      prisma.sessionPlayer.count(),
+      prisma.sessionAnswer.count(),
+    ]);
+    console.log(`GameSession=${sessions}, SessionPlayer=${players}, SessionAnswer=${answers}`);
+    if (sessions === 0) throw new Error("expected GameSession rows > 0");
+    if (players === 0) throw new Error("expected SessionPlayer rows > 0");
+    if (answers === 0) throw new Error("expected SessionAnswer rows > 0");
+    console.log("✓ persistence rows written");
+  } finally {
+    await prisma.$disconnect();
+  }
+}
 
 async function assertSameSocketDoubleSubmitIdempotent() {
   console.log("\n--- scenario: same-socket double submit is idempotent ---");
