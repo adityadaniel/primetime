@@ -1,4 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("./session-repo", () => ({
+  createSessionRecord: vi.fn(async () => null),
+  recordPlayerJoin: vi.fn(async () => undefined),
+  recordAnswer: vi.fn(async () => undefined),
+  finalizeSession: vi.fn(async () => undefined),
+}));
+
 import {
   advance,
   advanceToQuestion,

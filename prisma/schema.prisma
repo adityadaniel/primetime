@@ -12,18 +12,25 @@ enum Tier {
   pro
 }
 
+enum SessionStatus {
+  active
+  finished
+  abandoned
+}
+
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  emailVerified DateTime?
-  passwordHash  String?
-  name          String?
-  image         String?
-  tier          Tier      @default(free)
-  accounts      Account[]
-  sessions      Session[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id             String        @id @default(cuid())
+  email          String        @unique
+  emailVerified  DateTime?
+  passwordHash   String?
+  name           String?
+  image          String?
+  tier           Tier          @default(free)
+  accounts       Account[]
+  sessions       Session[]
+  hostedSessions GameSession[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 model Account {
@@ -92,4 +99,51 @@ model Question {
 
   @@unique([quizId, ordinal])
   @@index([quizId])
+}
+
+model GameSession {
+  id               String          @id @default(cuid())
+  pin              String          @unique
+  hostUserId       String?
+  hostUser         User?           @relation(fields: [hostUserId], references: [id], onDelete: SetNull)
+  quizSnapshot     Json
+  status           SessionStatus   @default(active)
+  createdAt        DateTime        @default(now())
+  startedAt        DateTime?
+  endedAt          DateTime?
+  finalLeaderboard Json?
+  players          SessionPlayer[]
+  answers          SessionAnswer[]
+
+  @@index([hostUserId, createdAt])
+  @@index([status])
+}
+
+model SessionPlayer {
+  id         String      @id @default(cuid())
+  sessionId  String
+  session    GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  inGameId   String
+  nickname   String
+  joinedAt   DateTime    @default(now())
+  finalScore Int         @default(0)
+  finalRank  Int?
+
+  @@unique([sessionId, inGameId])
+  @@index([sessionId])
+}
+
+model SessionAnswer {
+  id             String      @id @default(cuid())
+  sessionId      String
+  session        GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  questionIndex  Int
+  playerInGameId String
+  optionIndex    Int
+  correct        Boolean
+  msFromStart    Int
+  awarded        Int
+  createdAt      DateTime    @default(now())
+
+  @@index([sessionId, questionIndex])
 }
