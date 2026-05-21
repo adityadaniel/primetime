@@ -547,14 +547,24 @@ function FinalStage({ state, pin }: { state: PublicGameState; pin: string }) {
           </p>
         </div>
         {pin && (
-          <a
-            href={`/host/${pin}/results.csv`}
-            download
-            className="ink-border stamp px-4 py-3 ticker tracking-widest text-[12px] self-end"
-            style={{ background: "var(--ink)", color: "var(--bone)" }}
-          >
-            ⬇ DOWNLOAD RESULTS
-          </a>
+          <div className="flex flex-col gap-2 self-end">
+            <a
+              href={`/host/${pin}/results.csv`}
+              download
+              className="ink-border stamp px-4 py-3 ticker tracking-widest text-[12px]"
+              style={{ background: "var(--ink)", color: "var(--bone)" }}
+            >
+              ⬇ DOWNLOAD RESULTS
+            </a>
+            <a
+              href={`/host/${pin}/answers.csv`}
+              download
+              className="ink-border stamp px-4 py-3 ticker tracking-widest text-[12px]"
+              style={{ background: "var(--cobalt)", color: "var(--bone)" }}
+            >
+              ⬇ DOWNLOAD ANSWERS
+            </a>
+          </div>
         )}
       </div>
       <ol className="mt-6 divide-y-2" style={{ borderColor: "var(--ink)" }}>

@@ -9,6 +9,7 @@ import {
   detachSocket,
   endByHostLeft,
   exportResultsCsv,
+  exportAnswersCsv,
   getGame,
   joinPlayer,
   kickPlayer,
@@ -116,6 +117,11 @@ void app.prepare().then(() => {
     const csv = matchResultsCsv(req.url);
     if (csv) {
       handleResultsCsv(csv, res);
+      return;
+    }
+    const answersCsv = matchAnswersCsv(req.url);
+    if (answersCsv) {
+      handleAnswersCsv(answersCsv, res);
       return;
     }
     handle(req, res).catch((err) => {
@@ -377,6 +383,13 @@ function matchResultsCsv(url: string | undefined): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
+function matchAnswersCsv(url: string | undefined): string | null {
+  if (!url) return null;
+  const path = url.split("?")[0];
+  const m = /^\/host\/([^/]+)\/answers\.csv$/.exec(path);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
 function handleResultsCsv(pin: string, res: import("node:http").ServerResponse) {
   const game = getGame(pin);
   if (!game) {
@@ -402,6 +415,36 @@ function handleResultsCsv(pin: string, res: import("node:http").ServerResponse) 
   res.setHeader(
     "Content-Disposition",
     `attachment; filename="broadcast-${pin}-${utcDate}.csv"`,
+  );
+  res.setHeader("Cache-Control", "no-store");
+  res.end(body);
+}
+
+function handleAnswersCsv(pin: string, res: import("node:http").ServerResponse) {
+  const game = getGame(pin);
+  if (!game) {
+    res.statusCode = 404;
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.end(JSON.stringify({ error: "Game not found" }));
+    return;
+  }
+  if (game.phase !== "final") {
+    res.statusCode = 409;
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.end(JSON.stringify({ error: "Game not finished" }));
+    return;
+  }
+  const body = exportAnswersCsv(game);
+  const now = new Date();
+  const utcDate =
+    String(now.getUTCFullYear()) +
+    String(now.getUTCMonth() + 1).padStart(2, "0") +
+    String(now.getUTCDate()).padStart(2, "0");
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="broadcast-${pin}-${utcDate}-answers.csv"`,
   );
   res.setHeader("Cache-Control", "no-store");
   res.end(body);
