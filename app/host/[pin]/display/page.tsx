@@ -1,21 +1,21 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, useState } from "react";
-import { useSocket } from "@/lib/socket";
-import { CHANNELS, Checkmark, Shape } from "@/components/Shape";
-import { Chyron, Clock, FrameCounter, OnAir, SmpteBars } from "@/components/Broadcast";
-import { Countdown } from "@/components/Countdown";
-import { useSfx } from "@/lib/use-sfx";
-import type { PublicGameState } from "@/lib/types";
+import { useEffect, useRef, useState } from 'react';
+import { Chyron, Clock, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Countdown } from '@/components/Countdown';
+import { CHANNELS, Checkmark, Shape } from '@/components/Shape';
+import { useSocket } from '@/lib/socket';
+import type { PublicGameState } from '@/lib/types';
+import { useSfx } from '@/lib/use-sfx';
 
 export default function DisplayPage({ params }: { params: Promise<{ pin: string }> }) {
   const socket = useSocket();
   const sfx = useSfx();
-  const [pin, setPin] = useState<string>("");
+  const [pin, setPin] = useState<string>('');
   const [state, setState] = useState<PublicGameState | null>(null);
   const [needsUnlock, setNeedsUnlock] = useState(false);
 
-  const prevPhaseRef = useRef<string>("");
+  const prevPhaseRef = useRef<string>('');
   const lastTickSecRef = useRef(-1);
 
   useEffect(() => {
@@ -24,16 +24,16 @@ export default function DisplayPage({ params }: { params: Promise<{ pin: string 
 
   useEffect(() => {
     if (!socket || !pin) return;
-    const attach = () => socket.emit("display:attach", pin);
+    const attach = () => socket.emit('display:attach', pin);
     const onState = (s: PublicGameState) => {
       if (s.pin === pin) setState(s);
     };
     if (socket.connected) attach();
-    socket.on("connect", attach);
-    socket.on("state", onState);
+    socket.on('connect', attach);
+    socket.on('state', onState);
     return () => {
-      socket.off("connect", attach);
-      socket.off("state", onState);
+      socket.off('connect', attach);
+      socket.off('state', onState);
     };
   }, [socket, pin]);
 
@@ -51,11 +51,11 @@ export default function DisplayPage({ params }: { params: Promise<{ pin: string 
 
     sfx.stopAllLoops();
 
-    if (phase === "lobby") sfx.startLobbyAmbience();
-    if (phase === "question") sfx.startQuestionTension();
-    if (phase === "reveal") sfx.sfxCorrect();
-    if (phase === "leaderboard") sfx.sfxLeaderboardSweep();
-    if (phase === "final") {
+    if (phase === 'lobby') sfx.startLobbyAmbience();
+    if (phase === 'question') sfx.startQuestionTension();
+    if (phase === 'reveal') sfx.sfxCorrect();
+    if (phase === 'leaderboard') sfx.sfxLeaderboardSweep();
+    if (phase === 'final') {
       sfx.sfxFinalFanfare();
       setTimeout(() => sfx.startFinalLoop(), 700);
     }
@@ -64,7 +64,7 @@ export default function DisplayPage({ params }: { params: Promise<{ pin: string 
   }, [state, state?.phase, sfx]);
 
   useEffect(() => {
-    if (state?.phase !== "question" || !state?.endsAt) return;
+    if (state?.phase !== 'question' || !state?.endsAt) return;
     const id = window.setInterval(() => {
       const msLeft = Math.max(0, (state.endsAt ?? 0) - Date.now());
       const sec = Math.ceil(msLeft / 1000);
@@ -85,28 +85,32 @@ export default function DisplayPage({ params }: { params: Promise<{ pin: string 
     };
   }, [sfx]);
 
-  const phase = state?.phase ?? "lobby";
-  const dark = phase === "question" || phase === "reveal";
-  const live = phase !== "lobby" && phase !== "final";
+  const phase = state?.phase ?? 'lobby';
+  const dark = phase === 'question' || phase === 'reveal';
+  const live = phase !== 'lobby' && phase !== 'final';
   const currentNo = Math.max(0, (state?.questionIndex ?? -1) + 1);
 
   return (
     <main
-      className={`relative min-h-screen w-full overflow-hidden grain ${dark ? "ink-bg" : ""}`}
+      className={`relative min-h-screen w-full overflow-hidden grain ${dark ? 'ink-bg' : ''}`}
       style={{
-        background: dark ? "var(--ink)" : "var(--bone)",
-        color: dark ? "var(--bone)" : "var(--ink)",
+        background: dark ? 'var(--ink)' : 'var(--bone)',
+        color: dark ? 'var(--bone)' : 'var(--ink)',
       }}
     >
       <CornerMarksDark dark={dark} />
       {needsUnlock && (
         <button
+          type="button"
           onClick={() => sfx.unlockAudio().then(() => setNeedsUnlock(false))}
           className="fixed inset-0 z-50 grid place-items-center"
-          style={{ background: "rgba(15,15,15,0.55)", color: "var(--bone)" }}
+          style={{ background: 'rgba(15,15,15,0.55)', color: 'var(--bone)' }}
           aria-label="Enable sound"
         >
-          <span className="ink-border ticker text-[14px] tracking-widest px-6 py-4" style={{ background: "var(--ink)" }}>
+          <span
+            className="ink-border ticker text-[14px] tracking-widest px-6 py-4"
+            style={{ background: 'var(--ink)' }}
+          >
             CLICK ANYWHERE TO ENABLE SOUND
           </span>
         </button>
@@ -124,17 +128,17 @@ export default function DisplayPage({ params }: { params: Promise<{ pin: string 
       {state?.paused && <PausedOverlay resumeBy={state.paused.resumeBy} />}
 
       <section className="px-10 pt-8 pb-12 max-w-[1800px] mx-auto">
-        {phase === "lobby" && state && <LobbyDisplay state={state} pin={pin} />}
-        {(phase === "question" || phase === "reveal") && state && <QuestionDisplay state={state} />}
-        {phase === "leaderboard" && state && <PodiumDisplay state={state} />}
-        {phase === "final" && state && <FinalDisplay state={state} />}
+        {phase === 'lobby' && state && <LobbyDisplay state={state} pin={pin} />}
+        {(phase === 'question' || phase === 'reveal') && state && <QuestionDisplay state={state} />}
+        {phase === 'leaderboard' && state && <PodiumDisplay state={state} />}
+        {phase === 'final' && state && <FinalDisplay state={state} />}
       </section>
     </main>
   );
 }
 
 function CornerMarksDark({ dark }: { dark: boolean }) {
-  const color = dark ? "var(--bone)" : "var(--ink)";
+  const color = dark ? 'var(--bone)' : 'var(--ink)';
   return (
     <>
       <span
@@ -165,51 +169,57 @@ function LobbyDisplay({ state, pin }: { state: PublicGameState; pin: string }) {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <p className="chyron mb-3" style={{ color: "var(--vermilion)" }}>
+        <p className="chyron mb-3" style={{ color: 'var(--vermilion)' }}>
           STAND BY · TRANSMITTING ON CHANNEL 4
         </p>
         <p className="ticker text-[14px] tracking-widest opacity-70">JOIN AT</p>
-        <p className="display-num" style={{ fontSize: "clamp(48px, 8vw, 120px)", lineHeight: 0.85 }}>
+        <p
+          className="display-num"
+          style={{ fontSize: 'clamp(48px, 8vw, 120px)', lineHeight: 0.85 }}
+        >
           /JOIN
         </p>
         <p className="ticker text-[14px] tracking-widest opacity-70 mt-6">GAME PIN</p>
         <p
           className="display-num ticker"
           style={{
-            fontSize: "clamp(140px, 22vw, 360px)",
+            fontSize: 'clamp(140px, 22vw, 360px)',
             lineHeight: 0.82,
-            letterSpacing: "0.04em",
+            letterSpacing: '0.04em',
           }}
         >
-          {pin || "······"}
+          {pin || '······'}
         </p>
         <p className="font-editorial italic text-2xl mt-6 max-w-2xl">
           {state.players.length === 0
-            ? "Waiting for the first player to check in…"
+            ? 'Waiting for the first player to check in…'
             : `${state.players.length} on the floor — host signals ROLL TAPE to begin.`}
         </p>
       </div>
 
       <aside>
-        <div className="ink-border p-5" style={{ background: "var(--bone)" }}>
+        <div className="ink-border p-5" style={{ background: 'var(--bone)' }}>
           <div className="flex items-center justify-between">
             <span className="chyron">CHECK-IN</span>
             <span className="ticker text-[12px] tracking-widest">
-              {String(state.players.length).padStart(2, "0")} / {String(state.cap?.soft ?? 150).padStart(2, "0")}
+              {String(state.players.length).padStart(2, '0')} /{' '}
+              {String(state.cap?.soft ?? 150).padStart(2, '0')}
             </span>
           </div>
           <ul className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
             {state.players.length === 0 && (
-              <li className="col-span-full font-editorial italic opacity-60">No one on the floor.</li>
+              <li className="col-span-full font-editorial italic opacity-60">
+                No one on the floor.
+              </li>
             )}
             {state.players.map((p, i) => (
               <li
                 key={p.id}
                 className="ink-border px-3 py-2 flex items-center gap-2 teleprompter"
-                style={{ background: "var(--bone)" }}
+                style={{ background: 'var(--bone)' }}
               >
                 <span className="ticker text-[11px] tracking-widest opacity-60">
-                  {String(i + 1).padStart(2, "0")}
+                  {String(i + 1).padStart(2, '0')}
                 </span>
                 <span className="font-editorial truncate text-lg">{p.nickname}</span>
               </li>
@@ -217,7 +227,8 @@ function LobbyDisplay({ state, pin }: { state: PublicGameState; pin: string }) {
           </ul>
         </div>
         <p className="ticker text-[11px] tracking-widest mt-4 opacity-70">
-          PLAYER UI: open <span className="opacity-100">/join</span> on a phone, enter the PIN, pick a name.
+          PLAYER UI: open <span className="opacity-100">/join</span> on a phone, enter the PIN, pick
+          a name.
         </p>
       </aside>
     </div>
@@ -227,10 +238,13 @@ function LobbyDisplay({ state, pin }: { state: PublicGameState; pin: string }) {
 function QuestionDisplay({ state }: { state: PublicGameState }) {
   const q = state.question;
   if (!q) return null;
-  const qNum = String(state.questionIndex + 1).padStart(2, "0");
-  const total = String(state.totalQuestions).padStart(2, "0");
+  const qNum = String(state.questionIndex + 1).padStart(2, '0');
+  const total = String(state.totalQuestions).padStart(2, '0');
   const dist = state.reveal?.distribution ?? new Array(q.options.length).fill(0);
-  const totalAns = Math.max(1, dist.reduce((a, b) => a + b, 0));
+  const totalAns = Math.max(
+    1,
+    dist.reduce((a, b) => a + b, 0),
+  );
   const correct = state.reveal?.correct;
 
   return (
@@ -239,12 +253,12 @@ function QuestionDisplay({ state }: { state: PublicGameState }) {
         <div className="flex items-center gap-4">
           <span
             className="ticker text-[12px] tracking-widest px-2 py-[2px]"
-            style={{ background: "var(--vermilion)", color: "var(--bone)" }}
+            style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
           >
             CUE {qNum} / {total}
           </span>
           <span className="ticker text-[12px] tracking-widest opacity-80">
-            {q.timeLimit}s · {q.doublePoints ? "2× POINTS" : "1× POINTS"}
+            {q.timeLimit}s · {q.doublePoints ? '2× POINTS' : '1× POINTS'}
           </span>
         </div>
         <Countdown endsAt={state.endsAt} startedAt={state.startedAt} size={120} dark />
@@ -253,16 +267,16 @@ function QuestionDisplay({ state }: { state: PublicGameState }) {
       <div className="col-span-12">
         <p
           className="font-editorial leading-[1.05] teleprompter"
-          style={{ fontSize: "clamp(40px, 6.5vw, 108px)" }}
+          style={{ fontSize: 'clamp(40px, 6.5vw, 108px)' }}
         >
           {q.text}
         </p>
       </div>
 
-      {state.phase === "reveal" && correct !== undefined && (
+      {state.phase === 'reveal' && correct !== undefined && (
         <div
           className="col-span-12 ink-border stamp px-6 py-5 flex items-center gap-5"
-          style={{ background: "var(--ivy)", color: "var(--bone)" }}
+          style={{ background: 'var(--ivy)', color: 'var(--bone)' }}
         >
           <Shape
             kind={(CHANNELS[correct] ?? CHANNELS[0]).key}
@@ -273,7 +287,7 @@ function QuestionDisplay({ state }: { state: PublicGameState }) {
           />
           <p
             className="font-editorial leading-[1.0]"
-            style={{ fontSize: "clamp(36px, 5.5vw, 88px)" }}
+            style={{ fontSize: 'clamp(36px, 5.5vw, 88px)' }}
           >
             {q.options[correct]}
           </p>
@@ -284,7 +298,7 @@ function QuestionDisplay({ state }: { state: PublicGameState }) {
         {q.options.map((opt, i) => {
           const ch = CHANNELS[i] ?? CHANNELS[0];
           const pct = Math.round((dist[i] / totalAns) * 100);
-          const isReveal = state.phase === "reveal";
+          const isReveal = state.phase === 'reveal';
           const isCorrect = isReveal && correct === i;
           const isWrong = isReveal && correct !== undefined && correct !== i;
           return (
@@ -292,26 +306,38 @@ function QuestionDisplay({ state }: { state: PublicGameState }) {
               key={i}
               className="relative ink-border overflow-hidden"
               style={{
-                background: isCorrect ? "var(--ivy)" : ch.color,
+                background: isCorrect ? 'var(--ivy)' : ch.color,
                 opacity: isWrong ? 0.35 : 1,
-                aspectRatio: "1.05 / 1",
+                aspectRatio: '1.05 / 1',
               }}
             >
               {!isReveal && (
                 <div className="absolute inset-0 grid place-items-center">
-                  <Shape kind={ch.key} fill="var(--bone)" stroke="var(--ink)" size={150} strokeWidth={3} />
+                  <Shape
+                    kind={ch.key}
+                    fill="var(--bone)"
+                    stroke="var(--ink)"
+                    size={150}
+                    strokeWidth={3}
+                  />
                 </div>
               )}
               {isReveal && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12">
-                  <Shape kind={ch.key} fill="var(--bone)" stroke="var(--ink)" size={72} strokeWidth={3} />
+                  <Shape
+                    kind={ch.key}
+                    fill="var(--bone)"
+                    stroke="var(--ink)"
+                    size={72}
+                    strokeWidth={3}
+                  />
                   <p
                     className="font-editorial text-center leading-tight"
                     style={{
-                      color: "var(--bone)",
-                      fontSize: "clamp(18px, 2vw, 32px)",
-                      maxHeight: "3.6em",
-                      overflow: "hidden",
+                      color: 'var(--bone)',
+                      fontSize: 'clamp(18px, 2vw, 32px)',
+                      maxHeight: '3.6em',
+                      overflow: 'hidden',
                     }}
                   >
                     {opt}
@@ -323,15 +349,24 @@ function QuestionDisplay({ state }: { state: PublicGameState }) {
                   <Checkmark size={48} stroke="var(--bone)" strokeWidth={6} />
                 </div>
               )}
-              <div className="absolute top-2 left-2 ticker text-[11px] tracking-widest" style={{ color: "var(--bone)" }}>
-                CH.{String(i + 1).padStart(2, "0")}
+              <div
+                className="absolute top-2 left-2 ticker text-[11px] tracking-widest"
+                style={{ color: 'var(--bone)' }}
+              >
+                CH.{String(i + 1).padStart(2, '0')}
               </div>
               {isReveal && (
-                <div className="absolute bottom-0 left-0 right-0 px-3 py-2 flex items-end justify-between" style={{ background: "rgba(15,15,15,0.78)" }}>
-                  <span className="display-num text-5xl" style={{ color: "var(--bone)" }}>
+                <div
+                  className="absolute bottom-0 left-0 right-0 px-3 py-2 flex items-end justify-between"
+                  style={{ background: 'rgba(15,15,15,0.78)' }}
+                >
+                  <span className="display-num text-5xl" style={{ color: 'var(--bone)' }}>
                     {dist[i]}
                   </span>
-                  <span className="ticker text-[12px] tracking-widest" style={{ color: "var(--bone)" }}>
+                  <span
+                    className="ticker text-[12px] tracking-widest"
+                    style={{ color: 'var(--bone)' }}
+                  >
                     {pct}%
                   </span>
                 </div>
@@ -347,20 +382,22 @@ function QuestionDisplay({ state }: { state: PublicGameState }) {
 function PodiumDisplay({ state }: { state: PublicGameState }) {
   const order = state.podium ?? [];
   const slots = [order[1], order[0], order[2]];
-  const heights = ["40%", "65%", "30%"];
-  const colors = ["var(--ash)", "var(--marigold)", "var(--vermilion)"];
+  const heights = ['40%', '65%', '30%'];
+  const colors = ['var(--ash)', 'var(--marigold)', 'var(--vermilion)'];
   const ranks = [2, 1, 3];
   return (
     <div>
-      <p className="chyron mb-3" style={{ color: "var(--vermilion)" }}>
-        AFTER CUE {String(state.questionIndex + 1).padStart(2, "0")} · STANDINGS
+      <p className="chyron mb-3" style={{ color: 'var(--vermilion)' }}>
+        AFTER CUE {String(state.questionIndex + 1).padStart(2, '0')} · STANDINGS
       </p>
       <div className="grid grid-cols-3 gap-6 items-end h-[60vh]">
         {slots.map((p, i) => (
           <div key={i} className="flex flex-col items-center justify-end h-full">
             {p ? (
               <>
-                <div className="font-editorial text-3xl truncate w-full text-center mb-2">{p.nickname}</div>
+                <div className="font-editorial text-3xl truncate w-full text-center mb-2">
+                  {p.nickname}
+                </div>
                 <div className="ticker tabular-nums text-2xl mb-3">{p.score.toLocaleString()}</div>
               </>
             ) : (
@@ -372,7 +409,7 @@ function PodiumDisplay({ state }: { state: PublicGameState }) {
             >
               <span
                 className="display-num"
-                style={{ fontSize: "clamp(80px, 14vw, 220px)", color: "var(--ink)" }}
+                style={{ fontSize: 'clamp(80px, 14vw, 220px)', color: 'var(--ink)' }}
               >
                 {ranks[i]}
               </span>
@@ -387,30 +424,34 @@ function PodiumDisplay({ state }: { state: PublicGameState }) {
 function FinalDisplay({ state }: { state: PublicGameState }) {
   const board = [...state.players].sort((a, b) => b.score - a.score);
   const winner = board[0];
-  const hostLeft = state.endedReason === "host-left";
+  const hostLeft = state.endedReason === 'host-left';
   return (
     <div className="grid grid-cols-12 gap-6">
       <div className="col-span-12">
-        <p className="chyron" style={{ color: "var(--vermilion)" }}>
-          {hostLeft ? "HOST LEFT · TRANSMISSION ENDED" : "FADE TO BLACK · FINAL TRANSMISSION"}
+        <p className="chyron" style={{ color: 'var(--vermilion)' }}>
+          {hostLeft ? 'HOST LEFT · TRANSMISSION ENDED' : 'FADE TO BLACK · FINAL TRANSMISSION'}
         </p>
-        <p className="display-num" style={{ fontSize: "clamp(80px, 16vw, 240px)", lineHeight: 0.85 }}>
-          {hostLeft ? "OFF AIR." : "THAT'S A WRAP."}
+        <p
+          className="display-num"
+          style={{ fontSize: 'clamp(80px, 16vw, 240px)', lineHeight: 0.85 }}
+        >
+          {hostLeft ? 'OFF AIR.' : "THAT'S A WRAP."}
         </p>
       </div>
       {winner && (
-        <div className="col-span-12 lg:col-span-7 ink-border p-8" style={{ background: "var(--marigold)" }}>
+        <div
+          className="col-span-12 lg:col-span-7 ink-border p-8"
+          style={{ background: 'var(--marigold)' }}
+        >
           <span className="chyron">CHAMPION · CH.01</span>
-          <p className="display-num mt-2" style={{ fontSize: "clamp(56px, 10vw, 144px)" }}>
+          <p className="display-num mt-2" style={{ fontSize: 'clamp(56px, 10vw, 144px)' }}>
             {winner.nickname}
           </p>
-          <p className="ticker tabular-nums text-3xl mt-2">
-            {winner.score.toLocaleString()} pts
-          </p>
+          <p className="ticker tabular-nums text-3xl mt-2">{winner.score.toLocaleString()} pts</p>
         </div>
       )}
-      <div className="col-span-12 lg:col-span-5 ink-border" style={{ background: "var(--bone)" }}>
-        <div className="px-4 py-2 border-b-2" style={{ borderColor: "var(--ink)" }}>
+      <div className="col-span-12 lg:col-span-5 ink-border" style={{ background: 'var(--bone)' }}>
+        <div className="px-4 py-2 border-b-2" style={{ borderColor: 'var(--ink)' }}>
           <span className="chyron">FINAL ORDER</span>
         </div>
         <ol>
@@ -418,10 +459,10 @@ function FinalDisplay({ state }: { state: PublicGameState }) {
             <li
               key={p.id}
               className="px-4 py-2 flex items-center gap-3 border-b last:border-b-0"
-              style={{ borderColor: "rgba(15,15,15,.18)" }}
+              style={{ borderColor: 'rgba(15,15,15,.18)' }}
             >
               <span className="display-num text-3xl" style={{ minWidth: 40 }}>
-                {String(i + 1).padStart(2, "0")}
+                {String(i + 1).padStart(2, '0')}
               </span>
               <span className="font-editorial flex-1 truncate text-lg">{p.nickname}</span>
               <span className="ticker tabular-nums">{p.score.toLocaleString()}</span>
@@ -443,13 +484,16 @@ function PausedOverlay({ resumeBy }: { resumeBy: number }) {
   return (
     <div
       className="fixed inset-0 z-40 grid place-items-center"
-      style={{ background: "rgba(15,15,15,0.92)" }}
+      style={{ background: 'rgba(15,15,15,0.92)' }}
     >
-      <div className="text-center px-8" style={{ color: "var(--bone)" }}>
-        <p className="chyron mb-3" style={{ color: "var(--marigold)" }}>
+      <div className="text-center px-8" style={{ color: 'var(--bone)' }}>
+        <p className="chyron mb-3" style={{ color: 'var(--marigold)' }}>
           SIGNAL DROPPED · STAND BY
         </p>
-        <p className="display-num" style={{ fontSize: "clamp(80px, 14vw, 200px)", lineHeight: 0.85 }}>
+        <p
+          className="display-num"
+          style={{ fontSize: 'clamp(80px, 14vw, 200px)', lineHeight: 0.85 }}
+        >
           PAUSED.
         </p>
         <p className="font-editorial italic text-2xl mt-3 opacity-80">
@@ -457,9 +501,9 @@ function PausedOverlay({ resumeBy }: { resumeBy: number }) {
         </p>
         <p
           className="display-num ticker tabular-nums mt-6"
-          style={{ fontSize: "clamp(64px, 10vw, 120px)", color: "var(--marigold)" }}
+          style={{ fontSize: 'clamp(64px, 10vw, 120px)', color: 'var(--marigold)' }}
         >
-          {String(remaining).padStart(2, "0")}s
+          {String(remaining).padStart(2, '0')}s
         </p>
       </div>
     </div>

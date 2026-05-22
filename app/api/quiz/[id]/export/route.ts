@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getQuiz } from "@/lib/repos/quiz";
-import { serializeQuiz, quizFilenameSlug } from "@/lib/quiz-io";
+import { type NextRequest, NextResponse } from 'next/server';
+import { quizFilenameSlug, serializeQuiz } from '@/lib/quiz-io';
+import { getQuiz } from '@/lib/repos/quiz';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const quiz = await getQuiz(id);
-  if (!quiz) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!quiz) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
   const json = serializeQuiz({
     title: quiz.title,
@@ -23,8 +23,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   return new NextResponse(json, {
     status: 200,
     headers: {
-      "Content-Type": "application/json",
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      'Content-Type': 'application/json',
+      'Content-Disposition': `attachment; filename="${filename}"`,
     },
   });
 }

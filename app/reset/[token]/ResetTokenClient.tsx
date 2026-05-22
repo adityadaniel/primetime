@@ -1,15 +1,15 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
-import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from "@/components/Broadcast";
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
+import { useState } from 'react';
+import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/components/Broadcast';
 
 export default function ResetTokenClient({ token }: { token: string }) {
   const router = useRouter();
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,7 +18,7 @@ export default function ResetTokenClient({ token }: { token: string }) {
     if (pending) return;
     setError(null);
     if (password.length < 8) {
-      setError("Use at least 8 characters.");
+      setError('Use at least 8 characters.');
       return;
     }
     if (password !== confirm) {
@@ -28,31 +28,31 @@ export default function ResetTokenClient({ token }: { token: string }) {
 
     setPending(true);
     const res = await fetch(`/api/auth/reset/${encodeURIComponent(token)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password }),
     });
     if (!res.ok) {
       setPending(false);
       const body = await res.json().catch(() => ({}));
-      setError(typeof body?.error === "string" ? body.error : "Couldn't update password.");
+      setError(typeof body?.error === 'string' ? body.error : "Couldn't update password.");
       return;
     }
     const body: { email?: string } = await res.json().catch(() => ({}));
     if (body.email) {
-      const signinRes = await signIn("credentials", {
+      const signinRes = await signIn('credentials', {
         email: body.email,
         password,
         redirect: false,
       });
       if (signinRes && !signinRes.error) {
-        router.push("/host");
+        router.push('/host');
         router.refresh();
         return;
       }
     }
     setPending(false);
-    router.push("/signin");
+    router.push('/signin');
   }
 
   return (
@@ -70,12 +70,10 @@ export default function ResetTokenClient({ token }: { token: string }) {
 
       <section className="px-6 pt-8 pb-8 flex-1">
         <div className="max-w-[420px] mx-auto w-full">
-          <p className="ticker text-[11px] tracking-widest opacity-70 mb-2">
-            ▶ BROADCAST  ◀
-          </p>
+          <p className="ticker text-[11px] tracking-widest opacity-70 mb-2">▶ BROADCAST ◀</p>
           <h1
             className="display-num"
-            style={{ fontSize: "clamp(44px, 10vw, 88px)", lineHeight: 0.9 }}
+            style={{ fontSize: 'clamp(44px, 10vw, 88px)', lineHeight: 0.9 }}
           >
             SET NEW
             <br />
@@ -94,7 +92,7 @@ export default function ResetTokenClient({ token }: { token: string }) {
                 aria-label="New password"
                 aria-describedby="reset-password-hint"
                 className="w-full mt-1 ink-border bg-transparent font-editorial text-lg px-4 py-3"
-                style={{ background: "var(--bone)", minHeight: 56 }}
+                style={{ background: 'var(--bone)', minHeight: 56 }}
               />
               <span
                 id="reset-password-hint"
@@ -113,7 +111,7 @@ export default function ResetTokenClient({ token }: { token: string }) {
                 onChange={(e) => setConfirm(e.target.value)}
                 aria-label="Confirm new password"
                 className="w-full mt-1 ink-border bg-transparent font-editorial text-lg px-4 py-3"
-                style={{ background: "var(--bone)", minHeight: 56 }}
+                style={{ background: 'var(--bone)', minHeight: 56 }}
               />
             </label>
 
@@ -121,7 +119,7 @@ export default function ResetTokenClient({ token }: { token: string }) {
               {error && (
                 <div
                   className="ink-border px-4 py-3 ticker text-[12px] tracking-widest"
-                  style={{ background: "var(--vermilion)", color: "var(--bone)" }}
+                  style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
                 >
                   ⚠ {error}
                 </div>
@@ -132,14 +130,14 @@ export default function ResetTokenClient({ token }: { token: string }) {
               type="submit"
               disabled={pending}
               className="w-full ink-border stamp-lg ticker tracking-widest text-[14px] py-4"
-              style={{ background: "var(--ink)", color: "var(--bone)", minHeight: 56 }}
+              style={{ background: 'var(--ink)', color: 'var(--bone)', minHeight: 56 }}
             >
-              {pending ? "UPDATING…" : "▶  UPDATE PASSWORD"}
+              {pending ? 'UPDATING…' : '▶  UPDATE PASSWORD'}
             </button>
           </form>
 
           <p className="mt-6 ticker text-[12px] tracking-widest opacity-80">
-            CHANGED YOUR MIND?{" "}
+            CHANGED YOUR MIND?{' '}
             <Link href="/signin" className="underline">
               SIGN IN
             </Link>

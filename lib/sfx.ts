@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-const MUTE_KEY = "bc:sfx:muted";
-const VOL_KEY = "bc:sfx:vol";
+const MUTE_KEY = 'bc:sfx:muted';
+const VOL_KEY = 'bc:sfx:vol';
 const DEFAULT_VOLUME = 0.6;
 
 let ctx: AudioContext | null = null;
@@ -16,11 +16,11 @@ const loops: { [k: string]: { stop: () => void } | null } = {
 };
 
 function readPersisted() {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
   try {
     const m = localStorage.getItem(MUTE_KEY);
-    if (m === "1") muted = true;
-    else if (m === "0") muted = false;
+    if (m === '1') muted = true;
+    else if (m === '0') muted = false;
     const v = localStorage.getItem(VOL_KEY);
     if (v !== null) {
       const parsed = parseFloat(v);
@@ -32,10 +32,11 @@ function readPersisted() {
 readPersisted();
 
 function ensureCtx(): { ctx: AudioContext; master: GainNode } | null {
-  if (typeof window === "undefined") return null;
+  if (typeof window === 'undefined') return null;
   if (!ctx) {
     const Ctor: typeof AudioContext | undefined =
-      window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
     ctx = new Ctor();
     masterGain = ctx.createGain();
@@ -48,7 +49,7 @@ function ensureCtx(): { ctx: AudioContext; master: GainNode } | null {
 export async function unlockAudio(): Promise<void> {
   const env = ensureCtx();
   if (!env) return;
-  if (env.ctx.state === "suspended") {
+  if (env.ctx.state === 'suspended') {
     try {
       await env.ctx.resume();
     } catch {}
@@ -56,13 +57,13 @@ export async function unlockAudio(): Promise<void> {
 }
 
 export function isUnlocked(): boolean {
-  return !!ctx && ctx.state === "running";
+  return !!ctx && ctx.state === 'running';
 }
 
 export function setMuted(m: boolean): void {
   muted = m;
   try {
-    localStorage.setItem(MUTE_KEY, m ? "1" : "0");
+    localStorage.setItem(MUTE_KEY, m ? '1' : '0');
   } catch {}
   if (masterGain && ctx) {
     masterGain.gain.cancelScheduledValues(ctx.currentTime);
@@ -160,7 +161,7 @@ function noiseBurst(dur: number, peak: number, lpFreq: number) {
   const src = c.createBufferSource();
   src.buffer = buf;
   const f = c.createBiquadFilter();
-  f.type = "lowpass";
+  f.type = 'lowpass';
   f.frequency.value = lpFreq;
   const g = c.createGain();
   g.gain.setValueAtTime(peak, now);
@@ -180,14 +181,14 @@ function noiseBurst(dur: number, peak: number, lpFreq: number) {
 }
 
 export function sfxClick(): void {
-  blip(4000, 0.03, "sine", { peak: 0.25, attack: 0.002, release: 0.028 });
+  blip(4000, 0.03, 'sine', { peak: 0.25, attack: 0.002, release: 0.028 });
 }
 
 export function sfxLockIn(): void {
   const env = ensureCtx();
   if (!env || muted) return;
-  blip(880, 0.06, "square", { peak: 0.3, attack: 0.003, release: 0.057 }, undefined, 0);
-  blip(1320, 0.06, "square", { peak: 0.3, attack: 0.003, release: 0.057 }, undefined, 0.06);
+  blip(880, 0.06, 'square', { peak: 0.3, attack: 0.003, release: 0.057 }, undefined, 0);
+  blip(1320, 0.06, 'square', { peak: 0.3, attack: 0.003, release: 0.057 }, undefined, 0.06);
 }
 
 export function sfxTick(urgent = false): void {
@@ -195,12 +196,12 @@ export function sfxTick(urgent = false): void {
     blip(
       1320,
       0.08,
-      "sawtooth",
+      'sawtooth',
       { peak: 0.35, attack: 0.001, release: 0.079 },
-      { type: "lowpass", frequency: 4000, q: 1 },
+      { type: 'lowpass', frequency: 4000, q: 1 },
     );
   } else {
-    blip(880, 0.06, "sine", { peak: 0.25, attack: 0.003, release: 0.057 });
+    blip(880, 0.06, 'sine', { peak: 0.25, attack: 0.003, release: 0.057 });
   }
 }
 
@@ -210,9 +211,9 @@ export function sfxCorrect(): void {
     blip(
       f,
       0.09,
-      "sine",
+      'sine',
       { peak: 0.4, attack: 0.005, release: 0.085 },
-      { type: "bandpass", frequency: 1500, q: 1.2 },
+      { type: 'bandpass', frequency: 1500, q: 1.2 },
       i * 0.09,
     );
   });
@@ -223,17 +224,17 @@ export function sfxWrong(): void {
   blip(
     220,
     0.2,
-    "sawtooth",
+    'sawtooth',
     { peak: 0.45, attack: 0.005, release: 0.195 },
-    { type: "lowpass", frequency: 600, q: 1 },
+    { type: 'lowpass', frequency: 600, q: 1 },
     0,
   );
   blip(
     175,
     0.2,
-    "sawtooth",
+    'sawtooth',
     { peak: 0.45, attack: 0.005, release: 0.195 },
-    { type: "lowpass", frequency: 600, q: 1 },
+    { type: 'lowpass', frequency: 600, q: 1 },
     0.2,
   );
 }
@@ -241,8 +242,8 @@ export function sfxWrong(): void {
 export function sfxTimeUp(): void {
   const pattern = [0, 0.1, 0.2, 0.3];
   for (const t of pattern) {
-    blip(220, 0.06, "square", { peak: 0.35, attack: 0.001, release: 0.058 }, undefined, t);
-    blip(110, 0.06, "square", { peak: 0.35, attack: 0.001, release: 0.058 }, undefined, t);
+    blip(220, 0.06, 'square', { peak: 0.35, attack: 0.001, release: 0.058 }, undefined, t);
+    blip(110, 0.06, 'square', { peak: 0.35, attack: 0.001, release: 0.058 }, undefined, t);
   }
 }
 
@@ -253,7 +254,7 @@ export function sfxLeaderboardSweep(): void {
   const now = c.currentTime;
   const dur = 0.4;
   const osc = c.createOscillator();
-  osc.type = "sine";
+  osc.type = 'sine';
   osc.frequency.setValueAtTime(200, now);
   osc.frequency.exponentialRampToValueAtTime(1200, now + dur);
   const g = c.createGain();
@@ -281,13 +282,13 @@ export function sfxFinalFanfare(): void {
   chords.forEach((notes, i) => {
     const offset = i * 0.2;
     notes.forEach((f) => {
-      blip(f, 0.2, "sine", { peak: 0.18, attack: 0.005, release: 0.195 }, undefined, offset);
+      blip(f, 0.2, 'sine', { peak: 0.18, attack: 0.005, release: 0.195 }, undefined, offset);
       blip(
         f,
         0.2,
-        "sawtooth",
+        'sawtooth',
         { peak: 0.1, attack: 0.005, release: 0.195 },
-        { type: "lowpass", frequency: 2400, q: 0.7 },
+        { type: 'lowpass', frequency: 2400, q: 0.7 },
         offset,
       );
     });
@@ -312,17 +313,17 @@ export function startLobbyAmbience(): void {
   if (!made) return;
   const { ctx: c, gain } = made;
   const o1 = c.createOscillator();
-  o1.type = "sine";
+  o1.type = 'sine';
   o1.frequency.value = 110;
   const o2 = c.createOscillator();
-  o2.type = "sine";
+  o2.type = 'sine';
   o2.frequency.value = 165;
   const filter = c.createBiquadFilter();
-  filter.type = "lowpass";
+  filter.type = 'lowpass';
   filter.frequency.value = 800;
   filter.Q.value = 1;
   const lfo = c.createOscillator();
-  lfo.type = "sine";
+  lfo.type = 'sine';
   lfo.frequency.value = 0.2;
   const lfoGain = c.createGain();
   lfoGain.gain.value = 400;
@@ -371,7 +372,7 @@ export function startQuestionTension(): void {
   if (!made) return;
   const { ctx: c, gain } = made;
   const o = c.createOscillator();
-  o.type = "sine";
+  o.type = 'sine';
   o.frequency.value = 65;
   const pulse = c.createGain();
   pulse.gain.value = 0;
@@ -424,20 +425,22 @@ export function startFinalLoop(): void {
   const freqs = [130.81, 164.81, 196.0, 261.63]; // C3 E3 G3 C4
   const oscs = freqs.map((f) => {
     const o = c.createOscillator();
-    o.type = "sine";
+    o.type = 'sine';
     o.frequency.value = f;
     o.connect(gain);
     return o;
   });
   const lfo = c.createOscillator();
-  lfo.type = "sine";
+  lfo.type = 'sine';
   lfo.frequency.value = 0.1;
   const lfoGain = c.createGain();
   lfoGain.gain.value = 0.012; // ~±3dB at 0.06 base
   lfo.connect(lfoGain);
   lfoGain.connect(gain.gain);
   const now = c.currentTime;
-  oscs.forEach((o) => o.start(now));
+  oscs.forEach((o) => {
+    o.start(now);
+  });
   lfo.start(now);
   loops.final = {
     stop: () => {
@@ -445,11 +448,15 @@ export function startFinalLoop(): void {
       gain.gain.cancelScheduledValues(t);
       gain.gain.setValueAtTime(gain.gain.value, t);
       gain.gain.linearRampToValueAtTime(0, t + 0.15);
-      oscs.forEach((o) => o.stop(t + 0.18));
+      oscs.forEach((o) => {
+        o.stop(t + 0.18);
+      });
       lfo.stop(t + 0.18);
       const cleanup = () => {
         try {
-          oscs.forEach((o) => o.disconnect());
+          oscs.forEach((o) => {
+            o.disconnect();
+          });
           lfo.disconnect();
           lfoGain.disconnect();
           gain.disconnect();

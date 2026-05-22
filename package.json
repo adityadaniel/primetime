@@ -6,7 +6,9 @@
     "dev": "tsx server.ts",
     "build": "prisma generate && next build",
     "start": "NODE_ENV=production tsx server.ts",
-    "lint": "next lint",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
     "smoke": "tsx scripts/smoke.ts",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -33,6 +35,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.15",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "22.9.0",
     "@types/react": "^19.2.14",

@@ -1,8 +1,8 @@
-import type { NextAuthConfig } from "next-auth";
-import Google from "next-auth/providers/google";
+import type { NextAuthConfig } from 'next-auth';
+import Google from 'next-auth/providers/google';
 
 export default {
-  pages: { signIn: "/signin" },
+  pages: { signIn: '/signin' },
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,

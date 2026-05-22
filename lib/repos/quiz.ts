@@ -1,23 +1,28 @@
-import { prisma } from "@/lib/db";
-import type { Quiz, Question } from "@prisma/client";
-import type { QuestionInput, QuizSummary } from "@/lib/types";
+import type { Question, Quiz } from '@prisma/client';
+import { prisma } from '@/lib/db';
+import type { QuestionInput, QuizSummary } from '@/lib/types';
 
 export type QuizWithQuestions = Quiz & { questions: Question[] };
 
 function validateQuestionInput(q: QuestionInput, idx: number): string | null {
-  if (q.type !== "multiple" && q.type !== "truefalse") return `Q${idx}: bad type`;
-  if (typeof q.text !== "string" || !q.text.trim()) return `Q${idx}: empty text`;
-  if (!Array.isArray(q.options) || q.options.length < 2 || q.options.length > 4) return `Q${idx}: 2-4 options required`;
-  if (q.options.some((o) => typeof o !== "string" || !o.trim())) return `Q${idx}: empty option`;
+  if (q.type !== 'multiple' && q.type !== 'truefalse') return `Q${idx}: bad type`;
+  if (typeof q.text !== 'string' || !q.text.trim()) return `Q${idx}: empty text`;
+  if (!Array.isArray(q.options) || q.options.length < 2 || q.options.length > 4)
+    return `Q${idx}: 2-4 options required`;
+  if (q.options.some((o) => typeof o !== 'string' || !o.trim())) return `Q${idx}: empty option`;
   if (q.correct < 0 || q.correct >= q.options.length) return `Q${idx}: correct out of range`;
-  if (typeof q.timeLimit !== "number" || q.timeLimit < 3 || q.timeLimit > 600) return `Q${idx}: bad timeLimit`;
-  if (typeof q.doublePoints !== "boolean") return `Q${idx}: bad doublePoints`;
+  if (typeof q.timeLimit !== 'number' || q.timeLimit < 3 || q.timeLimit > 600)
+    return `Q${idx}: bad timeLimit`;
+  if (typeof q.doublePoints !== 'boolean') return `Q${idx}: bad doublePoints`;
   return null;
 }
 
-export async function createQuiz(input: { title: string; questions: QuestionInput[] }): Promise<QuizWithQuestions> {
-  if (!input.title?.trim()) throw new Error("Title required");
-  if (!input.questions?.length) throw new Error("At least one question required");
+export async function createQuiz(input: {
+  title: string;
+  questions: QuestionInput[];
+}): Promise<QuizWithQuestions> {
+  if (!input.title?.trim()) throw new Error('Title required');
+  if (!input.questions?.length) throw new Error('At least one question required');
   for (const [i, q] of input.questions.entries()) {
     const err = validateQuestionInput(q, i + 1);
     if (err) throw new Error(err);
@@ -37,20 +42,20 @@ export async function createQuiz(input: { title: string; questions: QuestionInpu
         })),
       },
     },
-    include: { questions: { orderBy: { ordinal: "asc" } } },
+    include: { questions: { orderBy: { ordinal: 'asc' } } },
   });
 }
 
 export async function getQuiz(id: string): Promise<QuizWithQuestions | null> {
   return prisma.quiz.findUnique({
     where: { id },
-    include: { questions: { orderBy: { ordinal: "asc" } } },
+    include: { questions: { orderBy: { ordinal: 'asc' } } },
   });
 }
 
 export async function listQuizzes(): Promise<QuizSummary[]> {
   const rows = await prisma.quiz.findMany({
-    orderBy: { updatedAt: "desc" },
+    orderBy: { updatedAt: 'desc' },
     select: {
       id: true,
       title: true,
@@ -66,16 +71,19 @@ export async function listQuizzes(): Promise<QuizSummary[]> {
   }));
 }
 
-export async function updateQuiz(id: string, input: { title: string; questions: QuestionInput[] }): Promise<QuizWithQuestions> {
-  if (!input.title?.trim()) throw new Error("Title required");
-  if (!input.questions?.length) throw new Error("At least one question required");
+export async function updateQuiz(
+  id: string,
+  input: { title: string; questions: QuestionInput[] },
+): Promise<QuizWithQuestions> {
+  if (!input.title?.trim()) throw new Error('Title required');
+  if (!input.questions?.length) throw new Error('At least one question required');
   for (const [i, q] of input.questions.entries()) {
     const err = validateQuestionInput(q, i + 1);
     if (err) throw new Error(err);
   }
   return prisma.$transaction(async (tx) => {
     const existing = await tx.quiz.findUnique({ where: { id } });
-    if (!existing) throw new Error("Quiz not found");
+    if (!existing) throw new Error('Quiz not found');
     await tx.question.deleteMany({ where: { quizId: id } });
     return tx.quiz.update({
       where: { id },
@@ -93,7 +101,7 @@ export async function updateQuiz(id: string, input: { title: string; questions: 
           })),
         },
       },
-      include: { questions: { orderBy: { ordinal: "asc" } } },
+      include: { questions: { orderBy: { ordinal: 'asc' } } },
     });
   });
 }

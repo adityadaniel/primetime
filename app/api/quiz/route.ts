@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createQuiz, listQuizzes } from "@/lib/repos/quiz";
+import { type NextRequest, NextResponse } from 'next/server';
+import { createQuiz, listQuizzes } from '@/lib/repos/quiz';
 
 export async function POST(req: NextRequest) {
   try {
@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     const quiz = await createQuiz(body);
     return NextResponse.json({ id: quiz.id });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "bad request";
+    const msg = e instanceof Error ? e.message : 'bad request';
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 }

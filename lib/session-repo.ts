@@ -1,9 +1,9 @@
-import { prisma } from "./db";
+import { prisma } from './db';
 
 function isEnabled(): boolean {
   const v = process.env.ENABLE_SESSION_PERSISTENCE;
   if (v === undefined) return true;
-  return v !== "false" && v !== "0";
+  return v !== 'false' && v !== '0';
 }
 
 export async function createSessionRecord(args: {
@@ -17,7 +17,7 @@ export async function createSessionRecord(args: {
       pin: args.pin,
       hostUserId: args.hostUserId,
       quizSnapshot: args.quizSnapshot as object,
-      status: "active",
+      status: 'active',
     },
     select: { id: true },
   });
@@ -71,7 +71,7 @@ export async function recordAnswer(args: {
 
 export async function finalizeSession(args: {
   sessionId: string;
-  status: "finished" | "abandoned";
+  status: 'finished' | 'abandoned';
   finalLeaderboard: Array<{
     playerId: string;
     nickname: string;

@@ -1,6 +1,6 @@
 export type AnswerIndex = 0 | 1 | 2 | 3;
 
-export type QuestionType = "multiple" | "truefalse";
+export type QuestionType = 'multiple' | 'truefalse';
 
 export interface Question {
   id: string;
@@ -27,13 +27,7 @@ export interface Player {
   disconnectedAt?: number;
 }
 
-export type GamePhase =
-  | "lobby"
-  | "question"
-  | "locked"
-  | "reveal"
-  | "leaderboard"
-  | "final";
+export type GamePhase = 'lobby' | 'question' | 'locked' | 'reveal' | 'leaderboard' | 'final';
 
 export interface AnswerRecord {
   playerId: string;
@@ -63,10 +57,10 @@ export interface PublicGameState {
     totalAnswers: number;
   };
   paused?: {
-    reason: "host-disconnected";
+    reason: 'host-disconnected';
     resumeBy: number;
   };
-  endedReason?: "host-left";
+  endedReason?: 'host-left';
   playerCount?: number;
   cap?: {
     hard: number;
@@ -86,7 +80,7 @@ export interface PersonalState {
   total?: number;
 }
 
-export type JoinErrorCode = "full" | "nickname-rejected";
+export type JoinErrorCode = 'full' | 'nickname-rejected';
 
 export interface JoinResult {
   ok: boolean;
