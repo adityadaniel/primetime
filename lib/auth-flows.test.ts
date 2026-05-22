@@ -53,13 +53,12 @@ beforeEach(() => {
 describe('POST /api/auth/signup', () => {
   it('creates a user with a hashed password and lowercases email', async () => {
     userFindUnique.mockResolvedValue(null);
-    let createdData: { email: string; passwordHash: string; name: string | null } | null = null;
-    userCreate.mockImplementation(
-      ({ data }: { data: { email: string; passwordHash: string; name: string | null } }) => {
-        createdData = data;
-        return { id: 'u1', ...data };
-      },
-    );
+    type CreatedData = { email: string; passwordHash: string; name: string | null };
+    const captured: { value: CreatedData | null } = { value: null };
+    userCreate.mockImplementation(({ data }: { data: CreatedData }) => {
+      captured.value = data;
+      return { id: 'u1', ...data };
+    });
 
     const res = await signupPOST(
       jsonReq('http://localhost/api/auth/signup', {
@@ -71,10 +70,11 @@ describe('POST /api/auth/signup', () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
-    expect(createdData).not.toBeNull();
-    expect(createdData?.email).toBe('alice@example.com');
-    expect(createdData?.passwordHash).not.toBe('hunter22');
-    expect(await compare('hunter22', createdData?.passwordHash)).toBe(true);
+    expect(captured.value).not.toBeNull();
+    expect(captured.value?.email).toBe('alice@example.com');
+    expect(captured.value?.passwordHash).not.toBe('hunter22');
+    expect(captured.value?.passwordHash).toBeDefined();
+    expect(await compare('hunter22', captured.value?.passwordHash ?? '')).toBe(true);
   });
 
   it('rejects an existing email with 409', async () => {

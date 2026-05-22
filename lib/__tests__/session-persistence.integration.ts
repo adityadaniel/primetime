@@ -50,7 +50,8 @@ describeIfIntegration('session-persistence integration', () => {
       quizSnapshot: { title: 'Integration', questions: [] },
     });
     expect(created).not.toBeNull();
-    const sessionId = created?.id;
+    if (!created) throw new Error('createSessionRecord returned null');
+    const sessionId = created.id;
 
     await recordPlayerJoin({ sessionId, inGameId: 'p_a', nickname: 'Alice' });
     await recordPlayerJoin({ sessionId, inGameId: 'p_b', nickname: 'Bob' });
