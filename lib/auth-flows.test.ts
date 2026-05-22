@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { compare } from 'bcryptjs';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const userFindUnique = vi.fn();
 const userCreate = vi.fn();
@@ -48,6 +48,14 @@ beforeEach(() => {
   tokenFindUnique.mockReset();
   tokenUpdate.mockReset();
   txn.mockReset();
+  // Default: invite gate OFF for legacy tests. Invite-specific tests opt in.
+  process.env.REQUIRE_INVITE_CODE = 'false';
+  process.env.BETA_INVITE_CODES = '';
+});
+
+afterEach(() => {
+  delete process.env.REQUIRE_INVITE_CODE;
+  delete process.env.BETA_INVITE_CODES;
 });
 
 describe('POST /api/auth/signup', () => {
@@ -111,6 +119,77 @@ describe('POST /api/auth/signup', () => {
     });
     const res = await signupPOST(req);
     expect(res.status).toBe(400);
+  });
+});
+
+describe('POST /api/auth/signup — invite-code gate', () => {
+  it('rejects signups without an invite code when the gate is on', async () => {
+    process.env.REQUIRE_INVITE_CODE = 'true';
+    process.env.BETA_INVITE_CODES = 'academy2026,daniel';
+    userFindUnique.mockResolvedValue(null);
+
+    const res = await signupPOST(
+      jsonReq('http://localhost/api/auth/signup', {
+        email: 'new@example.com',
+        password: 'hunter22',
+      }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ ok: false, error: 'Invite code not recognized' });
+    expect(userCreate).not.toHaveBeenCalled();
+  });
+
+  it('rejects signups with an unknown invite code', async () => {
+    process.env.REQUIRE_INVITE_CODE = 'true';
+    process.env.BETA_INVITE_CODES = 'academy2026,daniel';
+    userFindUnique.mockResolvedValue(null);
+
+    const res = await signupPOST(
+      jsonReq('http://localhost/api/auth/signup', {
+        email: 'new@example.com',
+        password: 'hunter22',
+        inviteCode: 'not-a-real-code',
+      }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(userCreate).not.toHaveBeenCalled();
+  });
+
+  it('accepts signups with a valid invite code (case-insensitive, whitespace tolerant)', async () => {
+    process.env.REQUIRE_INVITE_CODE = 'true';
+    process.env.BETA_INVITE_CODES = 'academy2026,daniel';
+    userFindUnique.mockResolvedValue(null);
+    userCreate.mockResolvedValue({ id: 'u1' });
+
+    const res = await signupPOST(
+      jsonReq('http://localhost/api/auth/signup', {
+        email: 'new@example.com',
+        password: 'hunter22',
+        inviteCode: ' Academy2026 ',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(userCreate).toHaveBeenCalledOnce();
+  });
+
+  it('skips the gate when REQUIRE_INVITE_CODE=false', async () => {
+    process.env.REQUIRE_INVITE_CODE = 'false';
+    process.env.BETA_INVITE_CODES = 'academy2026';
+    userFindUnique.mockResolvedValue(null);
+    userCreate.mockResolvedValue({ id: 'u1' });
+
+    const res = await signupPOST(
+      jsonReq('http://localhost/api/auth/signup', {
+        email: 'new@example.com',
+        password: 'hunter22',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(userCreate).toHaveBeenCalledOnce();
   });
 });
 
