@@ -1,15 +1,15 @@
-"use client";
+'use client';
 
-import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useSocket } from "@/lib/socket";
-import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from "@/components/Broadcast";
+import { useRouter } from 'next/navigation';
+import { useRef, useState } from 'react';
+import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/components/Broadcast';
+import { useSocket } from '@/lib/socket';
 
 export default function JoinPage() {
   const router = useRouter();
   const socket = useSocket();
-  const [pin, setPin] = useState("");
-  const [nickname, setNickname] = useState("");
+  const [pin, setPin] = useState('');
+  const [nickname, setNickname] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -22,29 +22,29 @@ export default function JoinPage() {
     setError(null);
     setErrorCode(null);
     if (pin.length !== 6 || !/^\d{6}$/.test(pin)) {
-      setError("PIN must be 6 digits");
+      setError('PIN must be 6 digits');
       return;
     }
     if (!nickname.trim()) {
-      setError("Pick a name");
+      setError('Pick a name');
       return;
     }
     inFlight.current = true;
     setPending(true);
     socket.emit(
-      "player:join",
+      'player:join',
       pin,
       nickname.trim(),
       (res: { ok: boolean; error?: string; code?: string; playerId?: string }) => {
         inFlight.current = false;
         setPending(false);
         if (!res.ok) {
-          setError(res.error ?? "Could not join");
+          setError(res.error ?? 'Could not join');
           setErrorCode(res.code ?? null);
           return;
         }
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem(`bc:player:${pin}`, res.playerId ?? "");
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(`bc:player:${pin}`, res.playerId ?? '');
           sessionStorage.setItem(`bc:nick:${pin}`, nickname.trim());
         }
         router.push(`/play/${pin}`);
@@ -69,7 +69,7 @@ export default function JoinPage() {
         <div className="max-w-[640px] mx-auto w-full">
           <h1
             className="display-num"
-            style={{ fontSize: "clamp(56px, 13vw, 140px)", lineHeight: 0.9 }}
+            style={{ fontSize: 'clamp(56px, 13vw, 140px)', lineHeight: 0.9 }}
           >
             JOIN
           </h1>
@@ -85,14 +85,14 @@ export default function JoinPage() {
                 pattern="\d*"
                 maxLength={6}
                 value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="000 000"
                 aria-label="6 digit PIN"
                 className="w-full mt-1 ink-border bg-transparent display-num ticker tabular-nums text-center px-3 py-3"
                 style={{
-                  fontSize: "clamp(44px, 11vw, 96px)",
-                  letterSpacing: "0.12em",
-                  background: "var(--bone)",
+                  fontSize: 'clamp(44px, 11vw, 96px)',
+                  letterSpacing: '0.12em',
+                  background: 'var(--bone)',
                   minHeight: 70,
                 }}
               />
@@ -106,25 +106,25 @@ export default function JoinPage() {
                 placeholder="Your name"
                 aria-label="Nickname"
                 className="w-full mt-1 ink-border bg-transparent font-editorial text-xl px-4 py-3"
-                style={{ background: "var(--bone)", minHeight: 56 }}
+                style={{ background: 'var(--bone)', minHeight: 56 }}
               />
             </label>
 
-            {error && errorCode === "full" && (
+            {error && errorCode === 'full' && (
               <div
                 className="ink-border halftone px-4 py-4"
                 role="alert"
-                style={{ background: "var(--ink)", color: "var(--bone)" }}
+                style={{ background: 'var(--ink)', color: 'var(--bone)' }}
               >
                 <span
                   className="ticker text-[11px] tracking-widest px-2 py-[2px] ink-border"
-                  style={{ background: "var(--vermilion)", color: "var(--bone)" }}
+                  style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
                 >
                   SIGNAL · AT CAPACITY
                 </span>
                 <p
                   className="display-num mt-3"
-                  style={{ fontSize: "clamp(28px, 5vw, 44px)", lineHeight: 0.95 }}
+                  style={{ fontSize: 'clamp(28px, 5vw, 44px)', lineHeight: 0.95 }}
                 >
                   ROOM IS FULL
                 </p>
@@ -134,11 +134,11 @@ export default function JoinPage() {
               </div>
             )}
 
-            {error && errorCode !== "full" && (
+            {error && errorCode !== 'full' && (
               <div
                 className="ink-border px-4 py-3 ticker text-[12px] tracking-widest"
                 role="alert"
-                style={{ background: "var(--vermilion)", color: "var(--bone)" }}
+                style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
               >
                 ⚠ {error}
               </div>
@@ -149,12 +149,12 @@ export default function JoinPage() {
               disabled={pending}
               className="w-full ink-border stamp-lg ticker tracking-widest text-[14px] py-4"
               style={{
-                background: "var(--vermilion)",
-                color: "var(--bone)",
+                background: 'var(--vermilion)',
+                color: 'var(--bone)',
                 minHeight: 56,
               }}
             >
-              {pending ? "JOINING…" : "▶  GO ON AIR"}
+              {pending ? 'JOINING…' : '▶  GO ON AIR'}
             </button>
           </form>
         </div>

@@ -1,6 +1,6 @@
-"use client";
-import { useEffect, useRef } from "react";
-import * as sfx from "./sfx";
+'use client';
+import { useEffect, useRef } from 'react';
+import * as sfx from './sfx';
 
 export function useSfx() {
   const unlockedRef = useRef(false);
@@ -10,14 +10,14 @@ export function useSfx() {
     const handler = async () => {
       await sfx.unlockAudio();
       unlockedRef.current = true;
-      window.removeEventListener("pointerdown", handler);
-      window.removeEventListener("keydown", handler);
+      window.removeEventListener('pointerdown', handler);
+      window.removeEventListener('keydown', handler);
     };
-    window.addEventListener("pointerdown", handler);
-    window.addEventListener("keydown", handler);
+    window.addEventListener('pointerdown', handler);
+    window.addEventListener('keydown', handler);
     return () => {
-      window.removeEventListener("pointerdown", handler);
-      window.removeEventListener("keydown", handler);
+      window.removeEventListener('pointerdown', handler);
+      window.removeEventListener('keydown', handler);
     };
   }, []);
 

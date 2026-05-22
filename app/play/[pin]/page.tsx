@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import { useSocket } from "@/lib/socket";
-import { CHANNELS, Shape } from "@/components/Shape";
-import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from "@/components/Broadcast";
-import { Countdown } from "@/components/Countdown";
-import { useSfx } from "@/lib/use-sfx";
-import type { AnswerIndex, PublicGameState } from "@/lib/types";
+import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
+import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Countdown } from '@/components/Countdown';
+import { CHANNELS, Shape } from '@/components/Shape';
+import { useSocket } from '@/lib/socket';
+import type { AnswerIndex, PublicGameState } from '@/lib/types';
+import { useSfx } from '@/lib/use-sfx';
 
 interface Personal {
   hasAnswered: boolean;
@@ -34,13 +34,16 @@ function PlayerPausedOverlay({ resumeBy }: { resumeBy: number }) {
   return (
     <div
       className="fixed inset-0 z-40 grid place-items-center px-6"
-      style={{ background: "rgba(15,15,15,0.92)" }}
+      style={{ background: 'rgba(15,15,15,0.92)' }}
     >
-      <div className="text-center" style={{ color: "var(--bone)" }}>
-        <p className="chyron mb-3" style={{ color: "var(--marigold)" }}>
+      <div className="text-center" style={{ color: 'var(--bone)' }}>
+        <p className="chyron mb-3" style={{ color: 'var(--marigold)' }}>
           STAND BY · HOST OFF-AIR
         </p>
-        <p className="display-num" style={{ fontSize: "clamp(56px, 14vw, 120px)", lineHeight: 0.85 }}>
+        <p
+          className="display-num"
+          style={{ fontSize: 'clamp(56px, 14vw, 120px)', lineHeight: 0.85 }}
+        >
           PAUSED.
         </p>
         <p className="font-editorial italic text-lg mt-3 opacity-80">
@@ -48,9 +51,9 @@ function PlayerPausedOverlay({ resumeBy }: { resumeBy: number }) {
         </p>
         <p
           className="display-num ticker tabular-nums mt-5"
-          style={{ fontSize: "clamp(48px, 14vw, 96px)", color: "var(--marigold)" }}
+          style={{ fontSize: 'clamp(48px, 14vw, 96px)', color: 'var(--marigold)' }}
         >
-          {String(remaining).padStart(2, "0")}s
+          {String(remaining).padStart(2, '0')}s
         </p>
       </div>
     </div>
@@ -60,7 +63,7 @@ function PlayerPausedOverlay({ resumeBy }: { resumeBy: number }) {
 export default function PlayPage({ params }: { params: Promise<{ pin: string }> }) {
   const socket = useSocket();
   const sfx = useSfx();
-  const [pin, setPin] = useState<string>("");
+  const [pin, setPin] = useState<string>('');
   const [state, setState] = useState<PublicGameState | null>(null);
   const [personal, setPersonal] = useState<Personal | null>(null);
   const [me, setMe] = useState<{ id: string; nickname: string } | null>(null);
@@ -70,7 +73,7 @@ export default function PlayPage({ params }: { params: Promise<{ pin: string }> 
   const [evicted, setEvicted] = useState<string | null>(null);
   const [muted, setMutedState] = useState<boolean>(() => sfx.isMuted());
 
-  const prevPhaseRef = useRef<string>("");
+  const prevPhaseRef = useRef<string>('');
   const prevAnsweredRef = useRef(false);
   const lastTickSecRef = useRef(-1);
 
@@ -81,15 +84,15 @@ export default function PlayPage({ params }: { params: Promise<{ pin: string }> 
 
     sfx.stopAllLoops();
 
-    if (phase === "lobby") sfx.startLobbyAmbience();
-    if (phase === "question") sfx.startQuestionTension();
-    if (phase === "reveal") {
+    if (phase === 'lobby') sfx.startLobbyAmbience();
+    if (phase === 'question') sfx.startQuestionTension();
+    if (phase === 'reveal') {
       if (personal && !personal.hasAnswered) sfx.sfxTimeUp();
       else if (personal?.lastCorrect) sfx.sfxCorrect();
       else sfx.sfxWrong();
     }
-    if (phase === "leaderboard") sfx.sfxLeaderboardSweep();
-    if (phase === "final") {
+    if (phase === 'leaderboard') sfx.sfxLeaderboardSweep();
+    if (phase === 'final') {
       sfx.sfxFinalFanfare();
       setTimeout(() => sfx.startFinalLoop(), 700);
     }
@@ -98,7 +101,7 @@ export default function PlayPage({ params }: { params: Promise<{ pin: string }> 
   }, [state, state?.phase, personal, personal?.lastCorrect, personal?.hasAnswered, sfx]);
 
   useEffect(() => {
-    if (state?.phase !== "question" || !state?.endsAt) return;
+    if (state?.phase !== 'question' || !state?.endsAt) return;
     const id = window.setInterval(() => {
       const msLeft = Math.max(0, (state.endsAt ?? 0) - Date.now());
       const sec = Math.ceil(msLeft / 1000);
@@ -148,19 +151,25 @@ export default function PlayPage({ params }: { params: Promise<{ pin: string }> 
     const onPersonal = (p: Personal) => setPersonal(p);
     const onReconnected = (e: { nickname: string }) => {
       if (e.nickname.toLowerCase() === me.nickname.toLowerCase()) {
-        flashToast(setToast, "Reconnected — score restored");
+        flashToast(setToast, 'Reconnected — score restored');
       }
     };
-    socket.on("state", onState);
-    socket.on("personal", onPersonal);
-    socket.on("event:reconnected", onReconnected);
+    socket.on('state', onState);
+    socket.on('personal', onPersonal);
+    socket.on('event:reconnected', onReconnected);
 
     const rejoin = () => {
       socket.emit(
-        "player:join",
+        'player:join',
         pin,
         me.nickname,
-        (res: { ok: boolean; error?: string; code?: string; playerId?: string; reconnected?: boolean }) => {
+        (res: {
+          ok: boolean;
+          error?: string;
+          code?: string;
+          playerId?: string;
+          reconnected?: boolean;
+        }) => {
           if (!res.ok) {
             setEvicted(res.error ?? "You're no longer in this game.");
             return;
@@ -172,50 +181,43 @@ export default function PlayPage({ params }: { params: Promise<{ pin: string }> 
       );
     };
     if (socket.connected) rejoin();
-    socket.on("connect", rejoin);
+    socket.on('connect', rejoin);
     return () => {
-      socket.off("state", onState);
-      socket.off("personal", onPersonal);
-      socket.off("event:reconnected", onReconnected);
-      socket.off("connect", rejoin);
+      socket.off('state', onState);
+      socket.off('personal', onPersonal);
+      socket.off('event:reconnected', onReconnected);
+      socket.off('connect', rejoin);
     };
   }, [socket, pin, me]);
 
   function submit(i: AnswerIndex) {
     if (!socket || !pin) return;
-    if (state?.phase !== "question") return;
+    if (state?.phase !== 'question') return;
     if (personal?.hasAnswered) return;
     setSubmitting(true);
     setError(null);
-    socket.emit(
-      "player:answer",
-      pin,
-      i,
-      (res: { ok: boolean; error?: string }) => {
-        setSubmitting(false);
-        if (!res.ok) setError(res.error ?? "Could not submit");
-      },
-    );
+    socket.emit('player:answer', pin, i, (res: { ok: boolean; error?: string }) => {
+      setSubmitting(false);
+      if (!res.ok) setError(res.error ?? 'Could not submit');
+    });
   }
 
-  const phase = state?.phase ?? "lobby";
-  const live = phase !== "lobby" && phase !== "final";
+  const phase = state?.phase ?? 'lobby';
+  const live = phase !== 'lobby' && phase !== 'final';
   const currentNo = Math.max(0, (state?.questionIndex ?? -1) + 1);
 
   if (!me) {
     return (
       <main className="min-h-screen grid place-items-center px-6">
         <div className="max-w-md text-center">
-          <p className="chyron mb-3" style={{ color: "var(--vermilion)" }}>
+          <p className="chyron mb-3" style={{ color: 'var(--vermilion)' }}>
             NO CREDENTIAL FOUND
           </p>
-          <p className="font-editorial text-xl mb-4">
-            Looks like you arrived without checking in.
-          </p>
+          <p className="font-editorial text-xl mb-4">Looks like you arrived without checking in.</p>
           <Link
             href="/join"
             className="ink-border stamp ticker text-[12px] tracking-widest px-4 py-3 inline-block"
-            style={{ background: "var(--vermilion)", color: "var(--bone)" }}
+            style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
           >
             ↩ HEAD TO /JOIN
           </Link>
@@ -228,14 +230,14 @@ export default function PlayPage({ params }: { params: Promise<{ pin: string }> 
     return (
       <main className="min-h-screen grid place-items-center px-6">
         <div className="max-w-md text-center">
-          <p className="chyron mb-3" style={{ color: "var(--vermilion)" }}>
+          <p className="chyron mb-3" style={{ color: 'var(--vermilion)' }}>
             SIGNAL LOST
           </p>
           <p className="font-editorial text-xl mb-4">{evicted}</p>
           <Link
             href="/join"
             className="ink-border stamp ticker text-[12px] tracking-widest px-4 py-3 inline-block"
-            style={{ background: "var(--vermilion)", color: "var(--bone)" }}
+            style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
           >
             ↩ REJOIN
           </Link>
@@ -249,23 +251,23 @@ export default function PlayPage({ params }: { params: Promise<{ pin: string }> 
       <CornerMarks />
       <button
         onClick={toggleMute}
-        aria-label={muted ? "Unmute" : "Mute"}
+        aria-label={muted ? 'Unmute' : 'Mute'}
         aria-pressed={muted}
         className="fixed top-3 right-3 z-50 ink-border ticker text-[11px] tracking-widest grid place-items-center"
         style={{
           width: 44,
           height: 44,
-          background: muted ? "var(--ash)" : "var(--bone)",
-          color: "var(--ink)",
+          background: muted ? 'var(--ash)' : 'var(--bone)',
+          color: 'var(--ink)',
         }}
       >
-        {muted ? "MUTE" : "SND"}
+        {muted ? 'MUTE' : 'SND'}
       </button>
       {state?.paused && <PlayerPausedOverlay resumeBy={state.paused.resumeBy} />}
       {toast && (
         <div
           className="fixed top-4 left-1/2 -translate-x-1/2 z-50 ink-border stamp ticker text-[11px] tracking-widest px-3 py-2"
-          style={{ background: "var(--ivy)", color: "var(--bone)" }}
+          style={{ background: 'var(--ivy)', color: 'var(--bone)' }}
         >
           ✓ {toast}
         </div>
@@ -281,18 +283,19 @@ export default function PlayPage({ params }: { params: Promise<{ pin: string }> 
       <SmpteBars className="h-1.5 mt-3" />
 
       <div className="px-5 pt-4 max-w-[680px] mx-auto w-full flex-1 flex flex-col">
-        <div className="flex items-center justify-between border-b-2 pb-2" style={{ borderColor: "var(--ink)" }}>
+        <div
+          className="flex items-center justify-between border-b-2 pb-2"
+          style={{ borderColor: 'var(--ink)' }}
+        >
           <span className="font-editorial text-lg">
             <span className="opacity-60">ID·</span>
             <span className="ml-1">{me.nickname}</span>
           </span>
-          <span className="ticker text-[11px] tracking-widest opacity-70">
-            PIN {pin}
-          </span>
+          <span className="ticker text-[11px] tracking-widest opacity-70">PIN {pin}</span>
         </div>
 
-        {phase === "lobby" && <PlayerLobby state={state} nickname={me.nickname} />}
-        {phase === "question" && state && (
+        {phase === 'lobby' && <PlayerLobby state={state} nickname={me.nickname} />}
+        {phase === 'question' && state && (
           <PlayerQuestion
             state={state}
             personal={personal}
@@ -301,9 +304,9 @@ export default function PlayPage({ params }: { params: Promise<{ pin: string }> 
             error={error}
           />
         )}
-        {phase === "reveal" && state && <PlayerReveal state={state} personal={personal} />}
-        {phase === "leaderboard" && <PlayerInterstitial personal={personal} />}
-        {phase === "final" && <PlayerFinal personal={personal} state={state} />}
+        {phase === 'reveal' && state && <PlayerReveal state={state} personal={personal} />}
+        {phase === 'leaderboard' && <PlayerInterstitial personal={personal} />}
+        {phase === 'final' && <PlayerFinal personal={personal} state={state} />}
       </div>
     </main>
   );
@@ -312,10 +315,10 @@ export default function PlayPage({ params }: { params: Promise<{ pin: string }> 
 function PlayerLobby({ state, nickname }: { state: PublicGameState | null; nickname: string }) {
   return (
     <div className="flex-1 flex flex-col justify-center items-center text-center pt-10">
-      <p className="chyron mb-3" style={{ color: "var(--vermilion)" }}>
+      <p className="chyron mb-3" style={{ color: 'var(--vermilion)' }}>
         STAND BY · MIC HOT
       </p>
-      <h1 className="display-num" style={{ fontSize: "clamp(72px, 18vw, 160px)" }}>
+      <h1 className="display-num" style={{ fontSize: 'clamp(72px, 18vw, 160px)' }}>
         YOU'RE&nbsp;IN.
       </h1>
       <p className="font-editorial text-2xl mt-3">
@@ -357,14 +360,18 @@ function PlayerQuestion({
       <div className="flex items-center justify-between">
         <span
           className="ticker text-[11px] tracking-widest px-2 py-[2px]"
-          style={{ background: "var(--vermilion)", color: "var(--bone)" }}
+          style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
         >
-          CUE {String(state.questionIndex + 1).padStart(2, "0")} / {String(state.totalQuestions).padStart(2, "0")}
+          CUE {String(state.questionIndex + 1).padStart(2, '0')} /{' '}
+          {String(state.totalQuestions).padStart(2, '0')}
         </span>
         <Countdown endsAt={state.endsAt} startedAt={state.startedAt} size={64} />
       </div>
 
-      <p className="font-editorial leading-tight mt-3 teleprompter" style={{ fontSize: "clamp(22px, 5vw, 32px)" }}>
+      <p
+        className="font-editorial leading-tight mt-3 teleprompter"
+        style={{ fontSize: 'clamp(22px, 5vw, 32px)' }}
+      >
         {q.text}
       </p>
 
@@ -381,7 +388,7 @@ function PlayerQuestion({
               className="answer-tile relative ink-border p-4 flex flex-col items-start text-left"
               style={{
                 background: ch.color,
-                color: "var(--bone)",
+                color: 'var(--bone)',
                 opacity: dim ? 0.45 : 1,
                 minHeight: 132,
               }}
@@ -389,17 +396,17 @@ function PlayerQuestion({
             >
               <div className="flex items-center justify-between w-full">
                 <span className="ticker text-[11px] tracking-widest opacity-90">
-                  CH.{String(i + 1).padStart(2, "0")}
+                  CH.{String(i + 1).padStart(2, '0')}
                 </span>
                 <Shape kind={ch.key} fill="var(--bone)" stroke="var(--ink)" size={36} />
               </div>
               <span className="font-editorial text-xl mt-3 leading-snug">
-                {q.type === "truefalse" ? opt : opt}
+                {q.type === 'truefalse' ? opt : opt}
               </span>
               {mine && (
                 <span
                   className="absolute -top-3 -right-3 ticker text-[11px] tracking-widest px-2 py-1 stamp stamp-in"
-                  style={{ background: "var(--ink)", color: "var(--bone)" }}
+                  style={{ background: 'var(--ink)', color: 'var(--bone)' }}
                 >
                   LOCKED
                 </span>
@@ -411,17 +418,12 @@ function PlayerQuestion({
 
       <div className="mt-5 min-h-[28px]">
         {error && (
-          <p
-            className="ticker text-[11px] tracking-widest"
-            style={{ color: "var(--vermilion)" }}
-          >
+          <p className="ticker text-[11px] tracking-widest" style={{ color: 'var(--vermilion)' }}>
             ⚠ {error}
           </p>
         )}
         {answered && (
-          <p className="font-editorial italic text-lg">
-            Answer locked. Hold for the reveal.
-          </p>
+          <p className="font-editorial italic text-lg">Answer locked. Hold for the reveal.</p>
         )}
       </div>
     </div>
@@ -439,9 +441,9 @@ function PlayerReveal({ state, personal }: { state: PublicGameState; personal: P
   const total = personal?.total;
 
   let banner: { label: string; bg: string; fg: string };
-  if (noAnswer) banner = { label: "NO ANSWER", bg: "var(--ash)", fg: "var(--ink)" };
-  else if (isCorrect) banner = { label: "CORRECT", bg: "var(--ivy)", fg: "var(--bone)" };
-  else banner = { label: "INCORRECT", bg: "var(--vermilion)", fg: "var(--bone)" };
+  if (noAnswer) banner = { label: 'NO ANSWER', bg: 'var(--ash)', fg: 'var(--ink)' };
+  else if (isCorrect) banner = { label: 'CORRECT', bg: 'var(--ivy)', fg: 'var(--bone)' };
+  else banner = { label: 'INCORRECT', bg: 'var(--vermilion)', fg: 'var(--bone)' };
 
   return (
     <div className="pt-6 flex-1 flex flex-col">
@@ -452,7 +454,7 @@ function PlayerReveal({ state, personal }: { state: PublicGameState; personal: P
         <span className="chyron" style={{ color: banner.fg, opacity: 0.85 }}>
           REVEAL
         </span>
-        <p className="display-num mt-1" style={{ fontSize: "clamp(64px, 16vw, 130px)" }}>
+        <p className="display-num mt-1" style={{ fontSize: 'clamp(64px, 16vw, 130px)' }}>
           {banner.label}
         </p>
         {!noAnswer && isCorrect && (
@@ -461,14 +463,14 @@ function PlayerReveal({ state, personal }: { state: PublicGameState; personal: P
       </div>
 
       <div className="grid grid-cols-2 gap-3 mt-5">
-        <div className="ink-border p-4" style={{ background: "var(--bone)" }}>
+        <div className="ink-border p-4" style={{ background: 'var(--bone)' }}>
           <span className="chyron opacity-70">YOUR SCORE</span>
           <p className="display-num text-5xl mt-1 ticker">{score.toLocaleString()}</p>
         </div>
-        <div className="ink-border p-4" style={{ background: "var(--bone)" }}>
+        <div className="ink-border p-4" style={{ background: 'var(--bone)' }}>
           <span className="chyron opacity-70">RANK</span>
           <p className="display-num text-5xl mt-1 ticker">
-            {rank ? `${rank}/${total ?? "—"}` : "—"}
+            {rank ? `${rank}/${total ?? '—'}` : '—'}
           </p>
         </div>
       </div>
@@ -476,16 +478,14 @@ function PlayerReveal({ state, personal }: { state: PublicGameState; personal: P
       {correctCh && (
         <div
           className="mt-5 ink-border p-4 flex items-center gap-4"
-          style={{ background: correctCh.color, color: "var(--bone)" }}
+          style={{ background: correctCh.color, color: 'var(--bone)' }}
         >
           <Shape kind={correctCh.key} fill="var(--bone)" stroke="var(--ink)" size={42} />
           <div>
-            <span className="chyron" style={{ color: "var(--bone)", opacity: 0.85 }}>
+            <span className="chyron" style={{ color: 'var(--bone)', opacity: 0.85 }}>
               CORRECT ANSWER
             </span>
-            <p className="font-editorial text-xl">
-              {state.question?.options[correct!]}
-            </p>
+            <p className="font-editorial text-xl">{state.question?.options[correct!]}</p>
           </div>
         </div>
       )}
@@ -496,23 +496,23 @@ function PlayerReveal({ state, personal }: { state: PublicGameState; personal: P
 function PlayerInterstitial({ personal }: { personal: Personal | null }) {
   return (
     <div className="flex-1 flex flex-col justify-center items-center text-center pt-10">
-      <p className="chyron mb-3" style={{ color: "var(--vermilion)" }}>
+      <p className="chyron mb-3" style={{ color: 'var(--vermilion)' }}>
         BETWEEN CUES · STANDBY
       </p>
-      <p className="display-num" style={{ fontSize: "clamp(56px, 14vw, 120px)" }}>
+      <p className="display-num" style={{ fontSize: 'clamp(56px, 14vw, 120px)' }}>
         HOLD&nbsp;TIGHT.
       </p>
       <div className="grid grid-cols-2 gap-3 mt-8 w-full max-w-[420px]">
-        <div className="ink-border p-4" style={{ background: "var(--bone)" }}>
+        <div className="ink-border p-4" style={{ background: 'var(--bone)' }}>
           <span className="chyron opacity-70">SCORE</span>
           <p className="display-num text-4xl mt-1 ticker">
             {(personal?.score ?? 0).toLocaleString()}
           </p>
         </div>
-        <div className="ink-border p-4" style={{ background: "var(--bone)" }}>
+        <div className="ink-border p-4" style={{ background: 'var(--bone)' }}>
           <span className="chyron opacity-70">RANK</span>
           <p className="display-num text-4xl mt-1 ticker">
-            {personal?.rank ? `${personal.rank}/${personal.total}` : "—"}
+            {personal?.rank ? `${personal.rank}/${personal.total}` : '—'}
           </p>
         </div>
       </div>
@@ -529,33 +529,33 @@ function PlayerFinal({
 }) {
   const rank = personal?.rank ?? 0;
   const podium = rank > 0 && rank <= 3;
-  const hostLeft = state?.endedReason === "host-left";
+  const hostLeft = state?.endedReason === 'host-left';
   return (
     <div className="flex-1 flex flex-col items-center text-center pt-8">
-      <p className="chyron mb-3" style={{ color: "var(--vermilion)" }}>
-        {hostLeft ? "HOST LEFT · TRANSMISSION ENDED" : "TRANSMISSION COMPLETE"}
+      <p className="chyron mb-3" style={{ color: 'var(--vermilion)' }}>
+        {hostLeft ? 'HOST LEFT · TRANSMISSION ENDED' : 'TRANSMISSION COMPLETE'}
       </p>
-      <p className="display-num" style={{ fontSize: "clamp(72px, 18vw, 160px)" }}>
-        {hostLeft ? "OFF AIR." : podium ? "ON THE PODIUM." : "WRAP IT UP."}
+      <p className="display-num" style={{ fontSize: 'clamp(72px, 18vw, 160px)' }}>
+        {hostLeft ? 'OFF AIR.' : podium ? 'ON THE PODIUM.' : 'WRAP IT UP.'}
       </p>
       <div className="grid grid-cols-2 gap-3 mt-6 w-full max-w-[420px]">
-        <div className="ink-border p-4" style={{ background: "var(--marigold)" }}>
+        <div className="ink-border p-4" style={{ background: 'var(--marigold)' }}>
           <span className="chyron opacity-70">FINAL SCORE</span>
           <p className="display-num text-4xl mt-1 ticker">
             {(personal?.score ?? 0).toLocaleString()}
           </p>
         </div>
-        <div className="ink-border p-4" style={{ background: "var(--bone)" }}>
+        <div className="ink-border p-4" style={{ background: 'var(--bone)' }}>
           <span className="chyron opacity-70">FINAL RANK</span>
           <p className="display-num text-4xl mt-1 ticker">
-            {personal?.rank ? `${personal.rank}/${personal.total}` : "—"}
+            {personal?.rank ? `${personal.rank}/${personal.total}` : '—'}
           </p>
         </div>
       </div>
       <Link
         href="/"
         className="mt-8 ink-border stamp ticker text-[12px] tracking-widest px-4 py-3"
-        style={{ background: "var(--ink)", color: "var(--bone)" }}
+        style={{ background: 'var(--ink)', color: 'var(--bone)' }}
       >
         ← back to studio master
       </Link>

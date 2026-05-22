@@ -1,41 +1,41 @@
 const BAD_WORDS: readonly string[] = [
-  "fuck",
-  "shit",
-  "bitch",
-  "cunt",
-  "dick",
-  "cock",
-  "pussy",
-  "asshole",
-  "bastard",
-  "piss",
-  "nigger",
-  "faggot",
-  "fag",
-  "retard",
-  "nazi",
-  "whore",
-  "slut",
-  "tits",
-  "boner",
-  "penis",
+  'fuck',
+  'shit',
+  'bitch',
+  'cunt',
+  'dick',
+  'cock',
+  'pussy',
+  'asshole',
+  'bastard',
+  'piss',
+  'nigger',
+  'faggot',
+  'fag',
+  'retard',
+  'nazi',
+  'whore',
+  'slut',
+  'tits',
+  'boner',
+  'penis',
 ];
 
 const LEET_MAP: Record<string, string> = {
-  "0": "o",
-  "3": "e",
-  "4": "a",
-  "5": "s",
-  "7": "t",
-  "@": "a",
-  $: "s",
+  '0': 'o',
+  '3': 'e',
+  '4': 'a',
+  '5': 's',
+  '7': 't',
+  '@': 'a',
+  $: 's',
 };
 
-function normalize(input: string, oneAs: "i" | "l"): string {
+function normalize(input: string, oneAs: 'i' | 'l'): string {
   const lower = input.toLowerCase();
-  let out = "";
+  let out = '';
   for (const ch of lower) {
-    if (ch === "1") {
+    if (ch === '1') {
       out += oneAs;
       continue;
     }
@@ -44,7 +44,7 @@ function normalize(input: string, oneAs: "i" | "l"): string {
       out += mapped;
       continue;
     }
-    if (ch >= "a" && ch <= "z") {
+    if (ch >= 'a' && ch <= 'z') {
       out += ch;
     }
   }
@@ -59,11 +59,11 @@ function containsBadWord(normalized: string): boolean {
 }
 
 export function isClean(nickname: string): boolean {
-  if (containsBadWord(normalize(nickname, "i"))) return false;
-  if (containsBadWord(normalize(nickname, "l"))) return false;
+  if (containsBadWord(normalize(nickname, 'i'))) return false;
+  if (containsBadWord(normalize(nickname, 'l'))) return false;
   return true;
 }
 
 export function reasonForRejection(nickname: string): string | null {
-  return isClean(nickname) ? null : "Pick another nickname";
+  return isClean(nickname) ? null : 'Pick another nickname';
 }

@@ -1,20 +1,16 @@
-import { createHash } from "crypto";
-import Link from "next/link";
-import { prisma } from "@/lib/db";
-import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from "@/components/Broadcast";
-import ResetTokenClient from "./ResetTokenClient";
+import { createHash } from 'node:crypto';
+import Link from 'next/link';
+import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/components/Broadcast';
+import { prisma } from '@/lib/db';
+import ResetTokenClient from './ResetTokenClient';
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 function hashToken(raw: string): string {
-  return createHash("sha256").update(raw).digest("hex");
+  return createHash('sha256').update(raw).digest('hex');
 }
 
-export default async function ResetTokenPage({
-  params,
-}: {
-  params: Promise<{ token: string }>;
-}) {
+export default async function ResetTokenPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const tokenHash = hashToken(token);
   const record = await prisma.passwordResetToken.findUnique({ where: { tokenHash } });
@@ -35,12 +31,10 @@ export default async function ResetTokenPage({
         <SmpteBars className="h-1.5 mt-2" />
         <section className="px-6 pt-8 pb-8 flex-1">
           <div className="max-w-[420px] mx-auto w-full">
-            <p className="ticker text-[11px] tracking-widest opacity-70 mb-2">
-              ▶ BROADCAST  ◀
-            </p>
+            <p className="ticker text-[11px] tracking-widest opacity-70 mb-2">▶ BROADCAST ◀</p>
             <h1
               className="display-num"
-              style={{ fontSize: "clamp(48px, 11vw, 96px)", lineHeight: 0.9 }}
+              style={{ fontSize: 'clamp(48px, 11vw, 96px)', lineHeight: 0.9 }}
             >
               LINK
               <br />
@@ -48,7 +42,7 @@ export default async function ResetTokenPage({
             </h1>
             <div
               className="mt-6 ink-border px-4 py-4"
-              style={{ background: "var(--vermilion)", color: "var(--bone)" }}
+              style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
               role="alert"
             >
               <p className="ticker text-[12px] tracking-widest">
@@ -59,9 +53,9 @@ export default async function ResetTokenPage({
               <Link
                 href="/reset"
                 className="ink-border stamp-lg ticker tracking-widest text-[14px] py-4 text-center"
-                style={{ background: "var(--ink)", color: "var(--bone)", minHeight: 56 }}
+                style={{ background: 'var(--ink)', color: 'var(--bone)', minHeight: 56 }}
               >
-                ▶  REQUEST NEW LINK
+                ▶ REQUEST NEW LINK
               </Link>
               <Link
                 href="/signin"

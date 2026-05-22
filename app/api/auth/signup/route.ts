@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
-import { z } from "zod";
-import { prisma } from "@/lib/db";
-import { createCredentialsUser } from "@/lib/auth-helpers";
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { createCredentialsUser } from '@/lib/auth-helpers';
+import { prisma } from '@/lib/db';
 
 const Body = z.object({
   email: z.string().email().max(254),
@@ -14,12 +14,12 @@ export async function POST(req: Request) {
   try {
     json = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
   const parsed = Body.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Validation failed", issues: parsed.error.issues },
+      { error: 'Validation failed', issues: parsed.error.issues },
       { status: 400 },
     );
   }
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     return NextResponse.json(
-      { error: "An account already exists with that email" },
+      { error: 'An account already exists with that email' },
       { status: 409 },
     );
   }

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const create = vi.fn();
 const upsert = vi.fn();
@@ -7,7 +7,7 @@ const sessionUpdate = vi.fn();
 const playerUpdateMany = vi.fn();
 const tx = vi.fn(async (ops: unknown[]) => ops);
 
-vi.mock("./db", () => ({
+vi.mock('./db', () => ({
   prisma: {
     gameSession: {
       create: (args: unknown) => create(args),
@@ -29,7 +29,7 @@ import {
   finalizeSession,
   recordAnswer,
   recordPlayerJoin,
-} from "./session-repo";
+} from './session-repo';
 
 const ORIGINAL = process.env.ENABLE_SESSION_PERSISTENCE;
 
@@ -52,32 +52,32 @@ afterEach(() => {
   }
 });
 
-describe("session-repo (enabled)", () => {
-  it("createSessionRecord stores pin, hostUserId, snapshot and returns id", async () => {
-    create.mockResolvedValueOnce({ id: "sess_1" });
+describe('session-repo (enabled)', () => {
+  it('createSessionRecord stores pin, hostUserId, snapshot and returns id', async () => {
+    create.mockResolvedValueOnce({ id: 'sess_1' });
     const out = await createSessionRecord({
-      pin: "123456",
+      pin: '123456',
       hostUserId: null,
-      quizSnapshot: { title: "Q", questions: [] },
+      quizSnapshot: { title: 'Q', questions: [] },
     });
-    expect(out).toEqual({ id: "sess_1" });
+    expect(out).toEqual({ id: 'sess_1' });
     expect(create).toHaveBeenCalledWith({
       data: {
-        pin: "123456",
+        pin: '123456',
         hostUserId: null,
-        quizSnapshot: { title: "Q", questions: [] },
-        status: "active",
+        quizSnapshot: { title: 'Q', questions: [] },
+        status: 'active',
       },
       select: { id: true },
     });
   });
 
-  it("recordPlayerJoin upserts on (sessionId, inGameId)", async () => {
+  it('recordPlayerJoin upserts on (sessionId, inGameId)', async () => {
     upsert.mockResolvedValueOnce({});
     await recordPlayerJoin({
-      sessionId: "sess_1",
-      inGameId: "p_abc",
-      nickname: "Alice",
+      sessionId: 'sess_1',
+      inGameId: 'p_abc',
+      nickname: 'Alice',
     });
     expect(upsert).toHaveBeenCalledOnce();
     const call = upsert.mock.calls[0][0] as {
@@ -85,18 +85,18 @@ describe("session-repo (enabled)", () => {
       create: { sessionId: string; inGameId: string; nickname: string };
     };
     expect(call.where.sessionId_inGameId).toEqual({
-      sessionId: "sess_1",
-      inGameId: "p_abc",
+      sessionId: 'sess_1',
+      inGameId: 'p_abc',
     });
-    expect(call.create.nickname).toBe("Alice");
+    expect(call.create.nickname).toBe('Alice');
   });
 
-  it("recordAnswer writes a SessionAnswer row", async () => {
+  it('recordAnswer writes a SessionAnswer row', async () => {
     answerCreate.mockResolvedValueOnce({});
     await recordAnswer({
-      sessionId: "sess_1",
+      sessionId: 'sess_1',
       questionIndex: 0,
-      playerInGameId: "p_abc",
+      playerInGameId: 'p_abc',
       optionIndex: 1,
       correct: true,
       msFromStart: 1234,
@@ -104,9 +104,9 @@ describe("session-repo (enabled)", () => {
     });
     expect(answerCreate).toHaveBeenCalledWith({
       data: {
-        sessionId: "sess_1",
+        sessionId: 'sess_1',
         questionIndex: 0,
-        playerInGameId: "p_abc",
+        playerInGameId: 'p_abc',
         optionIndex: 1,
         correct: true,
         msFromStart: 1234,
@@ -115,19 +115,19 @@ describe("session-repo (enabled)", () => {
     });
   });
 
-  it("finalizeSession updates status, leaderboard, and per-player scores", async () => {
-    sessionUpdate.mockReturnValue({ kind: "session-update" });
-    playerUpdateMany.mockReturnValue({ kind: "player-update" });
+  it('finalizeSession updates status, leaderboard, and per-player scores', async () => {
+    sessionUpdate.mockReturnValue({ kind: 'session-update' });
+    playerUpdateMany.mockReturnValue({ kind: 'player-update' });
     await finalizeSession({
-      sessionId: "sess_1",
-      status: "finished",
+      sessionId: 'sess_1',
+      status: 'finished',
       finalLeaderboard: [
-        { playerId: "p_a", nickname: "Alice", score: 2000, rank: 1 },
-        { playerId: "p_b", nickname: "Bob", score: 1000, rank: 2 },
+        { playerId: 'p_a', nickname: 'Alice', score: 2000, rank: 1 },
+        { playerId: 'p_b', nickname: 'Bob', score: 1000, rank: 2 },
       ],
       playerFinalScores: [
-        { inGameId: "p_a", finalScore: 2000, finalRank: 1 },
-        { inGameId: "p_b", finalScore: 1000, finalRank: 2 },
+        { inGameId: 'p_a', finalScore: 2000, finalRank: 1 },
+        { inGameId: 'p_b', finalScore: 1000, finalRank: 2 },
       ],
     });
     expect(sessionUpdate).toHaveBeenCalledOnce();
@@ -135,22 +135,22 @@ describe("session-repo (enabled)", () => {
       where: { id: string };
       data: { status: string; endedAt: Date; finalLeaderboard: unknown };
     };
-    expect(su.where.id).toBe("sess_1");
-    expect(su.data.status).toBe("finished");
+    expect(su.where.id).toBe('sess_1');
+    expect(su.data.status).toBe('finished');
     expect(su.data.endedAt).toBeInstanceOf(Date);
     expect(playerUpdateMany).toHaveBeenCalledTimes(2);
     expect(tx).toHaveBeenCalledOnce();
   });
 });
 
-describe("session-repo (disabled via ENABLE_SESSION_PERSISTENCE=false)", () => {
+describe('session-repo (disabled via ENABLE_SESSION_PERSISTENCE=false)', () => {
   beforeEach(() => {
-    process.env.ENABLE_SESSION_PERSISTENCE = "false";
+    process.env.ENABLE_SESSION_PERSISTENCE = 'false';
   });
 
-  it("createSessionRecord is a no-op returning null", async () => {
+  it('createSessionRecord is a no-op returning null', async () => {
     const out = await createSessionRecord({
-      pin: "123456",
+      pin: '123456',
       hostUserId: null,
       quizSnapshot: {},
     });
@@ -158,20 +158,20 @@ describe("session-repo (disabled via ENABLE_SESSION_PERSISTENCE=false)", () => {
     expect(create).not.toHaveBeenCalled();
   });
 
-  it("recordPlayerJoin / recordAnswer / finalizeSession are no-ops", async () => {
-    await recordPlayerJoin({ sessionId: "x", inGameId: "y", nickname: "z" });
+  it('recordPlayerJoin / recordAnswer / finalizeSession are no-ops', async () => {
+    await recordPlayerJoin({ sessionId: 'x', inGameId: 'y', nickname: 'z' });
     await recordAnswer({
-      sessionId: "x",
+      sessionId: 'x',
       questionIndex: 0,
-      playerInGameId: "y",
+      playerInGameId: 'y',
       optionIndex: 0,
       correct: false,
       msFromStart: 0,
       awarded: 0,
     });
     await finalizeSession({
-      sessionId: "x",
-      status: "finished",
+      sessionId: 'x',
+      status: 'finished',
       finalLeaderboard: [],
       playerFinalScores: [],
     });

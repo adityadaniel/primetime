@@ -1,9 +1,9 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties } from 'react';
 
 export function Checkmark({
   size = 40,
-  fill = "none",
-  stroke = "var(--ink)",
+  fill = 'none',
+  stroke = 'var(--ink)',
   strokeWidth = 8,
   style,
 }: {
@@ -14,13 +14,7 @@ export function Checkmark({
   style?: CSSProperties;
 }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 100 100"
-      style={style}
-      aria-hidden
-    >
+    <svg width={size} height={size} viewBox="0 0 100 100" style={style} aria-hidden>
       <polyline
         points="20,52 42,74 82,28"
         fill={fill}
@@ -33,7 +27,7 @@ export function Checkmark({
   );
 }
 
-export type ShapeKind = "triangle" | "diamond" | "circle" | "square";
+export type ShapeKind = 'triangle' | 'diamond' | 'circle' | 'square';
 
 export const CHANNELS: Array<{
   key: ShapeKind;
@@ -41,17 +35,17 @@ export const CHANNELS: Array<{
   label: string;
   number: string;
 }> = [
-  { key: "triangle", color: "var(--vermilion)", label: "TRIANGLE", number: "01" },
-  { key: "diamond", color: "var(--cobalt)", label: "DIAMOND", number: "02" },
-  { key: "circle", color: "var(--marigold)", label: "CIRCLE", number: "03" },
-  { key: "square", color: "var(--ivy)", label: "SQUARE", number: "04" },
+  { key: 'triangle', color: 'var(--vermilion)', label: 'TRIANGLE', number: '01' },
+  { key: 'diamond', color: 'var(--cobalt)', label: 'DIAMOND', number: '02' },
+  { key: 'circle', color: 'var(--marigold)', label: 'CIRCLE', number: '03' },
+  { key: 'square', color: 'var(--ivy)', label: 'SQUARE', number: '04' },
 ];
 
 export function Shape({
   kind,
   size = 40,
-  fill = "currentColor",
-  stroke = "var(--ink)",
+  fill = 'currentColor',
+  stroke = 'var(--ink)',
   strokeWidth = 2,
   style,
 }: {
@@ -65,13 +59,13 @@ export function Shape({
   const common = {
     width: size,
     height: size,
-    viewBox: "0 0 100 100",
+    viewBox: '0 0 100 100',
     style,
-    "aria-hidden": true,
+    'aria-hidden': true,
   } as const;
 
   switch (kind) {
-    case "triangle":
+    case 'triangle':
       return (
         <svg {...common}>
           <polygon
@@ -83,7 +77,7 @@ export function Shape({
           />
         </svg>
       );
-    case "diamond":
+    case 'diamond':
       return (
         <svg {...common}>
           <polygon
@@ -95,13 +89,13 @@ export function Shape({
           />
         </svg>
       );
-    case "circle":
+    case 'circle':
       return (
         <svg {...common}>
           <circle cx="50" cy="50" r="42" fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
         </svg>
       );
-    case "square":
+    case 'square':
       return (
         <svg {...common}>
           <rect

@@ -1,21 +1,21 @@
-import NextAuth, { type NextAuthConfig } from "next-auth";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import Credentials from "next-auth/providers/credentials";
-import Apple from "next-auth/providers/apple";
-import { compare } from "bcryptjs";
-import { prisma } from "@/lib/db";
-import { getAppleClientSecret } from "@/lib/apple-secret";
-import authConfig from "@/auth.config";
+import { PrismaAdapter } from '@auth/prisma-adapter';
+import { compare } from 'bcryptjs';
+import NextAuth, { type NextAuthConfig } from 'next-auth';
+import Apple from 'next-auth/providers/apple';
+import Credentials from 'next-auth/providers/credentials';
+import authConfig from '@/auth.config';
+import { getAppleClientSecret } from '@/lib/apple-secret';
+import { prisma } from '@/lib/db';
 
-const enableApple = process.env.ENABLE_APPLE_SIGNIN === "true";
+const enableApple = process.env.ENABLE_APPLE_SIGNIN === 'true';
 
 export const { handlers, signIn, signOut, auth } = NextAuth(async () => {
-  const providers: NextAuthConfig["providers"] = [
+  const providers: NextAuthConfig['providers'] = [
     ...authConfig.providers,
     Credentials({
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
       },
       async authorize(creds) {
         if (!creds?.email || !creds?.password) return null;
@@ -47,7 +47,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth(async () => {
   return {
     ...authConfig,
     adapter: PrismaAdapter(prisma),
-    session: { strategy: "jwt" },
+    session: { strategy: 'jwt' },
     providers,
     callbacks: {
       ...authConfig.callbacks,

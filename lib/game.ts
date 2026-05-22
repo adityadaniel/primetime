@@ -1,3 +1,10 @@
+import { isClean } from './profanity';
+import {
+  createSessionRecord,
+  finalizeSession,
+  recordAnswer,
+  recordPlayerJoin,
+} from './session-repo';
 import type {
   AnswerIndex,
   AnswerRecord,
@@ -7,14 +14,7 @@ import type {
   PublicGameState,
   Question,
   Quiz,
-} from "./types";
-import { isClean } from "./profanity";
-import {
-  createSessionRecord,
-  finalizeSession,
-  recordAnswer,
-  recordPlayerJoin,
-} from "./session-repo";
+} from './types';
 
 const HARD_CAP = 150;
 // TEMP M2.5 unused: MID-75 restores tier-aware cap
@@ -32,7 +32,7 @@ export function setReconnectGraceForTesting(ms: number) {
 const RESULT_BASE = 1000;
 const PIN_RETRY_LIMIT = 50;
 
-export type Tier = "free" | "pro";
+export type Tier = 'free' | 'pro';
 
 export interface GameSession {
   pin: string;
@@ -49,10 +49,10 @@ export interface GameSession {
   questionEndsAt?: number;
   questionTimer?: NodeJS.Timeout;
   pausedAt?: number;
-  pauseReason?: "host-disconnected";
+  pauseReason?: 'host-disconnected';
   pauseResumeBy?: number;
   pauseRemainingMs?: number;
-  endedReason?: "host-left";
+  endedReason?: 'host-left';
   createdAt: number;
   sessionDbId: string | null;
   finalized?: boolean;
@@ -69,30 +69,29 @@ function generatePin(): string {
     const pin = String(Math.floor(100000 + Math.random() * 900000));
     if (!games.has(pin)) return pin;
   }
-  throw new Error("Could not allocate PIN");
+  throw new Error('Could not allocate PIN');
 }
 
 export function createGame(
   quiz: Quiz,
-  tierOrOpts: Tier | { tier?: Tier; hostUserId?: string | null } = "free",
+  tierOrOpts: Tier | { tier?: Tier; hostUserId?: string | null } = 'free',
   legacyOpts?: { hostUserId?: string | null },
 ): GameSession {
   if (!quiz.questions.length) {
-    throw new Error("Quiz must have at least one question");
+    throw new Error('Quiz must have at least one question');
   }
-  const tier: Tier =
-    typeof tierOrOpts === "string" ? tierOrOpts : tierOrOpts.tier ?? "free";
+  const tier: Tier = typeof tierOrOpts === 'string' ? tierOrOpts : (tierOrOpts.tier ?? 'free');
   const hostUserId =
-    typeof tierOrOpts === "string"
-      ? legacyOpts?.hostUserId ?? null
-      : tierOrOpts.hostUserId ?? null;
+    typeof tierOrOpts === 'string'
+      ? (legacyOpts?.hostUserId ?? null)
+      : (tierOrOpts.hostUserId ?? null);
   const pin = generatePin();
   const session: GameSession = {
     pin,
     tier,
     displaySocketIds: new Set(),
     quiz,
-    phase: "lobby",
+    phase: 'lobby',
     questionIndex: -1,
     players: new Map(),
     socketToPlayer: new Map(),
@@ -105,7 +104,7 @@ export function createGame(
     .then((row) => {
       if (row) session.sessionDbId = row.id;
     })
-    .catch((err) => console.error("[session-repo]", err));
+    .catch((err) => console.error('[session-repo]', err));
   return session;
 }
 
@@ -129,11 +128,11 @@ export function attachDisplay(pin: string, socketId: string): GameSession | unde
 
 export function pauseForHostDisconnect(game: GameSession): boolean {
   if (game.pausedAt) return false;
-  if (game.phase === "final") return false;
+  if (game.phase === 'final') return false;
   game.pausedAt = Date.now();
-  game.pauseReason = "host-disconnected";
+  game.pauseReason = 'host-disconnected';
   game.pauseResumeBy = game.pausedAt + HOST_GRACE_MS;
-  if (game.phase === "question" && game.questionEndsAt) {
+  if (game.phase === 'question' && game.questionEndsAt) {
     game.pauseRemainingMs = Math.max(0, game.questionEndsAt - game.pausedAt);
   } else {
     game.pauseRemainingMs = undefined;
@@ -144,8 +143,8 @@ export function pauseForHostDisconnect(game: GameSession): boolean {
 export function resumeFromPause(game: GameSession): boolean {
   if (!game.pausedAt) return false;
   const now = Date.now();
-  if (game.phase === "question" && game.pauseRemainingMs !== undefined && game.questionStartedAt) {
-    const elapsed = (game.pausedAt - game.questionStartedAt);
+  if (game.phase === 'question' && game.pauseRemainingMs !== undefined && game.questionStartedAt) {
+    const elapsed = game.pausedAt - game.questionStartedAt;
     game.questionStartedAt = now - elapsed;
     game.questionEndsAt = now + game.pauseRemainingMs;
   }
@@ -161,21 +160,18 @@ export function endByHostLeft(game: GameSession) {
     clearTimeout(game.questionTimer);
     game.questionTimer = undefined;
   }
-  game.phase = "final";
-  game.endedReason = "host-left";
+  game.phase = 'final';
+  game.endedReason = 'host-left';
   game.pausedAt = undefined;
   game.pauseReason = undefined;
   game.pauseResumeBy = undefined;
   game.pauseRemainingMs = undefined;
   game.questionStartedAt = undefined;
   game.questionEndsAt = undefined;
-  finalizePersist(game, "abandoned");
+  finalizePersist(game, 'abandoned');
 }
 
-function finalizePersist(
-  game: GameSession,
-  status: "finished" | "abandoned",
-): void {
+function finalizePersist(game: GameSession, status: 'finished' | 'abandoned'): void {
   if (!game.sessionDbId) return;
   if (game.finalized) return;
   game.finalized = true;
@@ -194,7 +190,7 @@ function finalizePersist(
       finalScore: p.score,
       finalRank: p.rank,
     })),
-  }).catch((err) => console.error("[session-repo]", err));
+  }).catch((err) => console.error('[session-repo]', err));
 }
 
 export function isPaused(game: GameSession): boolean {
@@ -203,18 +199,18 @@ export function isPaused(game: GameSession): boolean {
 
 export function detachSocket(socketId: string): {
   pin: string;
-  type: "host" | "display" | "player";
+  type: 'host' | 'display' | 'player';
   playerId?: string;
 }[] {
-  const events: { pin: string; type: "host" | "display" | "player"; playerId?: string }[] = [];
+  const events: { pin: string; type: 'host' | 'display' | 'player'; playerId?: string }[] = [];
   for (const game of games.values()) {
     if (game.hostSocketId === socketId) {
       game.hostSocketId = undefined;
-      events.push({ pin: game.pin, type: "host" });
+      events.push({ pin: game.pin, type: 'host' });
     }
     if (game.displaySocketIds.has(socketId)) {
       game.displaySocketIds.delete(socketId);
-      events.push({ pin: game.pin, type: "display" });
+      events.push({ pin: game.pin, type: 'display' });
     }
     const playerId = game.socketToPlayer.get(socketId);
     if (playerId) {
@@ -224,7 +220,7 @@ export function detachSocket(socketId: string): {
         player.disconnectedAt = Date.now();
       }
       game.socketToPlayer.delete(socketId);
-      events.push({ pin: game.pin, type: "player", playerId });
+      events.push({ pin: game.pin, type: 'player', playerId });
     }
   }
   return events;
@@ -278,11 +274,11 @@ export function joinPlayer(
   | { ok: true; game: GameSession; player: Player; reconnected: boolean }
   | { ok: false; error: string; code?: JoinErrorCode } {
   const game = games.get(pin);
-  if (!game) return { ok: false, error: "Game not found" };
+  if (!game) return { ok: false, error: 'Game not found' };
   const trimmed = nickname.trim().slice(0, 20);
-  if (!trimmed) return { ok: false, error: "Nickname required" };
+  if (!trimmed) return { ok: false, error: 'Nickname required' };
   if (!isClean(trimmed)) {
-    return { ok: false, error: "Pick another nickname", code: "nickname-rejected" };
+    return { ok: false, error: 'Pick another nickname', code: 'nickname-rejected' };
   }
 
   const lower = trimmed.toLowerCase();
@@ -291,7 +287,9 @@ export function joinPlayer(
   if (existingPlayerId) {
     const owned = game.players.get(existingPlayerId);
     if (owned && owned.nickname.toLowerCase() === lower) {
-      console.warn(`[joinPlayer] duplicate emit from same socket (pin=${pin}, nickname=${trimmed})`);
+      console.warn(
+        `[joinPlayer] duplicate emit from same socket (pin=${pin}, nickname=${trimmed})`,
+      );
       return { ok: true, game, player: owned, reconnected: false };
     }
   }
@@ -302,7 +300,7 @@ export function joinPlayer(
 
   if (existing) {
     if (existing.connected) {
-      return { ok: false, error: "Nickname taken" };
+      return { ok: false, error: 'Nickname taken' };
     }
     if (!isWithinReconnectGrace(existing)) {
       game.players.delete(existing.id);
@@ -317,10 +315,10 @@ export function joinPlayer(
     }
   }
 
-  if (game.phase !== "lobby") return { ok: false, error: "Game already started" };
+  if (game.phase !== 'lobby') return { ok: false, error: 'Game already started' };
   const status = capStatus(game);
   if (status.full) {
-    return { ok: false, error: "Room is full", code: "full" satisfies JoinErrorCode };
+    return { ok: false, error: 'Room is full', code: 'full' satisfies JoinErrorCode };
   }
   const id = `p_${Math.random().toString(36).slice(2, 9)}`;
   const player: Player = { id, nickname: trimmed, score: 0, streak: 0, connected: true };
@@ -331,7 +329,7 @@ export function joinPlayer(
       sessionId: game.sessionDbId,
       inGameId: id,
       nickname: trimmed,
-    }).catch((err) => console.error("[session-repo]", err));
+    }).catch((err) => console.error('[session-repo]', err));
   }
   return { ok: true, game, player, reconnected: false };
 }
@@ -351,7 +349,7 @@ export function currentQuestion(game: GameSession): Question | undefined {
 }
 
 export function startGame(game: GameSession) {
-  if (game.phase !== "lobby") return;
+  if (game.phase !== 'lobby') return;
   if (isPaused(game)) return;
   if (!game.players.size) return;
   advanceToQuestion(game, 0);
@@ -367,14 +365,14 @@ function clearTimer(game: GameSession) {
 export function advanceToQuestion(game: GameSession, index: number) {
   clearTimer(game);
   if (index >= game.quiz.questions.length) {
-    game.phase = "final";
+    game.phase = 'final';
     game.questionStartedAt = undefined;
     game.questionEndsAt = undefined;
-    finalizePersist(game, "finished");
+    finalizePersist(game, 'finished');
     return;
   }
   game.questionIndex = index;
-  game.phase = "question";
+  game.phase = 'question';
   game.answers.set(index, []);
   const q = game.quiz.questions[index];
   const now = Date.now();
@@ -383,13 +381,13 @@ export function advanceToQuestion(game: GameSession, index: number) {
 }
 
 export function lockQuestion(game: GameSession) {
-  if (game.phase !== "question") return;
+  if (game.phase !== 'question') return;
   clearTimer(game);
-  game.phase = "reveal";
+  game.phase = 'reveal';
 }
 
 export function maybeExpireQuestion(game: GameSession): boolean {
-  if (game.phase !== "question") return false;
+  if (game.phase !== 'question') return false;
   if (!game.questionEndsAt) return false;
   if (Date.now() <= game.questionEndsAt) return false;
   lockQuestion(game);
@@ -399,24 +397,24 @@ export function maybeExpireQuestion(game: GameSession): boolean {
 export function advance(game: GameSession): GamePhase {
   if (isPaused(game)) return game.phase;
   switch (game.phase) {
-    case "lobby":
+    case 'lobby':
       if (game.players.size > 0) startGame(game);
       return game.phase;
-    case "question":
+    case 'question':
       lockQuestion(game);
       return game.phase;
-    case "reveal":
+    case 'reveal':
       if (game.questionIndex + 1 < game.quiz.questions.length) {
-        game.phase = "leaderboard";
+        game.phase = 'leaderboard';
       } else {
-        game.phase = "final";
-        finalizePersist(game, "finished");
+        game.phase = 'final';
+        finalizePersist(game, 'finished');
       }
       return game.phase;
-    case "leaderboard":
+    case 'leaderboard':
       advanceToQuestion(game, game.questionIndex + 1);
       return game.phase;
-    case "final":
+    case 'final':
       return game.phase;
     default:
       return game.phase;
@@ -430,26 +428,26 @@ export function submitAnswer(
 ): {
   ok: boolean;
   error?: string;
-  reason?: "paused" | "expired";
+  reason?: 'paused' | 'expired';
   awarded?: number;
   correct?: boolean;
 } {
-  if (isPaused(game)) return { ok: false, reason: "paused", error: "Game is paused" };
-  if (game.phase !== "question") return { ok: false, error: "Not accepting answers" };
+  if (isPaused(game)) return { ok: false, reason: 'paused', error: 'Game is paused' };
+  if (game.phase !== 'question') return { ok: false, error: 'Not accepting answers' };
   if (maybeExpireQuestion(game)) {
-    return { ok: false, reason: "expired", error: "Time is up" };
+    return { ok: false, reason: 'expired', error: 'Time is up' };
   }
   const q = currentQuestion(game);
-  if (!q) return { ok: false, error: "No active question" };
+  if (!q) return { ok: false, error: 'No active question' };
   if (optionIndex < 0 || optionIndex >= q.options.length) {
-    return { ok: false, error: "Invalid option" };
+    return { ok: false, error: 'Invalid option' };
   }
   const records = game.answers.get(game.questionIndex) ?? [];
   if (records.find((r) => r.playerId === playerId)) {
-    return { ok: false, error: "Already answered" };
+    return { ok: false, error: 'Already answered' };
   }
   const player = game.players.get(playerId);
-  if (!player) return { ok: false, error: "Player not in game" };
+  if (!player) return { ok: false, error: 'Player not in game' };
 
   const now = Date.now();
   const startedAt = game.questionStartedAt ?? now;
@@ -477,10 +475,11 @@ export function submitAnswer(
       correct,
       msFromStart,
       awarded,
-    }).catch((err) => console.error("[session-repo]", err));
+    }).catch((err) => console.error('[session-repo]', err));
   }
 
-  const allAnswered = records.length >= Array.from(game.players.values()).filter((p) => p.connected).length;
+  const allAnswered =
+    records.length >= Array.from(game.players.values()).filter((p) => p.connected).length;
   if (allAnswered) {
     lockQuestion(game);
   }
@@ -533,7 +532,7 @@ function csvEscape(value: string): string {
 export function exportResultsCsv(game: GameSession): string {
   const total = game.quiz.questions.length;
   const board = leaderboard(game);
-  const rows: string[] = ["rank,nickname,score,correct,total,avg_response_ms"];
+  const rows: string[] = ['rank,nickname,score,correct,total,avg_response_ms'];
   for (const entry of board) {
     let correct = 0;
     let answeredCount = 0;
@@ -547,25 +546,16 @@ export function exportResultsCsv(game: GameSession): string {
       msSum += mine.msFromStart;
       if (mine.correct) correct += 1;
     }
-    const avg = answeredCount > 0 ? String(Math.round(msSum / answeredCount)) : "";
-    rows.push(
-      [
-        entry.rank,
-        csvEscape(entry.nickname),
-        entry.score,
-        correct,
-        total,
-        avg,
-      ].join(","),
-    );
+    const avg = answeredCount > 0 ? String(Math.round(msSum / answeredCount)) : '';
+    rows.push([entry.rank, csvEscape(entry.nickname), entry.score, correct, total, avg].join(','));
   }
-  return rows.join("\r\n") + "\r\n";
+  return `${rows.join('\r\n')}\r\n`;
 }
 
 export function exportAnswersCsv(game: GameSession): string {
   const questions = game.quiz.questions;
   const rows: string[] = [
-    "question_no,question,player,choice_index,choice_text,correct,ms_from_start,awarded",
+    'question_no,question,player,choice_index,choice_text,correct,ms_from_start,awarded',
   ];
   for (let qi = 0; qi < questions.length; qi++) {
     const q = questions[qi];
@@ -580,30 +570,21 @@ export function exportAnswersCsv(game: GameSession): string {
           csvEscape(q.text),
           csvEscape(player.nickname),
           r.optionIndex,
-          csvEscape(q.options[r.optionIndex] ?? ""),
-          r.correct ? "true" : "false",
+          csvEscape(q.options[r.optionIndex] ?? ''),
+          r.correct ? 'true' : 'false',
           r.msFromStart,
           r.awarded,
-        ].join(","),
+        ].join(','),
       );
     }
     for (const player of game.players.values()) {
       if (answeredIds.has(player.id)) continue;
       rows.push(
-        [
-          qi + 1,
-          csvEscape(q.text),
-          csvEscape(player.nickname),
-          "",
-          "",
-          "false",
-          "",
-          0,
-        ].join(","),
+        [qi + 1, csvEscape(q.text), csvEscape(player.nickname), '', '', 'false', '', 0].join(','),
       );
     }
   }
-  return rows.join("\r\n") + "\r\n";
+  return `${rows.join('\r\n')}\r\n`;
 }
 
 export function publicState(game: GameSession): PublicGameState {
@@ -611,7 +592,7 @@ export function publicState(game: GameSession): PublicGameState {
   const board = leaderboard(game);
   const cap = capStatus(game);
   const reveal =
-    game.phase === "reveal" || game.phase === "leaderboard"
+    game.phase === 'reveal' || game.phase === 'leaderboard'
       ? q
         ? {
             correct: q.correct as AnswerIndex,
@@ -626,7 +607,7 @@ export function publicState(game: GameSession): PublicGameState {
     questionIndex: game.questionIndex,
     totalQuestions: game.quiz.questions.length,
     question:
-      q && (game.phase === "question" || game.phase === "reveal")
+      q && (game.phase === 'question' || game.phase === 'reveal')
         ? {
             text: q.text,
             type: q.type,

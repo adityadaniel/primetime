@@ -1,44 +1,49 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { useSocket } from "@/lib/socket";
-import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from "@/components/Broadcast";
-import { Shape, CHANNELS } from "@/components/Shape";
-import AccountMenu from "@/components/AccountMenu";
-import type { Question, Quiz, AnswerIndex } from "@/lib/types";
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import AccountMenu from '@/components/AccountMenu';
+import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { CHANNELS, Shape } from '@/components/Shape';
+import { useSocket } from '@/lib/socket';
+import type { AnswerIndex, Question, Quiz } from '@/lib/types';
 
 type Draft = Quiz & { questions: Question[] };
 
 const TIME_LIMITS = [10, 20, 30, 60, 90, 120];
 
 const STARTER: Draft = {
-  title: "QUIZ #001 — STUDIO PILOT",
+  title: 'QUIZ #001 — STUDIO PILOT',
   questions: [
     {
       id: q(),
-      type: "multiple",
-      text: "Which of these is broadcast in NTSC at 29.97 frames per second?",
-      options: ["A 35mm film print", "A US color TV broadcast", "A PAL video signal", "A web-native MP4"],
+      type: 'multiple',
+      text: 'Which of these is broadcast in NTSC at 29.97 frames per second?',
+      options: [
+        'A 35mm film print',
+        'A US color TV broadcast',
+        'A PAL video signal',
+        'A web-native MP4',
+      ],
       correct: 1,
       timeLimit: 20,
       doublePoints: false,
     },
     {
       id: q(),
-      type: "truefalse",
-      text: "The first commercial color TV broadcast was in 1965.",
-      options: ["TRUE", "FALSE"],
+      type: 'truefalse',
+      text: 'The first commercial color TV broadcast was in 1965.',
+      options: ['TRUE', 'FALSE'],
       correct: 1,
       timeLimit: 10,
       doublePoints: false,
     },
     {
       id: q(),
-      type: "multiple",
+      type: 'multiple',
       text: "Which channel is the diamond, in this network's signal kit?",
-      options: ["CH.01", "CH.02", "CH.03", "CH.04"],
+      options: ['CH.01', 'CH.02', 'CH.03', 'CH.04'],
       correct: 1,
       timeLimit: 20,
       doublePoints: true,
@@ -47,7 +52,7 @@ const STARTER: Draft = {
 };
 
 function q() {
-  return "q_" + Math.random().toString(36).slice(2, 9);
+  return `q_${Math.random().toString(36).slice(2, 9)}`;
 }
 
 export default function HostBuilder() {
@@ -63,7 +68,7 @@ export default function HostBuilder() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const quizId = params.get("quiz");
+    const quizId = params.get('quiz');
     if (!quizId) return;
     fetch(`/api/quiz/${quizId}`)
       .then((r) => (r.ok ? r.json() : null))
@@ -71,22 +76,24 @@ export default function HostBuilder() {
         if (!data) return;
         setDraft({
           title: data.title,
-          questions: data.questions.map((qq: {
-            type: "multiple" | "truefalse";
-            text: string;
-            options: string[];
-            correct: AnswerIndex;
-            timeLimit: number;
-            doublePoints: boolean;
-          }) => ({
-            id: q(),
-            type: qq.type,
-            text: qq.text,
-            options: qq.options,
-            correct: qq.correct,
-            timeLimit: qq.timeLimit,
-            doublePoints: qq.doublePoints,
-          })),
+          questions: data.questions.map(
+            (qq: {
+              type: 'multiple' | 'truefalse';
+              text: string;
+              options: string[];
+              correct: AnswerIndex;
+              timeLimit: number;
+              doublePoints: boolean;
+            }) => ({
+              id: q(),
+              type: qq.type,
+              text: qq.text,
+              options: qq.options,
+              correct: qq.correct,
+              timeLimit: qq.timeLimit,
+              doublePoints: qq.doublePoints,
+            }),
+          ),
         });
         setSavedId(quizId);
       });
@@ -106,13 +113,13 @@ export default function HostBuilder() {
     });
   }
 
-  function addQuestion(type: "multiple" | "truefalse" = "multiple") {
+  function addQuestion(type: 'multiple' | 'truefalse' = 'multiple') {
     setDraft((d) => {
       const newQ: Question = {
         id: q(),
         type,
-        text: "",
-        options: type === "truefalse" ? ["TRUE", "FALSE"] : ["", "", "", ""],
+        text: '',
+        options: type === 'truefalse' ? ['TRUE', 'FALSE'] : ['', '', '', ''],
         correct: 0,
         timeLimit: 20,
         doublePoints: false,
@@ -142,14 +149,14 @@ export default function HostBuilder() {
     setActiveIdx(i + dir);
   }
 
-  function changeType(t: "multiple" | "truefalse") {
+  function changeType(t: 'multiple' | 'truefalse') {
     if (t === active.type) return;
     setDraft((d) => {
       const qs = [...d.questions];
       qs[activeIdx] = {
         ...qs[activeIdx],
         type: t,
-        options: t === "truefalse" ? ["TRUE", "FALSE"] : ["", "", "", ""],
+        options: t === 'truefalse' ? ['TRUE', 'FALSE'] : ['', '', '', ''],
         correct: 0,
       };
       return { ...d, questions: qs };
@@ -157,7 +164,7 @@ export default function HostBuilder() {
   }
 
   function validate(): string | null {
-    if (!draft.title.trim()) return "Title required";
+    if (!draft.title.trim()) return 'Title required';
     for (const [i, q] of draft.questions.entries()) {
       if (!q.text.trim()) return `Question ${i + 1}: missing text`;
       if (q.options.some((o) => !o.trim())) return `Question ${i + 1}: empty option`;
@@ -173,8 +180,8 @@ export default function HostBuilder() {
     }
     if (!socket) return;
     setLaunching(true);
-    socket.emit("host:create", draft, (res: { pin: string }) => {
-      window.open(`/host/${res.pin}/display`, "_blank", "noopener");
+    socket.emit('host:create', draft, (res: { pin: string }) => {
+      window.open(`/host/${res.pin}/display`, '_blank', 'noopener');
       router.push(`/host/${res.pin}/control`);
     });
   }
@@ -199,10 +206,10 @@ export default function HostBuilder() {
         })),
       };
       const url = savedId ? `/api/quiz/${savedId}` : `/api/quiz`;
-      const method = savedId ? "PUT" : "POST";
+      const method = savedId ? 'PUT' : 'POST';
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
@@ -215,8 +222,8 @@ export default function HostBuilder() {
       setSavedId(id);
       if (wasNew) {
         const next = new URL(window.location.href);
-        next.searchParams.set("quiz", id);
-        window.history.replaceState({}, "", next.toString());
+        next.searchParams.set('quiz', id);
+        window.history.replaceState({}, '', next.toString());
       }
       setSavedFlash(true);
       window.setTimeout(() => setSavedFlash(false), 2000);
@@ -227,11 +234,11 @@ export default function HostBuilder() {
 
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    e.target.value = "";
+    e.target.value = '';
     if (!file) return;
     const form = new FormData();
-    form.append("file", file);
-    const res = await fetch("/api/quiz/import", { method: "POST", body: form });
+    form.append('file', file);
+    const res = await fetch('/api/quiz/import', { method: 'POST', body: form });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       alert(`Import failed: ${err.error ?? res.statusText}`);
@@ -258,37 +265,37 @@ export default function HostBuilder() {
       <section className="px-8 pt-8 max-w-[1400px] mx-auto">
         <div className="flex items-end justify-between gap-6 flex-wrap">
           <div>
-            <p className="chyron mb-2" style={{ color: "var(--vermilion)" }}>
+            <p className="chyron mb-2" style={{ color: 'var(--vermilion)' }}>
               CUE SHEET / WORKING DRAFT
             </p>
             <input
               value={draft.title}
               onChange={(e) => setDraft({ ...draft, title: e.target.value })}
               className="display-num bg-transparent outline-none border-b-2 pb-1 max-w-[900px] w-full"
-              style={{ borderColor: "var(--ink)", fontSize: "clamp(40px, 6vw, 84px)" }}
+              style={{ borderColor: 'var(--ink)', fontSize: 'clamp(40px, 6vw, 84px)' }}
             />
           </div>
           <div
             className="ink-border p-4 flex items-center gap-6"
-            style={{ background: "var(--bone)" }}
+            style={{ background: 'var(--bone)' }}
           >
-            <Stat label="QUESTIONS" value={String(draft.questions.length).padStart(2, "0")} />
+            <Stat label="QUESTIONS" value={String(draft.questions.length).padStart(2, '0')} />
             <Stat label="RUNTIME" value={`${totalSeconds}s`} />
             <button
               type="button"
               onClick={save}
               disabled={saving}
               className="ink-border stamp px-6 py-3 ticker tracking-widest text-[12px]"
-              style={{ background: "var(--ink)", color: "var(--bone)" }}
+              style={{ background: 'var(--ink)', color: 'var(--bone)' }}
             >
-              {saving ? "SAVING…" : savedFlash ? "SAVED ✓" : "SAVE"}
+              {saving ? 'SAVING…' : savedFlash ? 'SAVED ✓' : 'SAVE'}
             </button>
             {savedId && (
               <a
                 href={`/api/quiz/${savedId}/export`}
                 download
                 className="ink-border stamp px-6 py-3 ticker tracking-widest text-[12px]"
-                style={{ background: "var(--bone)", color: "var(--ink)" }}
+                style={{ background: 'var(--bone)', color: 'var(--ink)' }}
               >
                 EXPORT
               </a>
@@ -304,7 +311,7 @@ export default function HostBuilder() {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="ink-border stamp px-6 py-3 ticker tracking-widest text-[12px]"
-              style={{ background: "var(--bone)", color: "var(--ink)" }}
+              style={{ background: 'var(--bone)', color: 'var(--ink)' }}
             >
               IMPORT
             </button>
@@ -313,9 +320,9 @@ export default function HostBuilder() {
               onClick={launch}
               disabled={launching}
               className="ink-border stamp px-6 py-3 ticker tracking-widest text-[12px]"
-              style={{ background: "var(--vermilion)", color: "var(--bone)" }}
+              style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
             >
-              {launching ? "ON AIR…" : "▶  GO LIVE"}
+              {launching ? 'ON AIR…' : '▶  GO LIVE'}
             </button>
           </div>
         </div>
@@ -324,40 +331,41 @@ export default function HostBuilder() {
       <section className="px-8 mt-10 max-w-[1400px] mx-auto grid grid-cols-12 gap-6">
         <aside
           className="col-span-12 lg:col-span-4 ink-border"
-          style={{ background: "var(--bone)" }}
+          style={{ background: 'var(--bone)' }}
         >
           <div
             className="px-4 py-2 flex items-center justify-between border-b-2"
-            style={{ borderColor: "var(--ink)" }}
+            style={{ borderColor: 'var(--ink)' }}
           >
             <span className="chyron">RUN ORDER</span>
             <span className="ticker text-[11px] tracking-widest opacity-60">
-              {String(activeIdx + 1).padStart(2, "0")} / {String(draft.questions.length).padStart(2, "0")}
+              {String(activeIdx + 1).padStart(2, '0')} /{' '}
+              {String(draft.questions.length).padStart(2, '0')}
             </span>
           </div>
-          <ol className="divide-y-2" style={{ borderColor: "var(--ink)" }}>
+          <ol className="divide-y-2" style={{ borderColor: 'var(--ink)' }}>
             {draft.questions.map((qq, i) => (
               <li
                 key={qq.id}
                 className={`px-4 py-3 cursor-pointer flex gap-3 items-start ${
-                  i === activeIdx ? "" : "hover:opacity-90"
+                  i === activeIdx ? '' : 'hover:opacity-90'
                 }`}
                 style={{
-                  background: i === activeIdx ? "var(--ink)" : "transparent",
-                  color: i === activeIdx ? "var(--bone)" : "var(--ink)",
+                  background: i === activeIdx ? 'var(--ink)' : 'transparent',
+                  color: i === activeIdx ? 'var(--bone)' : 'var(--ink)',
                 }}
                 onClick={() => setActiveIdx(i)}
               >
                 <span className="display-num text-3xl" style={{ minWidth: 36 }}>
-                  {String(i + 1).padStart(2, "0")}
+                  {String(i + 1).padStart(2, '0')}
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="font-editorial truncate text-[15px]">
                     {qq.text || <span className="opacity-50 italic">untitled cue</span>}
                   </p>
                   <p className="ticker text-[10px] tracking-widest mt-1 opacity-70">
-                    {qq.type === "truefalse" ? "T/F" : "MC"} · {qq.timeLimit}s
-                    {qq.doublePoints ? " · 2× PTS" : ""}
+                    {qq.type === 'truefalse' ? 'T/F' : 'MC'} · {qq.timeLimit}s
+                    {qq.doublePoints ? ' · 2× PTS' : ''}
                   </p>
                 </div>
                 <div className="flex flex-col gap-1">
@@ -387,15 +395,15 @@ export default function HostBuilder() {
               </li>
             ))}
           </ol>
-          <div className="p-3 flex gap-2 border-t-2" style={{ borderColor: "var(--ink)" }}>
+          <div className="p-3 flex gap-2 border-t-2" style={{ borderColor: 'var(--ink)' }}>
             <button
-              onClick={() => addQuestion("multiple")}
+              onClick={() => addQuestion('multiple')}
               className="flex-1 ink-border py-2 ticker text-[11px] tracking-widest"
             >
               + MULTIPLE
             </button>
             <button
-              onClick={() => addQuestion("truefalse")}
+              onClick={() => addQuestion('truefalse')}
               className="flex-1 ink-border py-2 ticker text-[11px] tracking-widest"
             >
               + T/F
@@ -405,10 +413,13 @@ export default function HostBuilder() {
 
         <article
           className="col-span-12 lg:col-span-8 ink-border p-6 lg:p-8 relative"
-          style={{ background: "var(--bone)" }}
+          style={{ background: 'var(--bone)' }}
         >
-          <div className="absolute -top-3 left-6 px-2 py-[2px] ticker text-[11px] tracking-widest" style={{ background: "var(--vermilion)", color: "var(--bone)" }}>
-            CUE {String(activeIdx + 1).padStart(2, "0")}
+          <div
+            className="absolute -top-3 left-6 px-2 py-[2px] ticker text-[11px] tracking-widest"
+            style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
+          >
+            CUE {String(activeIdx + 1).padStart(2, '0')}
           </div>
 
           <div className="flex items-center justify-between mb-3">
@@ -416,7 +427,7 @@ export default function HostBuilder() {
             <button
               onClick={() => removeQuestion(activeIdx)}
               className="ticker text-[11px] tracking-widest"
-              style={{ color: "var(--vermilion)" }}
+              style={{ color: 'var(--vermilion)' }}
               disabled={draft.questions.length <= 1}
             >
               DELETE CUE ✕
@@ -425,11 +436,11 @@ export default function HostBuilder() {
           <textarea
             value={active.text}
             maxLength={120}
-            onChange={(e) => patch("text", e.target.value)}
+            onChange={(e) => patch('text', e.target.value)}
             rows={2}
             placeholder="What's the question?"
             className="w-full font-editorial text-2xl md:text-3xl bg-transparent outline-none border-b-2 pb-2"
-            style={{ borderColor: "var(--ink)" }}
+            style={{ borderColor: 'var(--ink)' }}
           />
           <div className="ticker text-[11px] tracking-widest mt-1 opacity-60">
             {active.text.length}/120
@@ -447,13 +458,13 @@ export default function HostBuilder() {
                       key={i}
                       className="flex items-center gap-3 ink-border"
                       style={{
-                        background: isCorrect ? ch.color : "var(--bone)",
-                        color: isCorrect ? "var(--bone)" : "var(--ink)",
+                        background: isCorrect ? ch.color : 'var(--bone)',
+                        color: isCorrect ? 'var(--bone)' : 'var(--ink)',
                       }}
                     >
                       <div
                         className="grid place-items-center w-14 h-14 shrink-0 border-r-2"
-                        style={{ borderColor: "var(--ink)", background: ch.color }}
+                        style={{ borderColor: 'var(--ink)', background: ch.color }}
                       >
                         <Shape kind={ch.key} fill="var(--bone)" stroke="var(--ink)" size={32} />
                       </div>
@@ -462,21 +473,21 @@ export default function HostBuilder() {
                         onChange={(e) => {
                           const opts = [...active.options];
                           opts[i] = e.target.value;
-                          patch("options", opts);
+                          patch('options', opts);
                         }}
                         placeholder={`Option ${i + 1}`}
-                        readOnly={active.type === "truefalse"}
+                        readOnly={active.type === 'truefalse'}
                         className="flex-1 bg-transparent outline-none py-3 pr-3 font-editorial text-lg"
                       />
                       <button
-                        onClick={() => patch("correct", i as AnswerIndex)}
+                        onClick={() => patch('correct', i as AnswerIndex)}
                         className="ticker text-[11px] tracking-widest px-3 mr-3 py-1 ink-border"
                         style={{
-                          background: isCorrect ? "var(--ink)" : "transparent",
-                          color: isCorrect ? "var(--bone)" : "var(--ink)",
+                          background: isCorrect ? 'var(--ink)' : 'transparent',
+                          color: isCorrect ? 'var(--bone)' : 'var(--ink)',
                         }}
                       >
-                        {isCorrect ? "✓ CORRECT" : "MARK CORRECT"}
+                        {isCorrect ? '✓ CORRECT' : 'MARK CORRECT'}
                       </button>
                     </div>
                   );
@@ -488,18 +499,18 @@ export default function HostBuilder() {
               <div>
                 <span className="chyron">TYPE</span>
                 <div className="flex mt-2 ink-border">
-                  {(["multiple", "truefalse"] as const).map((t) => (
+                  {(['multiple', 'truefalse'] as const).map((t) => (
                     <button
                       key={t}
                       onClick={() => changeType(t)}
                       className="flex-1 py-2 ticker text-[11px] tracking-widest border-r-2 last:border-r-0"
                       style={{
-                        background: active.type === t ? "var(--ink)" : "transparent",
-                        color: active.type === t ? "var(--bone)" : "var(--ink)",
-                        borderColor: "var(--ink)",
+                        background: active.type === t ? 'var(--ink)' : 'transparent',
+                        color: active.type === t ? 'var(--bone)' : 'var(--ink)',
+                        borderColor: 'var(--ink)',
                       }}
                     >
-                      {t === "multiple" ? "MULTIPLE CHOICE" : "TRUE / FALSE"}
+                      {t === 'multiple' ? 'MULTIPLE CHOICE' : 'TRUE / FALSE'}
                     </button>
                   ))}
                 </div>
@@ -511,11 +522,11 @@ export default function HostBuilder() {
                   {TIME_LIMITS.map((s) => (
                     <button
                       key={s}
-                      onClick={() => patch("timeLimit", s)}
+                      onClick={() => patch('timeLimit', s)}
                       className="ink-border ticker text-[11px] tracking-widest px-3 py-2"
                       style={{
-                        background: active.timeLimit === s ? "var(--ink)" : "transparent",
-                        color: active.timeLimit === s ? "var(--bone)" : "var(--ink)",
+                        background: active.timeLimit === s ? 'var(--ink)' : 'transparent',
+                        color: active.timeLimit === s ? 'var(--bone)' : 'var(--ink)',
                       }}
                     >
                       {s}s
@@ -527,22 +538,23 @@ export default function HostBuilder() {
               <div>
                 <span className="chyron">SCORING</span>
                 <button
-                  onClick={() => patch("doublePoints", !active.doublePoints)}
+                  onClick={() => patch('doublePoints', !active.doublePoints)}
                   className="mt-2 w-full ink-border py-3 ticker text-[12px] tracking-widest flex items-center justify-between px-3"
                   style={{
-                    background: active.doublePoints ? "var(--marigold)" : "transparent",
-                    color: "var(--ink)",
+                    background: active.doublePoints ? 'var(--marigold)' : 'transparent',
+                    color: 'var(--ink)',
                   }}
                 >
                   <span>DOUBLE POINTS</span>
-                  <span>{active.doublePoints ? "ON · 2×" : "OFF · 1×"}</span>
+                  <span>{active.doublePoints ? 'ON · 2×' : 'OFF · 1×'}</span>
                 </button>
               </div>
 
-              <div className="ink-border p-4 halftone" style={{ background: "var(--bone)" }}>
+              <div className="ink-border p-4 halftone" style={{ background: 'var(--bone)' }}>
                 <p className="chyron mb-1">SCORING FORMULA</p>
                 <p className="ticker text-[12px] leading-relaxed">
-                  pts = 1000 × (½ + ½ × t<sub>left</sub>/t<sub>limit</sub>) × {active.doublePoints ? "2" : "1"}
+                  pts = 1000 × (½ + ½ × t<sub>left</sub>/t<sub>limit</sub>) ×{' '}
+                  {active.doublePoints ? '2' : '1'}
                 </p>
                 <p className="ticker text-[10px] tracking-widest mt-2 opacity-60">
                   MAX {active.doublePoints ? 2000 : 1000} · MIN {active.doublePoints ? 1000 : 500}
@@ -553,8 +565,13 @@ export default function HostBuilder() {
         </article>
       </section>
 
-      <footer className="mt-16 px-8 max-w-[1400px] mx-auto flex justify-between items-center border-t-2 pt-4" style={{ borderColor: "var(--ink)" }}>
-        <Link href="/" className="ticker text-[11px] tracking-widest">← STUDIO MASTER</Link>
+      <footer
+        className="mt-16 px-8 max-w-[1400px] mx-auto flex justify-between items-center border-t-2 pt-4"
+        style={{ borderColor: 'var(--ink)' }}
+      >
+        <Link href="/" className="ticker text-[11px] tracking-widest">
+          ← STUDIO MASTER
+        </Link>
         <span className="font-editorial italic opacity-60">Save the cue, then roll tape.</span>
       </footer>
     </main>

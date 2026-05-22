@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import Link from "next/link";
-import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from "@/components/Broadcast";
+import Link from 'next/link';
+import { useState } from 'react';
+import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/components/Broadcast';
 
 export default function ResetPage() {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState('');
   const [pending, setPending] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [devUrl, setDevUrl] = useState<string | null>(null);
@@ -16,13 +16,13 @@ export default function ResetPage() {
     if (pending) return;
     setError(null);
     if (!email.trim()) {
-      setError("Enter your email.");
+      setError('Enter your email.');
       return;
     }
     setPending(true);
-    const res = await fetch("/api/auth/reset", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const res = await fetch('/api/auth/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email.trim().toLowerCase() }),
     });
     setPending(false);
@@ -50,12 +50,10 @@ export default function ResetPage() {
 
       <section className="px-6 pt-8 pb-8 flex-1">
         <div className="max-w-[420px] mx-auto w-full">
-          <p className="ticker text-[11px] tracking-widest opacity-70 mb-2">
-            ▶ BROADCAST  ◀
-          </p>
+          <p className="ticker text-[11px] tracking-widest opacity-70 mb-2">▶ BROADCAST ◀</p>
           <h1
             className="display-num"
-            style={{ fontSize: "clamp(48px, 11vw, 100px)", lineHeight: 0.9 }}
+            style={{ fontSize: 'clamp(48px, 11vw, 100px)', lineHeight: 0.9 }}
           >
             RESET
             <br />
@@ -79,7 +77,7 @@ export default function ResetPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     aria-label="Email"
                     className="w-full mt-1 ink-border bg-transparent font-editorial text-lg px-4 py-3"
-                    style={{ background: "var(--bone)", minHeight: 56 }}
+                    style={{ background: 'var(--bone)', minHeight: 56 }}
                   />
                 </label>
 
@@ -87,7 +85,7 @@ export default function ResetPage() {
                   {error && (
                     <div
                       className="ink-border px-4 py-3 ticker text-[12px] tracking-widest"
-                      style={{ background: "var(--vermilion)", color: "var(--bone)" }}
+                      style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
                     >
                       ⚠ {error}
                     </div>
@@ -99,21 +97,18 @@ export default function ResetPage() {
                   disabled={pending}
                   className="w-full ink-border stamp-lg ticker tracking-widest text-[14px] py-4"
                   style={{
-                    background: "var(--ink)",
-                    color: "var(--bone)",
+                    background: 'var(--ink)',
+                    color: 'var(--bone)',
                     minHeight: 56,
                   }}
                 >
-                  {pending ? "SENDING…" : "▶  SEND RESET LINK"}
+                  {pending ? 'SENDING…' : '▶  SEND RESET LINK'}
                 </button>
               </form>
             </>
           ) : (
             <div className="mt-6 space-y-4" role="status" aria-live="polite">
-              <div
-                className="ink-border px-4 py-4 halftone"
-                style={{ background: "var(--bone)" }}
-              >
+              <div className="ink-border px-4 py-4 halftone" style={{ background: 'var(--bone)' }}>
                 <p className="chyron mb-2">SIGNAL · DISPATCHED</p>
                 <p className="font-editorial text-lg">
                   If an account exists, we just sent a reset link.
@@ -124,7 +119,7 @@ export default function ResetPage() {
               {devUrl && (
                 <div
                   className="ink-border px-4 py-4"
-                  style={{ background: "var(--marigold)", color: "var(--ink)" }}
+                  style={{ background: 'var(--marigold)', color: 'var(--ink)' }}
                 >
                   <p className="ticker text-[11px] tracking-widest mb-2">
                     DEV ONLY · OPEN THIS LINK
@@ -141,7 +136,7 @@ export default function ResetPage() {
           )}
 
           <p className="mt-6 ticker text-[12px] tracking-widest opacity-80">
-            REMEMBERED IT?{" "}
+            REMEMBERED IT?{' '}
             <Link href="/signin" className="underline">
               SIGN IN
             </Link>

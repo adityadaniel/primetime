@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
 export function useCountdown(endsAt: number | undefined): {
   msLeft: number;
@@ -41,7 +41,7 @@ export function Countdown({
   const left = Math.max(0, endsAt - now);
   const fraction = left / total;
   const seconds = Math.ceil(left / 1000);
-  const stroke = dark ? "var(--bone)" : "var(--ink)";
+  const stroke = dark ? 'var(--bone)' : 'var(--ink)';
   const r = size / 2 - 8;
   const c = 2 * Math.PI * r;
   const dash = c * (1 - fraction);
@@ -51,14 +51,14 @@ export function Countdown({
         width={size}
         height={size}
         viewBox={`0 0 ${size} ${size}`}
-        style={{ transform: "rotate(-90deg)" }}
+        style={{ transform: 'rotate(-90deg)' }}
       >
         <circle
           cx={size / 2}
           cy={size / 2}
           r={r}
           fill="none"
-          stroke={dark ? "rgba(242,235,220,0.18)" : "rgba(15,15,15,0.18)"}
+          stroke={dark ? 'rgba(242,235,220,0.18)' : 'rgba(15,15,15,0.18)'}
           strokeWidth={6}
         />
         <circle

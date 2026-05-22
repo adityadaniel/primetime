@@ -1,19 +1,19 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
-import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from "@/components/Broadcast";
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { signIn } from 'next-auth/react';
+import { useState } from 'react';
+import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/components/Broadcast';
 
 export default function SignInClient({ enableApple }: { enableApple: boolean }) {
   const router = useRouter();
   const search = useSearchParams();
-  const callbackUrl = search.get("callbackUrl") || "/host";
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const callbackUrl = search.get('callbackUrl') || '/host';
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
-  const [oauthPending, setOauthPending] = useState<"google" | "apple" | null>(null);
+  const [oauthPending, setOauthPending] = useState<'google' | 'apple' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
@@ -21,11 +21,11 @@ export default function SignInClient({ enableApple }: { enableApple: boolean }) 
     if (pending) return;
     setError(null);
     if (!email.trim() || !password) {
-      setError("Enter your email and password.");
+      setError('Enter your email and password.');
       return;
     }
     setPending(true);
-    const res = await signIn("credentials", {
+    const res = await signIn('credentials', {
       email: email.trim().toLowerCase(),
       password,
       redirect: false,
@@ -39,7 +39,7 @@ export default function SignInClient({ enableApple }: { enableApple: boolean }) 
     router.refresh();
   }
 
-  function oauth(provider: "google" | "apple") {
+  function oauth(provider: 'google' | 'apple') {
     setOauthPending(provider);
     signIn(provider, { callbackUrl });
   }
@@ -59,46 +59,42 @@ export default function SignInClient({ enableApple }: { enableApple: boolean }) 
 
       <section className="px-6 pt-8 pb-8 flex-1">
         <div className="max-w-[420px] mx-auto w-full">
-          <p className="ticker text-[11px] tracking-widest opacity-70 mb-2">
-            ▶ BROADCAST  ◀
-          </p>
+          <p className="ticker text-[11px] tracking-widest opacity-70 mb-2">▶ BROADCAST ◀</p>
           <h1
             className="display-num"
-            style={{ fontSize: "clamp(56px, 12vw, 120px)", lineHeight: 0.9 }}
+            style={{ fontSize: 'clamp(56px, 12vw, 120px)', lineHeight: 0.9 }}
           >
             SIGN IN
           </h1>
-          <p className="font-editorial italic text-base mt-1 opacity-80">
-            Step into the studio.
-          </p>
+          <p className="font-editorial italic text-base mt-1 opacity-80">Step into the studio.</p>
 
           <div className="mt-6 space-y-3">
             <button
               type="button"
-              onClick={() => oauth("google")}
+              onClick={() => oauth('google')}
               disabled={!!oauthPending}
               className="w-full ink-border ticker tracking-widest text-[12px] py-4"
-              style={{ background: "var(--bone)", color: "var(--ink)", minHeight: 56 }}
+              style={{ background: 'var(--bone)', color: 'var(--ink)', minHeight: 56 }}
             >
-              {oauthPending === "google" ? "REDIRECTING…" : "CONTINUE WITH GOOGLE"}
+              {oauthPending === 'google' ? 'REDIRECTING…' : 'CONTINUE WITH GOOGLE'}
             </button>
             {enableApple && (
               <button
                 type="button"
-                onClick={() => oauth("apple")}
+                onClick={() => oauth('apple')}
                 disabled={!!oauthPending}
                 className="w-full ink-border ticker tracking-widest text-[12px] py-4"
-                style={{ background: "var(--ink)", color: "var(--bone)", minHeight: 56 }}
+                style={{ background: 'var(--ink)', color: 'var(--bone)', minHeight: 56 }}
               >
-                {oauthPending === "apple" ? "REDIRECTING…" : "CONTINUE WITH APPLE"}
+                {oauthPending === 'apple' ? 'REDIRECTING…' : 'CONTINUE WITH APPLE'}
               </button>
             )}
           </div>
 
           <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 border-t-2" style={{ borderColor: "var(--ink)" }} />
+            <div className="flex-1 border-t-2" style={{ borderColor: 'var(--ink)' }} />
             <span className="ticker text-[11px] tracking-widest opacity-70">OR</span>
-            <div className="flex-1 border-t-2" style={{ borderColor: "var(--ink)" }} />
+            <div className="flex-1 border-t-2" style={{ borderColor: 'var(--ink)' }} />
           </div>
 
           <form onSubmit={submit} className="space-y-3" noValidate>
@@ -112,7 +108,7 @@ export default function SignInClient({ enableApple }: { enableApple: boolean }) 
                 onChange={(e) => setEmail(e.target.value)}
                 aria-label="Email"
                 className="w-full mt-1 ink-border bg-transparent font-editorial text-lg px-4 py-3"
-                style={{ background: "var(--bone)", minHeight: 56 }}
+                style={{ background: 'var(--bone)', minHeight: 56 }}
               />
             </label>
             <label className="block">
@@ -125,15 +121,12 @@ export default function SignInClient({ enableApple }: { enableApple: boolean }) 
                 onChange={(e) => setPassword(e.target.value)}
                 aria-label="Password"
                 className="w-full mt-1 ink-border bg-transparent font-editorial text-lg px-4 py-3"
-                style={{ background: "var(--bone)", minHeight: 56 }}
+                style={{ background: 'var(--bone)', minHeight: 56 }}
               />
             </label>
 
             <div className="flex justify-end">
-              <Link
-                href="/reset"
-                className="ticker text-[11px] tracking-widest underline"
-              >
+              <Link href="/reset" className="ticker text-[11px] tracking-widest underline">
                 FORGOT PASSWORD?
               </Link>
             </div>
@@ -142,7 +135,7 @@ export default function SignInClient({ enableApple }: { enableApple: boolean }) 
               {error && (
                 <div
                   className="ink-border px-4 py-3 ticker text-[12px] tracking-widest"
-                  style={{ background: "var(--vermilion)", color: "var(--bone)" }}
+                  style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
                 >
                   ⚠ {error}
                 </div>
@@ -154,17 +147,17 @@ export default function SignInClient({ enableApple }: { enableApple: boolean }) 
               disabled={pending}
               className="w-full ink-border stamp-lg ticker tracking-widest text-[14px] py-4"
               style={{
-                background: "var(--ink)",
-                color: "var(--bone)",
+                background: 'var(--ink)',
+                color: 'var(--bone)',
                 minHeight: 56,
               }}
             >
-              {pending ? "SIGNING IN…" : "▶  SIGN IN"}
+              {pending ? 'SIGNING IN…' : '▶  SIGN IN'}
             </button>
           </form>
 
           <p className="mt-6 ticker text-[12px] tracking-widest opacity-80">
-            DON&apos;T HAVE AN ACCOUNT?{" "}
+            DON&apos;T HAVE AN ACCOUNT?{' '}
             <Link href="/signup" className="underline">
               SIGN UP
             </Link>
