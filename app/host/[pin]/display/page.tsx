@@ -101,6 +101,7 @@ export default function DisplayPage({ params }: { params: Promise<{ pin: string 
       <CornerMarksDark dark={dark} />
       {needsUnlock && (
         <button
+          type="button"
           onClick={() => sfx.unlockAudio().then(() => setNeedsUnlock(false))}
           className="fixed inset-0 z-50 grid place-items-center"
           style={{ background: 'rgba(15,15,15,0.55)', color: 'var(--bone)' }}

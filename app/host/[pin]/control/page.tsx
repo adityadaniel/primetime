@@ -150,6 +150,7 @@ export default function ControlPanel({ params }: { params: Promise<{ pin: string
           <Clock />
           <OnAir live={live} />
           <button
+            type="button"
             onClick={toggleMute}
             aria-label={muted ? 'Unmute audio' : 'Mute audio'}
             aria-pressed={muted}
@@ -301,6 +302,7 @@ export default function ControlPanel({ params }: { params: Promise<{ pin: string
             style={{ borderColor: 'var(--ink)' }}
           >
             <button
+              type="button"
               onClick={nextStep}
               className="ink-border stamp px-4 py-3 ticker tracking-widest text-[12px]"
               style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
@@ -380,6 +382,7 @@ function LobbyView({
             : 'Players checked in. Roll tape when ready.'}
         </p>
         <button
+          type="button"
           onClick={onStart}
           disabled={state.players.length === 0}
           className="ink-border stamp px-4 py-2 ticker tracking-widest text-[12px]"
@@ -405,6 +408,7 @@ function LobbyView({
               <span className="font-editorial truncate">{p.nickname}</span>
             </div>
             <button
+              type="button"
               onClick={() => onKick(p.id)}
               className="ticker text-[10px] tracking-widest opacity-60 hover:opacity-100"
               aria-label={`Kick ${p.nickname}`}

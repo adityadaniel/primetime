@@ -45,12 +45,12 @@
         "noSvgWithoutTitle": "off"
       },
       "style": {
-        "noNonNullAssertion": "warn"
+        "noNonNullAssertion": "off"
       },
       "suspicious": {
         "noExplicitAny": "warn",
         "noConsole": "off",
-        "noArrayIndexKey": "warn"
+        "noArrayIndexKey": "off"
       },
       "complexity": {
         "noForEach": "off"

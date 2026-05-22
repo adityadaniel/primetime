@@ -438,7 +438,9 @@ export function startFinalLoop(): void {
   lfo.connect(lfoGain);
   lfoGain.connect(gain.gain);
   const now = c.currentTime;
-  oscs.forEach((o) => o.start(now));
+  oscs.forEach((o) => {
+    o.start(now);
+  });
   lfo.start(now);
   loops.final = {
     stop: () => {
@@ -446,11 +448,15 @@ export function startFinalLoop(): void {
       gain.gain.cancelScheduledValues(t);
       gain.gain.setValueAtTime(gain.gain.value, t);
       gain.gain.linearRampToValueAtTime(0, t + 0.15);
-      oscs.forEach((o) => o.stop(t + 0.18));
+      oscs.forEach((o) => {
+        o.stop(t + 0.18);
+      });
       lfo.stop(t + 0.18);
       const cleanup = () => {
         try {
-          oscs.forEach((o) => o.disconnect());
+          oscs.forEach((o) => {
+            o.disconnect();
+          });
           lfo.disconnect();
           lfoGain.disconnect();
           gain.disconnect();

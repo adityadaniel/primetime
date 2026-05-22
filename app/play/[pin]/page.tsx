@@ -250,6 +250,7 @@ export default function PlayPage({ params }: { params: Promise<{ pin: string }> 
     <main className="relative min-h-screen pb-10 flex flex-col">
       <CornerMarks />
       <button
+        type="button"
         onClick={toggleMute}
         aria-label={muted ? 'Unmute' : 'Mute'}
         aria-pressed={muted}
@@ -382,6 +383,7 @@ function PlayerQuestion({
           const dim = answered && !mine;
           return (
             <button
+              type="button"
               key={i}
               onClick={() => onSubmit(i as AnswerIndex)}
               disabled={answered || submitting}

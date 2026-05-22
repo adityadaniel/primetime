@@ -345,31 +345,34 @@ export default function HostBuilder() {
           </div>
           <ol className="divide-y-2" style={{ borderColor: 'var(--ink)' }}>
             {draft.questions.map((qq, i) => (
-              <li
-                key={qq.id}
-                className={`px-4 py-3 cursor-pointer flex gap-3 items-start ${
-                  i === activeIdx ? '' : 'hover:opacity-90'
-                }`}
-                style={{
-                  background: i === activeIdx ? 'var(--ink)' : 'transparent',
-                  color: i === activeIdx ? 'var(--bone)' : 'var(--ink)',
-                }}
-                onClick={() => setActiveIdx(i)}
-              >
-                <span className="display-num text-3xl" style={{ minWidth: 36 }}>
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="font-editorial truncate text-[15px]">
-                    {qq.text || <span className="opacity-50 italic">untitled cue</span>}
-                  </p>
-                  <p className="ticker text-[10px] tracking-widest mt-1 opacity-70">
-                    {qq.type === 'truefalse' ? 'T/F' : 'MC'} · {qq.timeLimit}s
-                    {qq.doublePoints ? ' · 2× PTS' : ''}
-                  </p>
-                </div>
+              <li key={qq.id} className="flex items-start gap-3 px-4 py-3">
+                <button
+                  type="button"
+                  className={`flex-1 text-left flex gap-3 items-start ${
+                    i === activeIdx ? '' : 'hover:opacity-90'
+                  }`}
+                  style={{
+                    background: i === activeIdx ? 'var(--ink)' : 'transparent',
+                    color: i === activeIdx ? 'var(--bone)' : 'var(--ink)',
+                  }}
+                  onClick={() => setActiveIdx(i)}
+                >
+                  <span className="display-num text-3xl" style={{ minWidth: 36 }}>
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-editorial truncate text-[15px]">
+                      {qq.text || <span className="opacity-50 italic">untitled cue</span>}
+                    </p>
+                    <p className="ticker text-[10px] tracking-widest mt-1 opacity-70">
+                      {qq.type === 'truefalse' ? 'T/F' : 'MC'} · {qq.timeLimit}s
+                      {qq.doublePoints ? ' · 2× PTS' : ''}
+                    </p>
+                  </div>
+                </button>
                 <div className="flex flex-col gap-1">
                   <button
+                    type="button"
                     aria-label="Move up"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -381,6 +384,7 @@ export default function HostBuilder() {
                     ▲
                   </button>
                   <button
+                    type="button"
                     aria-label="Move down"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -397,12 +401,14 @@ export default function HostBuilder() {
           </ol>
           <div className="p-3 flex gap-2 border-t-2" style={{ borderColor: 'var(--ink)' }}>
             <button
+              type="button"
               onClick={() => addQuestion('multiple')}
               className="flex-1 ink-border py-2 ticker text-[11px] tracking-widest"
             >
               + MULTIPLE
             </button>
             <button
+              type="button"
               onClick={() => addQuestion('truefalse')}
               className="flex-1 ink-border py-2 ticker text-[11px] tracking-widest"
             >
@@ -425,6 +431,7 @@ export default function HostBuilder() {
           <div className="flex items-center justify-between mb-3">
             <span className="chyron">QUESTION TEXT · ≤120 CHARS</span>
             <button
+              type="button"
               onClick={() => removeQuestion(activeIdx)}
               className="ticker text-[11px] tracking-widest"
               style={{ color: 'var(--vermilion)' }}
@@ -480,6 +487,7 @@ export default function HostBuilder() {
                         className="flex-1 bg-transparent outline-none py-3 pr-3 font-editorial text-lg"
                       />
                       <button
+                        type="button"
                         onClick={() => patch('correct', i as AnswerIndex)}
                         className="ticker text-[11px] tracking-widest px-3 mr-3 py-1 ink-border"
                         style={{
@@ -501,6 +509,7 @@ export default function HostBuilder() {
                 <div className="flex mt-2 ink-border">
                   {(['multiple', 'truefalse'] as const).map((t) => (
                     <button
+                      type="button"
                       key={t}
                       onClick={() => changeType(t)}
                       className="flex-1 py-2 ticker text-[11px] tracking-widest border-r-2 last:border-r-0"
@@ -521,6 +530,7 @@ export default function HostBuilder() {
                 <div className="flex flex-wrap gap-2 mt-2">
                   {TIME_LIMITS.map((s) => (
                     <button
+                      type="button"
                       key={s}
                       onClick={() => patch('timeLimit', s)}
                       className="ink-border ticker text-[11px] tracking-widest px-3 py-2"
@@ -538,6 +548,7 @@ export default function HostBuilder() {
               <div>
                 <span className="chyron">SCORING</span>
                 <button
+                  type="button"
                   onClick={() => patch('doublePoints', !active.doublePoints)}
                   className="mt-2 w-full ink-border py-3 ticker text-[12px] tracking-widest flex items-center justify-between px-3"
                   style={{
