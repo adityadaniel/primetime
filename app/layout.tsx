@@ -3,8 +3,35 @@ import './globals.css';
 import Providers from './providers';
 
 export const metadata: Metadata = {
-  title: 'BROADCAST — live quiz',
-  description: 'A real-time quiz game, broadcast-style.',
+  metadataBase: new URL(process.env.NEXTAUTH_URL ?? 'http://localhost:4321'),
+  title: {
+    default: 'BROADCAST — Live quizzes done well',
+    template: '%s — BROADCAST',
+  },
+  description:
+    'BROADCAST is a real-time quiz network for classrooms, conference rooms, and the back of any room with a projector. Editorial brutalist by design — no purple gradient.',
+  applicationName: 'BROADCAST',
+  keywords: [
+    'live quiz',
+    'classroom quiz',
+    'real-time quiz',
+    'kahoot alternative',
+    'broadcast',
+    'projector trivia',
+  ],
+  openGraph: {
+    type: 'website',
+    siteName: 'BROADCAST',
+    title: 'BROADCAST — Live quizzes done well',
+    description:
+      'A real-time quiz broadcast for classrooms and conference rooms. Editorial brutalist by design.',
+    url: '/',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'BROADCAST — Live quizzes done well',
+    description: 'A real-time quiz broadcast. Editorial brutalist by design.',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
