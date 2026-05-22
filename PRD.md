@@ -22,6 +22,11 @@ Traditional knowledge checks (polls, quizzes, tests) are passive and disengaging
 - Analytics dashboard beyond session-level stats
 - Offline mode
 
+### 1.5 Companion activities
+BROADCAST is not strictly a quiz product. Other activity types live in sister PRDs and reuse the same socket/PIN/host/player infrastructure:
+
+- **Word Cloud** (live typographic prompt) — see [`docs/wordcloud-prd.md`](docs/wordcloud-prd.md)
+
 ## 2. Users & Roles
 
 | Role | Description |
