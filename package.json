@@ -11,8 +11,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up -d --wait && prisma migrate dev",
+    "db:logs": "docker compose logs -f postgres",
+    "db:psql": "docker compose exec postgres psql -U broadcast -d broadcast_dev",
     "db:migrate": "prisma migrate dev",
-    "db:reset": "prisma migrate reset --skip-seed",
     "db:studio": "prisma studio"
   },
   "dependencies": {
