@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSocket } from "@/lib/socket";
 import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from "@/components/Broadcast";
 import { Shape, CHANNELS } from "@/components/Shape";
+import AccountMenu from "@/components/AccountMenu";
 import type { Question, Quiz, AnswerIndex } from "@/lib/types";
 
 type Draft = Quiz & { questions: Question[] };
@@ -249,6 +250,7 @@ export default function HostBuilder() {
           <FrameCounter index={0} />
           <Clock />
           <OnAir live={false} />
+          <AccountMenu />
         </div>
       </header>
       <SmpteBars className="h-2 mt-4" />

@@ -1,0 +1,49 @@
+# Local dev infrastructure for BROADCAST.
+#
+# Postgres 16 matches Vercel Postgres (Neon) so dev/CI/prod run the same engine.
+# Adminer gives you a tiny web UI at http://localhost:8080 for poking at the DB.
+#
+# Bring up:    npm run db:up
+# Bring down:  npm run db:down
+# Reset:       npm run db:reset   (wipes volume, runs prisma migrate)
+# Logs:        npm run db:logs
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: broadcast-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: broadcast
+      POSTGRES_PASSWORD: broadcast
+      POSTGRES_DB: broadcast_dev
+      # Use C locale for predictable sort order in tests
+      POSTGRES_INITDB_ARGS: "--locale=C --encoding=UTF8"
+    ports:
+      # Bind to localhost only — never expose Postgres on LAN/Tailscale
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - broadcast_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U broadcast -d broadcast_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  adminer:
+    image: adminer:5
+    container_name: broadcast-adminer
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: dracula
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  broadcast_pg_data:
+    name: broadcast_pg_data
