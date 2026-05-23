@@ -22,6 +22,26 @@ import {
   submitAnswer,
 } from './lib/game';
 import type { AnswerIndex, Quiz } from './lib/types';
+import {
+  addPlayerToCloud,
+  createWordCloudState,
+  normalizeWord,
+  playerSubmissions,
+  removeWord,
+  setStatus as setCloudStatus,
+  snapshotWords,
+  submitWord,
+  type WordCloudState,
+  type WordCloudStateStatus,
+} from './lib/wordcloud';
+import {
+  addPlayer as repoAddPlayer,
+  addSubmission as repoAddSubmission,
+  createSession as repoCreateSession,
+  logModeration as repoLogModeration,
+  markSubmissionRemoved as repoMarkRemoved,
+  setStatus as repoSetStatus,
+} from './lib/wordcloud-repo';
 
 const dev = process.env.NODE_ENV !== 'production';
 const port = Number(process.env.PORT ?? 4321);
@@ -139,6 +159,46 @@ void app.prepare().then(() => {
   const lockTimers = new Map<string, NodeJS.Timeout>();
   const hostGraceTimers = new Map<string, NodeJS.Timeout>();
   const HOST_GRACE_MS = 60_000;
+
+  const wordCloudStates = new Map<string, WordCloudState>();
+  const wcSocketToPin = new Map<string, { pin: string; role: 'host' | 'player' }>();
+  const wcLastSubmitAt = new Map<string, number>();
+  const WC_PIN_RETRY_LIMIT = 50;
+  const WC_RATE_LIMIT_MS = 800;
+
+  function allocateWordCloudPin(): string {
+    for (let i = 0; i < WC_PIN_RETRY_LIMIT; i++) {
+      const pin = String(Math.floor(100000 + Math.random() * 900000));
+      if (wordCloudStates.has(pin)) continue;
+      if (getGame(pin)) continue;
+      return pin;
+    }
+    throw new Error('Could not allocate PIN');
+  }
+
+  function isWordsPerPlayer(v: unknown): v is number {
+    return typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 5;
+  }
+
+  function isValidStatus(v: unknown): v is WordCloudStateStatus {
+    return v === 'LOBBY' || v === 'LIVE' || v === 'PAUSED' || v === 'ENDED';
+  }
+
+  function wcSnapshot(state: WordCloudState) {
+    return {
+      pin: state.pin,
+      prompt: state.prompt,
+      wordsPerPlayer: state.wordsPerPlayer,
+      profanityFilter: state.profanityFilter,
+      status: state.status,
+      joinerCount: state.players.size,
+      words: snapshotWords(state),
+    };
+  }
+
+  function wcEmitState(state: WordCloudState) {
+    io.to(`wc:${state.pin}`).emit('wordcloud:state', wcSnapshot(state));
+  }
 
   function broadcast(pin: string) {
     const game = getGame(pin);
@@ -304,7 +364,251 @@ void app.prepare().then(() => {
       broadcast(pin);
     });
 
+    socket.on('wordcloud:host:create', (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[wordcloud:host:create] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: { pin: string; sessionId: string } | { error: string }) => void;
+      if (!payload || typeof payload !== 'object') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const p = payload as Record<string, unknown>;
+      const prompt = typeof p.prompt === 'string' ? p.prompt.trim() : '';
+      const wordsPerPlayer = p.wordsPerPlayer;
+      const profanityFilter = p.profanityFilter;
+      if (!prompt || prompt.length > 200) {
+        cb({ error: 'invalid_prompt' });
+        return;
+      }
+      if (!isWordsPerPlayer(wordsPerPlayer)) {
+        cb({ error: 'invalid_words_per_player' });
+        return;
+      }
+      if (typeof profanityFilter !== 'boolean') {
+        cb({ error: 'invalid_filter' });
+        return;
+      }
+
+      let pin: string;
+      try {
+        pin = allocateWordCloudPin();
+      } catch {
+        cb({ error: 'pin_unavailable' });
+        return;
+      }
+
+      const sessionId = `wcs_${Math.random().toString(36).slice(2, 11)}`;
+      const state = createWordCloudState({
+        pin,
+        sessionId,
+        prompt,
+        wordsPerPlayer,
+        profanityFilter,
+        hostUserId: null,
+      });
+      state.hostSocketId = socket.id;
+      wordCloudStates.set(pin, state);
+      wcSocketToPin.set(socket.id, { pin, role: 'host' });
+      socket.join(`wc:${pin}`);
+
+      repoCreateSession({
+        pin,
+        prompt,
+        wordsPerPlayer,
+        profanityFilter,
+        hostUserId: null,
+      })
+        .then((row) => {
+          state.sessionId = row.id;
+        })
+        .catch((err) => console.error('[wordcloud-repo] createSession', err));
+
+      cb({ pin, sessionId });
+      wcEmitState(state);
+    });
+
+    socket.on('wordcloud:player:join', (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[wordcloud:player:join] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (
+        res:
+          | {
+              playerId: string;
+              prompt: string;
+              wordsPerPlayer: number;
+              status: WordCloudStateStatus;
+              mySubmissions: { normalized: string; display: string }[];
+              words: { normalized: string; display: string; count: number }[];
+            }
+          | { error: string },
+      ) => void;
+      if (!payload || typeof payload !== 'object') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const p = payload as Record<string, unknown>;
+      if (!isPin(p.pin)) {
+        cb({ error: 'invalid_pin' });
+        return;
+      }
+      if (!isNickname(p.nickname)) {
+        cb({ error: 'invalid_nickname' });
+        return;
+      }
+      const state = wordCloudStates.get(p.pin);
+      if (!state) {
+        cb({ error: 'not_found' });
+        return;
+      }
+      const result = addPlayerToCloud(state, { nickname: p.nickname.trim() });
+      if (result.error || !result.playerId) {
+        cb({ error: result.error ?? 'unknown' });
+        return;
+      }
+      const playerId = result.playerId;
+      state.socketToPlayer.set(socket.id, playerId);
+      wcSocketToPin.set(socket.id, { pin: state.pin, role: 'player' });
+      socket.join(`wc:${state.pin}`);
+
+      const nicknameForDb = p.nickname.trim();
+      repoAddPlayer({ sessionId: state.sessionId, nickname: nicknameForDb }).catch((err) =>
+        console.error('[wordcloud-repo] addPlayer', err),
+      );
+
+      cb({
+        playerId,
+        prompt: state.prompt,
+        wordsPerPlayer: state.wordsPerPlayer,
+        status: state.status,
+        mySubmissions: playerSubmissions(state, playerId),
+        words: snapshotWords(state),
+      });
+      wcEmitState(state);
+    });
+
+    socket.on('wordcloud:player:submit', (payload: unknown) => {
+      if (!payload || typeof payload !== 'object') return;
+      const p = payload as Record<string, unknown>;
+      if (!isPin(p.pin)) return;
+      if (typeof p.playerId !== 'string') return;
+      if (typeof p.word !== 'string') return;
+      const state = wordCloudStates.get(p.pin);
+      if (!state) {
+        socket.emit('wordcloud:player:rejected', { reason: 'session_not_live' });
+        return;
+      }
+      const ownPlayerId = state.socketToPlayer.get(socket.id);
+      if (!ownPlayerId || ownPlayerId !== p.playerId) {
+        socket.emit('wordcloud:player:rejected', { reason: 'unknown_player' });
+        return;
+      }
+
+      const now = Date.now();
+      const last = wcLastSubmitAt.get(p.playerId) ?? 0;
+      if (now - last < WC_RATE_LIMIT_MS) {
+        socket.emit('wordcloud:player:rejected', { reason: 'rate_limited' });
+        return;
+      }
+      wcLastSubmitAt.set(p.playerId, now);
+
+      const result = submitWord(state, { playerId: p.playerId, word: p.word });
+      if (!result.accepted) {
+        socket.emit('wordcloud:player:rejected', {
+          reason: result.reason,
+          normalized: result.normalized,
+        });
+        return;
+      }
+
+      const normalized = result.normalized as string;
+      const display = result.display as string;
+      const count = result.count as number;
+
+      io.to(`wc:${state.pin}`).emit('wordcloud:word:added', {
+        normalized,
+        display,
+        count,
+      });
+      socket.emit('wordcloud:player:my-submissions', {
+        submissions: playerSubmissions(state, p.playerId),
+      });
+
+      const norm = normalizeWord(p.word);
+      if (norm) {
+        repoAddSubmission({
+          sessionId: state.sessionId,
+          playerId: p.playerId,
+          rawText: norm.display,
+          normalized: norm.normalized,
+        }).catch((err) => console.error('[wordcloud-repo] addSubmission', err));
+      }
+    });
+
+    socket.on('wordcloud:host:remove', (payload: unknown) => {
+      if (!payload || typeof payload !== 'object') return;
+      const p = payload as Record<string, unknown>;
+      if (!isPin(p.pin)) return;
+      if (typeof p.normalized !== 'string') return;
+      const state = wordCloudStates.get(p.pin);
+      if (!state) return;
+      if (state.hostSocketId !== socket.id) {
+        socket.emit('wordcloud:player:rejected', { reason: 'not_authorized' });
+        return;
+      }
+      const result = removeWord(state, { normalized: p.normalized });
+      if (!result.removed) return;
+      io.to(`wc:${state.pin}`).emit('wordcloud:word:removed', { normalized: p.normalized });
+
+      repoMarkRemoved({
+        sessionId: state.sessionId,
+        normalized: p.normalized,
+        hostUserId: state.hostUserId,
+      }).catch((err) => console.error('[wordcloud-repo] markSubmissionRemoved', err));
+      repoLogModeration({
+        sessionId: state.sessionId,
+        hostUserId: state.hostUserId,
+        word: p.normalized,
+        reason: 'trash',
+      }).catch((err) => console.error('[wordcloud-repo] logModeration', err));
+    });
+
+    socket.on('wordcloud:host:set-status', (payload: unknown) => {
+      if (!payload || typeof payload !== 'object') return;
+      const p = payload as Record<string, unknown>;
+      if (!isPin(p.pin)) return;
+      if (!isValidStatus(p.status)) return;
+      const state = wordCloudStates.get(p.pin);
+      if (!state) return;
+      if (state.hostSocketId !== socket.id) {
+        socket.emit('wordcloud:player:rejected', { reason: 'not_authorized' });
+        return;
+      }
+      setCloudStatus(state, p.status);
+      io.to(`wc:${state.pin}`).emit('wordcloud:status:changed', { status: p.status });
+      wcEmitState(state);
+
+      const dbStatus = p.status === 'PAUSED' ? 'LIVE' : p.status;
+      repoSetStatus({ sessionId: state.sessionId, status: dbStatus }).catch((err) =>
+        console.error('[wordcloud-repo] setStatus', err),
+      );
+    });
+
     socket.on('disconnect', () => {
+      const wcLink = wcSocketToPin.get(socket.id);
+      if (wcLink) {
+        wcSocketToPin.delete(socket.id);
+        const wcState = wordCloudStates.get(wcLink.pin);
+        if (wcState) {
+          if (wcLink.role === 'player') {
+            wcState.socketToPlayer.delete(socket.id);
+          }
+        }
+      }
+
       const events = detachSocket(socket.id);
       const pins = new Set(events.map((e) => e.pin));
       for (const event of events) {
