@@ -1,3 +1,4 @@
+import { registerActivePinsProvider, tryAllocateAgainstActiveSet } from './pin-allocator';
 import { isClean } from './profanity';
 import {
   createSessionRecord,
@@ -30,7 +31,6 @@ export function setReconnectGraceForTesting(ms: number) {
   RECONNECT_GRACE_MS = ms;
 }
 const RESULT_BASE = 1000;
-const PIN_RETRY_LIMIT = 50;
 
 export type Tier = 'free' | 'pro';
 
@@ -60,16 +60,18 @@ export interface GameSession {
 
 const games = new Map<string, GameSession>();
 
+// Register the in-memory active-PINs set with the shared allocator so
+// word-cloud creation can avoid collisions before either side hits the DB.
+registerActivePinsProvider(() => games.keys());
+
 export function listGames(): GameSession[] {
   return Array.from(games.values());
 }
 
 function generatePin(): string {
-  for (let i = 0; i < PIN_RETRY_LIMIT; i++) {
-    const pin = String(Math.floor(100000 + Math.random() * 900000));
-    if (!games.has(pin)) return pin;
-  }
-  throw new Error('Could not allocate PIN');
+  const pin = tryAllocateAgainstActiveSet((p) => games.has(p));
+  if (!pin) throw new Error('Could not allocate PIN');
+  return pin;
 }
 
 export function createGame(

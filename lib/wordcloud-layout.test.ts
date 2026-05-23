@@ -90,7 +90,7 @@ describe('layoutWords', () => {
     }
   });
 
-  it('uses a perceptual sqrt scale for font sizes', () => {
+  it('uses a perceptual sqrt scale for top-rank font sizes', () => {
     const words = makeWords([
       ['top', 100],
       ['mid', 25],
@@ -103,11 +103,43 @@ describe('layoutWords', () => {
     expect(top && mid && low).toBeTruthy();
     if (!top || !mid || !low) return;
 
-    // sqrt(100/100)=1.0 → 200, sqrt(25/100)=0.5 → 24+0.5*(200-24)=112,
-    // sqrt(1/100)=0.1 → 24+0.1*176=41.6.
+    // All three are top-5 ranks (cap = 200), so the sqrt curve still lands
+    // top at 200, mid at ~112, low at ~41.6.
     expect(top.fontSize).toBeCloseTo(200, 1);
     expect(mid.fontSize).toBeCloseTo(112, 1);
     expect(low.fontSize).toBeCloseTo(41.6, 1);
+  });
+
+  it('caps mid-rank words (rank 5-19) at 90px and tail-rank at 50px', () => {
+    // 21 words all with the same count so the sqrt curve hits 1.0 for every
+    // rank — that lets us check the rank-tier cap is what limits font size.
+    const words = makeWords(
+      Array.from(
+        { length: 21 },
+        (_, i) => [`word${String(i).padStart(2, '0')}`, 5] as [string, number],
+      ),
+    );
+    const result = layoutWords({ words, seed: 'tier', viewport: VIEWPORT });
+    const sortedByCountThenName = [...words].sort((a, b) =>
+      b.count !== a.count ? b.count - a.count : a.normalized.localeCompare(b.normalized),
+    );
+    const indexOf = (norm: string) => result.findIndex((p) => p.normalized === norm);
+    // Rank 0-4 should be ≤ 200 (we don't assert top exactly 200 since they
+    // all tie and ordering inside the tier is by name).
+    for (let i = 0; i <= 4; i++) {
+      const p = result[indexOf(sortedByCountThenName[i].normalized)];
+      if (p) expect(p.fontSize).toBeLessThanOrEqual(200);
+    }
+    // Rank 5-19 capped at 90.
+    for (let i = 5; i <= 19; i++) {
+      const target = sortedByCountThenName[i].normalized;
+      const p = result[indexOf(target)];
+      if (p) expect(p.fontSize).toBeLessThanOrEqual(90.001);
+    }
+    // Rank 20+ capped at 50.
+    const tailTarget = sortedByCountThenName[20].normalized;
+    const tail = result[indexOf(tailTarget)];
+    if (tail) expect(tail.fontSize).toBeLessThanOrEqual(50.001);
   });
 
   it('keeps rotation within bucketed ±15° range, never vertical', () => {

@@ -13,6 +13,12 @@ export type LayoutInput = {
   words: LayoutInputWord[];
   seed: string;
   viewport: { width: number; height: number };
+  /**
+   * Hard cap on visible words. Anything beyond this is dropped from the
+   * placement loop and surfaced via the returned `omitted` count so the
+   * display can render a "+N more" indicator (F9).
+   */
+  maxWords?: number;
 };
 
 export type LayoutPlacement = {
@@ -27,11 +33,20 @@ export type LayoutPlacement = {
   color: LayoutColor;
 };
 
+export type LayoutResult = {
+  placements: LayoutPlacement[];
+  omitted: number;
+};
+
 const MIN_FONT = 24;
-const MAX_FONT = 200;
+const MAX_FONT_TOP = 200; // ranks 0-4
+const MAX_FONT_MID = 90; // ranks 5-19
+const MAX_FONT_TAIL = 50; // ranks 20+
 const BASELINE_VIEWPORT_WIDTH = 1920;
 const ROTATION_BUCKETS: readonly number[] = [-15, -7, 0, 0, 0, 7, 15];
-const COLLISION_RETRY_LIMIT = 60;
+// Spiral retries — bumped from 60 to 240 so 150+ unique words can find a slot
+// (F9). Combined with a tighter padding it gets us past the 87% placement bar.
+const COLLISION_RETRY_LIMIT = 240;
 const SPIRAL_STEP = 14;
 const SPIRAL_GROWTH = 0.55;
 // Approximate width-per-character ratio for serif display type at the chosen
@@ -39,22 +54,31 @@ const SPIRAL_GROWTH = 0.55;
 // estimate so collision boxes are roughly right.
 const CHAR_WIDTH_RATIO = 0.55;
 const LINE_HEIGHT_RATIO = 1.05;
-const PAD_X = 10;
-const PAD_Y = 6;
+// Padding tightened from (10, 6) → (8, 5) so smaller words can sit closer
+// without visually colliding (F9).
+const PAD_X = 8;
+const PAD_Y = 5;
+const DEFAULT_MAX_WORDS = 150;
 
 export function layoutWords(input: LayoutInput): LayoutPlacement[] {
-  if (input.words.length === 0) return [];
+  return layoutWordsDetailed(input).placements;
+}
+
+export function layoutWordsDetailed(input: LayoutInput): LayoutResult {
+  if (input.words.length === 0) return { placements: [], omitted: 0 };
 
   const { width, height } = input.viewport;
   const scale = Math.min(1, width / BASELINE_VIEWPORT_WIDTH);
   const minFont = MIN_FONT * scale;
-  const maxFont = MAX_FONT * scale;
 
   const sorted = [...input.words].sort((a, b) => {
     if (b.count !== a.count) return b.count - a.count;
     return a.normalized.localeCompare(b.normalized);
   });
   const maxCount = sorted[0].count;
+  const cap = input.maxWords ?? DEFAULT_MAX_WORDS;
+  const omitted = sorted.length > cap ? sorted.length - cap : 0;
+  const visible = sorted.slice(0, cap);
 
   const seedHash = hashString(input.seed);
   const rand = mulberry32(seedHash);
@@ -63,9 +87,9 @@ export function layoutWords(input: LayoutInput): LayoutPlacement[] {
   const cx = width / 2;
   const cy = height / 2;
 
-  for (let i = 0; i < sorted.length; i++) {
-    const word = sorted[i];
-    const fontSize = perceptualFontSize(word.count, maxCount, minFont, maxFont);
+  for (let i = 0; i < visible.length; i++) {
+    const word = visible[i];
+    const fontSize = perceptualFontSize(i, word.count, maxCount, minFont, scale);
     const rotation = pickRotation(input.seed, word.normalized);
     const color = pickColor(i);
     const box = boundingBox(word.display, fontSize, rotation);
@@ -95,10 +119,21 @@ export function layoutWords(input: LayoutInput): LayoutPlacement[] {
     });
   }
 
-  return placements;
+  return { placements, omitted };
 }
 
-function perceptualFontSize(count: number, maxCount: number, minFont: number, maxFont: number) {
+// Tiered font scale (F9). Top 5 words use the original sqrt curve at the full
+// 200px max so they remain dominant. Ranks 5-19 cap at MAX_FONT_MID, ranks 20+
+// cap at MAX_FONT_TAIL — this is what lets a 150-word cloud actually fit.
+function perceptualFontSize(
+  rank: number,
+  count: number,
+  maxCount: number,
+  minFont: number,
+  scale: number,
+): number {
+  const cap = rank <= 4 ? MAX_FONT_TOP : rank <= 19 ? MAX_FONT_MID : MAX_FONT_TAIL;
+  const maxFont = cap * scale;
   if (maxCount <= 0) return minFont;
   const ratio = Math.sqrt(Math.max(0, count) / maxCount);
   return minFont + ratio * (maxFont - minFont);

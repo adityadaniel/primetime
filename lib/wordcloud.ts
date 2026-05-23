@@ -25,6 +25,9 @@ export type WordCloudState = {
   socketToPlayer: Map<string, string>;
   players: Map<string, WordCloudPlayerEntry>;
   words: Map<string, WordCloudWordEntry>;
+  // Normalized words the host has trashed. Submissions that race the trash
+  // event use this to persist with removed=true (F5 race guard).
+  trashedNormalized: Set<string>;
   createdAt: number;
 };
 
@@ -91,6 +94,7 @@ export function createWordCloudState(args: {
     socketToPlayer: new Map(),
     players: new Map(),
     words: new Map(),
+    trashedNormalized: new Set(),
     createdAt: Date.now(),
   };
 }
@@ -169,13 +173,34 @@ export function removeWord(
   return { removed: true };
 }
 
-export function setStatus(
-  state: WordCloudState,
-  status: WordCloudStateStatus,
-): { from: WordCloudStateStatus; to: WordCloudStateStatus } {
+export type SetStatusResult =
+  | { ok: true; from: WordCloudStateStatus; to: WordCloudStateStatus }
+  | {
+      ok: false;
+      reason: 'invalid_transition';
+      from: WordCloudStateStatus;
+      to: WordCloudStateStatus;
+    };
+
+const STATUS_TRANSITIONS: Record<WordCloudStateStatus, ReadonlySet<WordCloudStateStatus>> = {
+  LOBBY: new Set<WordCloudStateStatus>(['LIVE']),
+  LIVE: new Set<WordCloudStateStatus>(['PAUSED', 'ENDED']),
+  PAUSED: new Set<WordCloudStateStatus>(['LIVE', 'ENDED']),
+  // ENDED is terminal for live sockets — moderators can archive via DB only.
+  ENDED: new Set<WordCloudStateStatus>(),
+};
+
+export function isValidTransition(from: WordCloudStateStatus, to: WordCloudStateStatus): boolean {
+  return STATUS_TRANSITIONS[from]?.has(to) ?? false;
+}
+
+export function setStatus(state: WordCloudState, status: WordCloudStateStatus): SetStatusResult {
   const from = state.status;
+  if (!isValidTransition(from, status)) {
+    return { ok: false, reason: 'invalid_transition', from, to: status };
+  }
   state.status = status;
-  return { from, to: status };
+  return { ok: true, from, to: status };
 }
 
 export function snapshotWords(

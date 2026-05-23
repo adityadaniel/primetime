@@ -14,7 +14,7 @@ export async function GET(
 
   const session = await prisma.wordCloudSession.findUnique({
     where: { pin },
-    select: { id: true, hostUserId: true, prompt: true },
+    select: { id: true, hostUserId: true, prompt: true, status: true },
   });
   if (!session) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
@@ -29,6 +29,13 @@ export async function GET(
     if (userId !== session.hostUserId) {
       return NextResponse.json({ error: 'forbidden' }, { status: 403 });
     }
+  }
+
+  if (session.status !== 'ENDED' && session.status !== 'ARCHIVED') {
+    return NextResponse.json(
+      { error: 'session_not_ended', status: session.status },
+      { status: 409 },
+    );
   }
 
   const rows = await prisma.wordCloudSubmission.findMany({

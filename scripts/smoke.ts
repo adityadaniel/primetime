@@ -970,10 +970,22 @@ async function wcCreate(
   host: ReturnType<typeof io>,
   args: { prompt: string; wordsPerPlayer: number; profanityFilter: boolean },
 ) {
+  // F6 fail-closed: socket-only creation is gone. Allocate + persist via the
+  // shared lib (which is what the API route calls) and then bind the socket.
+  const { allocatePin: allocateWcPin } = await import('../lib/pin-allocator');
+  const { createSession } = await import('../lib/wordcloud-repo');
+  const pin = await allocateWcPin();
+  const created = await createSession({
+    pin,
+    prompt: args.prompt,
+    wordsPerPlayer: args.wordsPerPlayer,
+    profanityFilter: args.profanityFilter,
+    hostUserId: null,
+  });
   return new Promise<{ pin: string; sessionId: string }>((resolve, reject) => {
     host.emit(
       'wordcloud:host:create',
-      args,
+      { pin: created.pin, sessionId: created.id },
       (res: { pin?: string; sessionId?: string; error?: string }) => {
         if (!res.pin || !res.sessionId) {
           reject(new Error(`wordcloud:host:create failed: ${res.error ?? 'unknown'}`));
@@ -983,6 +995,27 @@ async function wcCreate(
       },
     );
   });
+}
+
+async function wcJoinViaJoinPath(
+  player: ReturnType<typeof io>,
+  args: { pin: string; nickname: string },
+) {
+  // Mirror what /join does: HTTP precheck FIRST, then emit the wordcloud
+  // socket event so a word-cloud PIN never tries the quiz flow (F1).
+  const lookup = await fetch(`${URL}/api/lookup-pin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin: args.pin }),
+  });
+  if (lookup.status !== 200) {
+    throw new Error(`/api/lookup-pin failed for pin ${args.pin}: ${lookup.status}`);
+  }
+  const looked = (await lookup.json()) as { type?: string };
+  if (looked.type !== 'wordcloud') {
+    throw new Error(`expected lookup-pin to return wordcloud, got ${JSON.stringify(looked)}`);
+  }
+  return wcJoin(player, args);
 }
 
 async function wcJoin(player: ReturnType<typeof io>, args: { pin: string; nickname: string }) {
@@ -1054,8 +1087,8 @@ async function assertWordCloudHappyPath() {
   const { pin } = created;
   console.log('wc pin:', pin);
 
-  const ja = await wcJoin(a, { pin, nickname: 'Alice' });
-  const jb = await wcJoin(b, { pin, nickname: 'Bob' });
+  const ja = await wcJoinViaJoinPath(a, { pin, nickname: 'Alice' });
+  const jb = await wcJoinViaJoinPath(b, { pin, nickname: 'Bob' });
 
   await wcSetStatus(host, { pin, status: 'LIVE' });
 

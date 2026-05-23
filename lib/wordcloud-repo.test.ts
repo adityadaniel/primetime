@@ -197,6 +197,8 @@ describe('addSubmission', () => {
         playerId: 'p_1',
         rawText: 'Excited',
         normalized: 'excited',
+        removed: false,
+        removedAt: null,
       },
     });
   });

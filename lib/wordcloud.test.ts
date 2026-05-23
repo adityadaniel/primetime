@@ -189,10 +189,58 @@ describe('setStatus', () => {
   it('walks LOBBY → LIVE → PAUSED → LIVE → ENDED', () => {
     const state = makeState();
     expect(state.status).toBe('LOBBY');
-    expect(setStatus(state, 'LIVE')).toEqual({ from: 'LOBBY', to: 'LIVE' });
-    expect(setStatus(state, 'PAUSED')).toEqual({ from: 'LIVE', to: 'PAUSED' });
-    expect(setStatus(state, 'LIVE')).toEqual({ from: 'PAUSED', to: 'LIVE' });
-    expect(setStatus(state, 'ENDED')).toEqual({ from: 'LIVE', to: 'ENDED' });
+    expect(setStatus(state, 'LIVE')).toEqual({ ok: true, from: 'LOBBY', to: 'LIVE' });
+    expect(setStatus(state, 'PAUSED')).toEqual({ ok: true, from: 'LIVE', to: 'PAUSED' });
+    expect(setStatus(state, 'LIVE')).toEqual({ ok: true, from: 'PAUSED', to: 'LIVE' });
+    expect(setStatus(state, 'ENDED')).toEqual({ ok: true, from: 'LIVE', to: 'ENDED' });
     expect(state.status).toBe('ENDED');
+  });
+
+  it('rejects LOBBY → ENDED (must go through LIVE)', () => {
+    const state = makeState();
+    const r = setStatus(state, 'ENDED');
+    expect(r).toEqual({ ok: false, reason: 'invalid_transition', from: 'LOBBY', to: 'ENDED' });
+    expect(state.status).toBe('LOBBY');
+  });
+
+  it('rejects LOBBY → PAUSED', () => {
+    const state = makeState();
+    const r = setStatus(state, 'PAUSED');
+    expect(r.ok).toBe(false);
+    expect(state.status).toBe('LOBBY');
+  });
+
+  it('rejects ENDED → LIVE (terminal)', () => {
+    const state = makeState({ status: 'ENDED' });
+    const r = setStatus(state, 'LIVE');
+    expect(r).toEqual({ ok: false, reason: 'invalid_transition', from: 'ENDED', to: 'LIVE' });
+    expect(state.status).toBe('ENDED');
+  });
+
+  it('rejects ENDED → PAUSED (terminal)', () => {
+    const state = makeState({ status: 'ENDED' });
+    const r = setStatus(state, 'PAUSED');
+    expect(r.ok).toBe(false);
+    expect(state.status).toBe('ENDED');
+  });
+
+  it('rejects LIVE → LOBBY', () => {
+    const state = makeState({ status: 'LIVE' });
+    const r = setStatus(state, 'LOBBY');
+    expect(r.ok).toBe(false);
+    expect(state.status).toBe('LIVE');
+  });
+
+  it('rejects PAUSED → LOBBY', () => {
+    const state = makeState({ status: 'PAUSED' });
+    const r = setStatus(state, 'LOBBY');
+    expect(r.ok).toBe(false);
+    expect(state.status).toBe('PAUSED');
+  });
+
+  it('rejects re-entering same state (LIVE → LIVE)', () => {
+    const state = makeState({ status: 'LIVE' });
+    const r = setStatus(state, 'LIVE');
+    expect(r.ok).toBe(false);
   });
 });
