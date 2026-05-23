@@ -3,9 +3,7 @@ import './globals.css';
 import Providers from './providers';
 
 function siteUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXTAUTH_URL ?? 'http://localhost:4321'
-  );
+  return process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXTAUTH_URL ?? 'http://localhost:4321';
 }
 
 export const metadata: Metadata = {
