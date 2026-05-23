@@ -6,7 +6,11 @@ import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/components/Broadcast';
 
-type ErrorState = { kind: 'none' } | { kind: 'duplicate' } | { kind: 'message'; text: string };
+type ErrorState =
+  | { kind: 'none' }
+  | { kind: 'duplicate' }
+  | { kind: 'invite' }
+  | { kind: 'message'; text: string };
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -14,6 +18,7 @@ export default function SignUpPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [pending, setPending] = useState(false);
   const [err, setErr] = useState<ErrorState>({ kind: 'none' });
 
@@ -44,12 +49,18 @@ export default function SignUpPage() {
         email: normalizedEmail,
         password,
         name: name.trim() || undefined,
+        inviteCode: inviteCode.trim() || undefined,
       }),
     });
 
     if (res.status === 409) {
       setPending(false);
       setErr({ kind: 'duplicate' });
+      return;
+    }
+    if (res.status === 403) {
+      setPending(false);
+      setErr({ kind: 'invite' });
       return;
     }
     if (!res.ok) {
@@ -162,6 +173,26 @@ export default function SignUpPage() {
                 style={{ background: 'var(--bone)', minHeight: 56 }}
               />
             </label>
+            <label className="block">
+              <span className="chyron">INVITE CODE</span>
+              <input
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value.slice(0, 80))}
+                aria-label="Invite code"
+                aria-describedby="invite-hint"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                className="w-full mt-1 ink-border bg-transparent font-editorial text-lg px-4 py-3"
+                style={{ background: 'var(--bone)', minHeight: 56 }}
+              />
+              <span
+                id="invite-hint"
+                className="ticker text-[11px] tracking-widest opacity-60 block mt-1"
+              >
+                BETA ACCESS CODE — REQUIRED
+              </span>
+            </label>
 
             <div role="alert" aria-live="polite">
               {err.kind === 'duplicate' && (
@@ -173,6 +204,14 @@ export default function SignUpPage() {
                   <Link href="/signin" className="underline">
                     SIGN IN
                   </Link>
+                </div>
+              )}
+              {err.kind === 'invite' && (
+                <div
+                  className="ink-border px-4 py-3 ticker text-[12px] tracking-widest"
+                  style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
+                >
+                  ⚠ INVITE CODE NOT RECOGNIZED.
                 </div>
               )}
               {err.kind === 'message' && (
