@@ -7,7 +7,31 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: broadcast
+          POSTGRES_PASSWORD: broadcast
+          POSTGRES_DB: broadcast_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U broadcast -d broadcast_dev"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+          --health-start-period 5s
+
+    env:
+      DATABASE_URL: postgresql://broadcast:broadcast@localhost:5432/broadcast_dev
+      AUTH_SECRET: ci-test-secret-not-for-prod
+      NEXTAUTH_URL: http://localhost:4321
+      NEXT_PUBLIC_SITE_URL: http://localhost:4321
+      ENABLE_SESSION_PERSISTENCE: 'true'
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,24 +39,37 @@ jobs:
           node-version: '24'
           cache: 'npm'
       - run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
       - name: Typecheck
         run: npx tsc --noEmit
+
       - name: Lint
         run: npm run lint
+
       - name: Unit tests + coverage
         run: npm run test:coverage
+
       - name: Boot dev server
         run: |
           nohup npm run dev > /tmp/dev.log 2>&1 &
           echo $! > /tmp/dev.pid
+
       - name: Wait for dev server
         run: npx wait-on http://localhost:4321 --timeout 60000
+
       - name: Smoke test
         run: npx tsx scripts/smoke.ts
+
       - name: Teardown dev server
         if: always()
         run: |
           if [ -f /tmp/dev.pid ]; then
             kill $(cat /tmp/dev.pid) || true
           fi
-          tail -50 /tmp/dev.log || true
+          tail -100 /tmp/dev.log || true
