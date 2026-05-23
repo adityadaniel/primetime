@@ -19,18 +19,19 @@ enum SessionStatus {
 }
 
 model User {
-  id             String        @id @default(cuid())
-  email          String        @unique
-  emailVerified  DateTime?
-  passwordHash   String?
-  name           String?
-  image          String?
-  tier           Tier          @default(free)
-  accounts       Account[]
-  sessions       Session[]
-  hostedSessions GameSession[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                 String             @id @default(cuid())
+  email              String             @unique
+  emailVerified      DateTime?
+  passwordHash       String?
+  name               String?
+  image              String?
+  tier               Tier               @default(free)
+  accounts           Account[]
+  sessions           Session[]
+  hostedSessions     GameSession[]
+  wordCloudSessions  WordCloudSession[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 }
 
 model Account {
@@ -146,4 +147,72 @@ model SessionAnswer {
   createdAt      DateTime    @default(now())
 
   @@index([sessionId, questionIndex])
+}
+
+enum WordCloudStatus {
+  LOBBY
+  LIVE
+  PAUSED
+  ENDED
+  ARCHIVED
+}
+
+model WordCloudSession {
+  id              String                @id @default(cuid())
+  pin             String                @unique
+  prompt          String                @db.VarChar(200)
+  wordsPerPlayer  Int                   @default(3)
+  profanityFilter Boolean               @default(true)
+  hostUserId      String?
+  hostUser        User?                 @relation(fields: [hostUserId], references: [id], onDelete: SetNull)
+  status          WordCloudStatus       @default(LOBBY)
+  createdAt       DateTime              @default(now())
+  startedAt       DateTime?
+  endedAt         DateTime?
+  players         WordCloudPlayer[]
+  submissions     WordCloudSubmission[]
+  moderation      WordCloudModeration[]
+
+  @@index([hostUserId, createdAt])
+  @@index([status])
+}
+
+model WordCloudPlayer {
+  id          String                @id @default(cuid())
+  sessionId   String
+  session     WordCloudSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  nickname    String
+  joinedAt    DateTime              @default(now())
+  submissions WordCloudSubmission[]
+
+  @@unique([sessionId, nickname])
+  @@index([sessionId])
+}
+
+model WordCloudSubmission {
+  id         String           @id @default(cuid())
+  sessionId  String
+  session    WordCloudSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  playerId   String
+  player     WordCloudPlayer  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  rawText    String           @db.VarChar(40)
+  normalized String           @db.VarChar(40)
+  removed    Boolean          @default(false)
+  removedAt  DateTime?
+  createdAt  DateTime         @default(now())
+
+  @@index([sessionId, normalized])
+  @@index([sessionId, removed])
+}
+
+model WordCloudModeration {
+  id         String           @id @default(cuid())
+  sessionId  String
+  session    WordCloudSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  hostUserId String?
+  word       String
+  reason     String
+  createdAt  DateTime         @default(now())
+
+  @@index([sessionId, createdAt])
 }
