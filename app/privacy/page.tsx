@@ -5,6 +5,7 @@ import { Chyron, Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/compo
 export const metadata: Metadata = {
   title: 'Privacy',
   description: 'Privacy policy for BROADCAST.',
+  robots: { index: false, follow: false },
 };
 
 export default function PrivacyPage() {
@@ -47,7 +48,11 @@ export default function PrivacyPage() {
           </div>
 
           <p className="mt-8 ticker text-[12px] tracking-widest">
-            <Link href="/" className="underline">
+            <Link
+              href="/"
+              className="underline inline-flex items-center min-h-11 px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+              style={{ outlineColor: 'var(--ink)' }}
+            >
               ← BACK TO BROADCAST
             </Link>
           </p>

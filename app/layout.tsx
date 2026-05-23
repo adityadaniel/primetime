@@ -2,8 +2,14 @@ import type { Metadata } from 'next';
 import './globals.css';
 import Providers from './providers';
 
+function siteUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXTAUTH_URL ?? 'http://localhost:4321'
+  );
+}
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXTAUTH_URL ?? 'http://localhost:4321'),
+  metadataBase: new URL(siteUrl()),
   title: {
     default: 'BROADCAST — Live quizzes done well',
     template: '%s — BROADCAST',

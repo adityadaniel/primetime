@@ -1,7 +1,9 @@
 import type { MetadataRoute } from 'next';
 
 function siteUrl(): string {
-  return process.env.NEXTAUTH_URL ?? 'http://localhost:4321';
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXTAUTH_URL ?? 'http://localhost:4321'
+  );
 }
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -12,6 +14,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: '/pricing', priority: 0.8, changeFrequency: 'monthly' },
     { path: '/signin', priority: 0.5, changeFrequency: 'monthly' },
     { path: '/signup', priority: 0.7, changeFrequency: 'monthly' },
+    { path: '/privacy', priority: 0.2, changeFrequency: 'monthly' },
+    { path: '/terms', priority: 0.2, changeFrequency: 'monthly' },
   ];
   return routes.map((r) => ({
     url: `${base}${r.path}`,
