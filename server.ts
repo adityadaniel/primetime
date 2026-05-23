@@ -495,7 +495,36 @@ void app.prepare().then(() => {
         cb({ error: 'not_found' });
         return;
       }
-      const result = addPlayerToCloud(state, { nickname: p.nickname.trim() });
+
+      // Reconnect path: if the client kept a playerId from a prior socket
+      // (page refresh, mobile sleep) and it still exists in memory under the
+      // same nickname, rebind the socket and return current state. Word cloud
+      // has no disconnect grace per PRD — submissions stick until session end.
+      const providedPlayerId = typeof p.playerId === 'string' ? p.playerId : null;
+      const trimmedNick = p.nickname.trim();
+      if (providedPlayerId) {
+        const existing = state.players.get(providedPlayerId);
+        if (existing && existing.nickname.toLowerCase() === trimmedNick.toLowerCase()) {
+          for (const [socketId, pid] of state.socketToPlayer.entries()) {
+            if (pid === providedPlayerId) state.socketToPlayer.delete(socketId);
+          }
+          state.socketToPlayer.set(socket.id, providedPlayerId);
+          wcSocketToPin.set(socket.id, { pin: state.pin, role: 'player' });
+          socket.join(`wc:${state.pin}`);
+          cb({
+            playerId: providedPlayerId,
+            prompt: state.prompt,
+            wordsPerPlayer: state.wordsPerPlayer,
+            status: state.status,
+            mySubmissions: playerSubmissions(state, providedPlayerId),
+            words: snapshotWords(state),
+          });
+          wcEmitState(state);
+          return;
+        }
+      }
+
+      const result = addPlayerToCloud(state, { nickname: trimmedNick });
       if (result.error || !result.playerId) {
         cb({ error: result.error ?? 'unknown' });
         return;
@@ -505,7 +534,7 @@ void app.prepare().then(() => {
       wcSocketToPin.set(socket.id, { pin: state.pin, role: 'player' });
       socket.join(`wc:${state.pin}`);
 
-      const nicknameForDb = p.nickname.trim();
+      const nicknameForDb = trimmedNick;
       repoAddPlayer({ sessionId: state.sessionId, nickname: nicknameForDb }).catch((err) =>
         console.error('[wordcloud-repo] addPlayer', err),
       );
