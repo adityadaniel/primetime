@@ -3,17 +3,16 @@ import Link from 'next/link';
 import { Chyron, Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/components/Broadcast';
 
 export const metadata: Metadata = {
-  title: 'Terms',
-  description: 'Terms of service for BROADCAST.',
-  robots: { index: false, follow: false },
+  title: 'Pricing',
+  description: 'Pricing for BROADCAST.',
 };
 
-export default function TermsPage() {
+export default function PricingPage() {
   return (
     <main className="relative flex flex-col min-h-[100dvh] overflow-hidden grain">
       <CornerMarks fixed />
       <header className="px-6 pt-4 flex items-center justify-between">
-        <Chyron label="BROADCAST / DOC.TERMS" number="T" />
+        <Chyron label="BROADCAST / DOC.PRICING" number="$" />
         <div className="flex items-center gap-3">
           <DateStamp />
           <span className="ticker text-[11px] opacity-40">·</span>
@@ -25,25 +24,19 @@ export default function TermsPage() {
 
       <section className="px-6 pt-10 pb-12 flex-1">
         <div className="max-w-[720px] mx-auto w-full">
-          <p className="ticker text-[11px] tracking-widest opacity-70 mb-3">▶ TERMS ◀</p>
+          <p className="ticker text-[11px] tracking-widest opacity-70 mb-3">▶ RATE CARD ◀</p>
           <h1
             className="display-num"
             style={{ fontSize: 'clamp(56px, 12vw, 132px)', lineHeight: 0.88 }}
           >
-            TERMS OF
+            FULL RATE
             <br />
-            <span style={{ color: 'var(--vermilion)' }}>SERVICE.</span>
+            <span style={{ color: 'var(--vermilion)' }}>CARD.</span>
           </h1>
 
           <div className="mt-10 ink-border p-6 md:p-8" style={{ background: 'var(--bone)' }}>
             <p className="font-editorial text-xl md:text-2xl leading-[1.4]">
-              Terms of service coming soon. While we&apos;re in beta, BROADCAST is provided as-is
-              for classroom and small-room use. Don&apos;t use it to run anything you wouldn&apos;t
-              want a server outage to interrupt. Contact{' '}
-              <a className="underline" href="mailto:support@broadcast.example">
-                support@broadcast.example
-              </a>{' '}
-              with questions.
+              Detailed pricing coming with billing launch.
             </p>
           </div>
 

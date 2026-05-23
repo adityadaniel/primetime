@@ -252,7 +252,7 @@ export default function HomePage() {
                 <li>· Unlimited live games</li>
                 <li>· Up to 50 concurrent players</li>
                 <li>· Per-answer CSV export</li>
-                <li>· No watermark on the projector</li>
+                <li>· BROADCAST watermark on the projector</li>
               </ul>
             </article>
 
@@ -304,29 +304,49 @@ export default function HomePage() {
             <span className="font-editorial italic opacity-70">"Roll tape."</span>
           </div>
           <nav aria-label="Footer">
-            <ul className="flex flex-wrap gap-x-6 gap-y-2 ticker text-[12px] tracking-widest">
+            <ul className="flex flex-wrap gap-x-4 gap-y-1 ticker text-[12px] tracking-widest">
               <li>
-                <Link href="/signin" className="underline">
+                <Link
+                  href="/signin"
+                  className="underline inline-flex items-center min-h-11 px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  style={{ outlineColor: 'var(--ink)' }}
+                >
                   SIGN IN
                 </Link>
               </li>
               <li>
-                <Link href="/signup" className="underline">
+                <Link
+                  href="/signup"
+                  className="underline inline-flex items-center min-h-11 px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  style={{ outlineColor: 'var(--ink)' }}
+                >
                   SIGN UP
                 </Link>
               </li>
               <li>
-                <Link href="/pricing" className="underline">
+                <Link
+                  href="/pricing"
+                  className="underline inline-flex items-center min-h-11 px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  style={{ outlineColor: 'var(--ink)' }}
+                >
                   PRICING
                 </Link>
               </li>
               <li>
-                <Link href="/privacy" className="underline">
+                <Link
+                  href="/privacy"
+                  className="underline inline-flex items-center min-h-11 px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  style={{ outlineColor: 'var(--ink)' }}
+                >
                   PRIVACY
                 </Link>
               </li>
               <li>
-                <Link href="/terms" className="underline">
+                <Link
+                  href="/terms"
+                  className="underline inline-flex items-center min-h-11 px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  style={{ outlineColor: 'var(--ink)' }}
+                >
                   TERMS
                 </Link>
               </li>

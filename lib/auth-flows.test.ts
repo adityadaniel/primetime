@@ -31,6 +31,7 @@ vi.mock('@/auth', () => ({ auth: vi.fn() }));
 import { POST as resetTokenPOST } from '@/app/api/auth/reset/[token]/route';
 import { POST as resetRequestPOST } from '@/app/api/auth/reset/route';
 import { POST as signupPOST } from '@/app/api/auth/signup/route';
+import { __resetRateLimitForTests } from '@/lib/rate-limit';
 
 function jsonReq(url: string, body: unknown, headers: Record<string, string> = {}): Request {
   return new Request(url, {
@@ -48,6 +49,7 @@ beforeEach(() => {
   tokenFindUnique.mockReset();
   tokenUpdate.mockReset();
   txn.mockReset();
+  __resetRateLimitForTests();
   // Default: invite gate OFF for legacy tests. Invite-specific tests opt in.
   process.env.REQUIRE_INVITE_CODE = 'false';
   process.env.BETA_INVITE_CODES = '';
@@ -190,6 +192,153 @@ describe('POST /api/auth/signup — invite-code gate', () => {
 
     expect(res.status).toBe(200);
     expect(userCreate).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an invite code that differs by a single character (timing-safe)', async () => {
+    process.env.REQUIRE_INVITE_CODE = 'true';
+    process.env.BETA_INVITE_CODES = 'academy2026';
+    userFindUnique.mockResolvedValue(null);
+
+    const res = await signupPOST(
+      jsonReq('http://localhost/api/auth/signup', {
+        email: 'new@example.com',
+        password: 'hunter22',
+        inviteCode: 'academy2027',
+      }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(userCreate).not.toHaveBeenCalled();
+  });
+
+  it('returns 503 when invite gate is required but BETA_INVITE_CODES is empty', async () => {
+    process.env.REQUIRE_INVITE_CODE = 'true';
+    process.env.BETA_INVITE_CODES = '';
+    userFindUnique.mockResolvedValue(null);
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const res = await signupPOST(
+      jsonReq('http://localhost/api/auth/signup', {
+        email: 'new@example.com',
+        password: 'hunter22',
+        inviteCode: 'whatever',
+      }),
+    );
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({
+      ok: false,
+      error: 'Signup is temporarily unavailable. Please try again later.',
+    });
+    expect(errSpy).toHaveBeenCalled();
+    expect(userCreate).not.toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
+
+  it('returns 503 when invite gate is required but BETA_INVITE_CODES is whitespace-only', async () => {
+    process.env.REQUIRE_INVITE_CODE = 'true';
+    process.env.BETA_INVITE_CODES = '   ,  ,';
+    userFindUnique.mockResolvedValue(null);
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const res = await signupPOST(
+      jsonReq('http://localhost/api/auth/signup', {
+        email: 'new2@example.com',
+        password: 'hunter22',
+        inviteCode: 'anything',
+      }),
+    );
+
+    expect(res.status).toBe(503);
+    expect(errSpy).toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
+});
+
+describe('POST /api/auth/signup — rate limiting', () => {
+  it('returns 429 with Retry-After on the 6th attempt within the window', async () => {
+    process.env.REQUIRE_INVITE_CODE = 'true';
+    process.env.BETA_INVITE_CODES = 'academy2026';
+    userFindUnique.mockResolvedValue(null);
+
+    const headers = { 'x-forwarded-for': '203.0.113.7' };
+    const send = () =>
+      signupPOST(
+        jsonReq(
+          'http://localhost/api/auth/signup',
+          {
+            email: 'brute@example.com',
+            password: 'hunter22',
+            inviteCode: 'wrong-guess',
+          },
+          headers,
+        ),
+      );
+
+    for (let i = 0; i < 5; i += 1) {
+      const r = await send();
+      expect(r.status).toBe(403);
+    }
+
+    const limited = await send();
+    expect(limited.status).toBe(429);
+    expect(await limited.json()).toEqual({
+      ok: false,
+      error: 'Too many signup attempts. Try again later.',
+    });
+    const retryAfter = limited.headers.get('Retry-After');
+    expect(retryAfter).toBeTruthy();
+    expect(Number(retryAfter)).toBeGreaterThan(0);
+  });
+
+  it('resets the limiter after the window expires (15min)', async () => {
+    process.env.REQUIRE_INVITE_CODE = 'true';
+    process.env.BETA_INVITE_CODES = 'academy2026';
+    userFindUnique.mockResolvedValue(null);
+    userCreate.mockResolvedValue({ id: 'u1' });
+
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-05-23T10:00:00Z'));
+      const headers = { 'x-forwarded-for': '203.0.113.8' };
+      const badReq = () =>
+        signupPOST(
+          jsonReq(
+            'http://localhost/api/auth/signup',
+            {
+              email: 'expire@example.com',
+              password: 'hunter22',
+              inviteCode: 'wrong-guess',
+            },
+            headers,
+          ),
+        );
+
+      for (let i = 0; i < 5; i += 1) {
+        const r = await badReq();
+        expect(r.status).toBe(403);
+      }
+      const limited = await badReq();
+      expect(limited.status).toBe(429);
+
+      // Advance past the 15-minute window.
+      vi.setSystemTime(new Date('2026-05-23T10:16:00Z'));
+
+      const recovered = await signupPOST(
+        jsonReq(
+          'http://localhost/api/auth/signup',
+          {
+            email: 'expire@example.com',
+            password: 'hunter22',
+            inviteCode: 'academy2026',
+          },
+          headers,
+        ),
+      );
+      expect(recovered.status).toBe(200);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
