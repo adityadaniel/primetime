@@ -57,6 +57,18 @@ export async function createSession(args: {
   });
 }
 
+export async function allocatePin(): Promise<string> {
+  for (let i = 0; i < 50; i++) {
+    const pin = String(Math.floor(100000 + Math.random() * 900000));
+    const existing = await prisma.wordCloudSession.findUnique({
+      where: { pin },
+      select: { id: true },
+    });
+    if (!existing) return pin;
+  }
+  throw new Error('Could not allocate PIN');
+}
+
 export async function getSessionByPin(pin: string): Promise<WordCloudSessionWithRelations | null> {
   return prisma.wordCloudSession.findUnique({
     where: { pin },

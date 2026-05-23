@@ -391,6 +391,37 @@ void app.prepare().then(() => {
         return;
       }
 
+      // API-allocated path: caller (HTTP API) already allocated PIN + persisted DB row.
+      // The control page passes pin/sessionId so we just register in-memory + attach socket.
+      const providedPin = typeof p.pin === 'string' && /^\d{6}$/.test(p.pin) ? p.pin : null;
+      const providedSessionId =
+        typeof p.sessionId === 'string' && p.sessionId.length > 0 ? p.sessionId : null;
+      const hostUserId = typeof p.hostUserId === 'string' ? p.hostUserId : null;
+
+      if (providedPin && providedSessionId) {
+        let state = wordCloudStates.get(providedPin);
+        if (!state) {
+          state = createWordCloudState({
+            pin: providedPin,
+            sessionId: providedSessionId,
+            prompt,
+            wordsPerPlayer,
+            profanityFilter,
+            hostUserId,
+          });
+          wordCloudStates.set(providedPin, state);
+        } else if (state.sessionId !== providedSessionId) {
+          cb({ error: 'session_mismatch' });
+          return;
+        }
+        state.hostSocketId = socket.id;
+        wcSocketToPin.set(socket.id, { pin: providedPin, role: 'host' });
+        socket.join(`wc:${providedPin}`);
+        cb({ pin: providedPin, sessionId: providedSessionId });
+        wcEmitState(state);
+        return;
+      }
+
       let pin: string;
       try {
         pin = allocateWordCloudPin();
