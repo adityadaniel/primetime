@@ -521,7 +521,7 @@ export function neutralizeFormulaPrefix(value: string): string {
   return value;
 }
 
-function csvEscape(value: string): string {
+export function csvEscape(value: string): string {
   const safe = neutralizeFormulaPrefix(value);
   if (/[",\n\r]/.test(safe)) {
     return `"${safe.replace(/"/g, '""')}"`;

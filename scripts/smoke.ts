@@ -151,6 +151,10 @@ async function main() {
   await assertMalformedPlayerAnswerRejected();
   await assertCsvFormulaNeutralized();
 
+  await assertWordCloudHappyPath();
+  await assertWordCloudProfanityRejection();
+  await assertWordCloudHostTrash();
+
   await assertPersistenceRowsWritten();
 }
 
@@ -575,9 +579,9 @@ async function assertSameSocketDoubleSubmitIdempotent() {
 }
 
 setTimeout(() => {
-  console.error('[smoke] hard timeout 180s');
+  console.error('[smoke] hard timeout 360s');
   process.exit(2);
-}, 180000).unref();
+}, 360000).unref();
 
 // --- scenario 7: display reconnect rejoins room ---
 
@@ -958,4 +962,281 @@ async function assertCsvFormulaNeutralized() {
   host.disconnect();
   a.disconnect();
   b.disconnect();
+}
+
+// --- scenario 15: word cloud happy path + CSV export ---
+
+async function wcCreate(
+  host: ReturnType<typeof io>,
+  args: { prompt: string; wordsPerPlayer: number; profanityFilter: boolean },
+) {
+  return new Promise<{ pin: string; sessionId: string }>((resolve, reject) => {
+    host.emit(
+      'wordcloud:host:create',
+      args,
+      (res: { pin?: string; sessionId?: string; error?: string }) => {
+        if (!res.pin || !res.sessionId) {
+          reject(new Error(`wordcloud:host:create failed: ${res.error ?? 'unknown'}`));
+          return;
+        }
+        resolve({ pin: res.pin, sessionId: res.sessionId });
+      },
+    );
+  });
+}
+
+async function wcJoin(player: ReturnType<typeof io>, args: { pin: string; nickname: string }) {
+  return new Promise<{ playerId: string }>((resolve, reject) => {
+    player.emit('wordcloud:player:join', args, (res: { playerId?: string; error?: string }) => {
+      if (!res.playerId) {
+        reject(new Error(`wordcloud:player:join failed: ${res.error ?? 'unknown'}`));
+        return;
+      }
+      resolve({ playerId: res.playerId });
+    });
+  });
+}
+
+async function wcSetStatus(
+  host: ReturnType<typeof io>,
+  args: { pin: string; status: 'LOBBY' | 'LIVE' | 'PAUSED' | 'ENDED' },
+) {
+  host.emit('wordcloud:host:set-status', args);
+  await sleep(150);
+}
+
+async function wcSubmit(
+  player: ReturnType<typeof io>,
+  args: { pin: string; playerId: string; word: string },
+) {
+  return new Promise<{ accepted: boolean; rejection?: { reason: string } }>((resolve) => {
+    let resolved = false;
+    const onAdded = () => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      resolve({ accepted: true });
+    };
+    const onRejected = (payload: { reason: string }) => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      resolve({ accepted: false, rejection: payload });
+    };
+    function cleanup() {
+      player.off('wordcloud:word:added', onAdded);
+      player.off('wordcloud:player:rejected', onRejected);
+      clearTimeout(t);
+    }
+    const t = setTimeout(() => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      resolve({ accepted: false, rejection: { reason: 'timeout' } });
+    }, 3000);
+    player.on('wordcloud:word:added', onAdded);
+    player.on('wordcloud:player:rejected', onRejected);
+    player.emit('wordcloud:player:submit', args);
+  });
+}
+
+async function assertWordCloudHappyPath() {
+  console.log('\n--- scenario 15: word cloud happy path + CSV export ---');
+  const host = await connectSock();
+  const a = await connectSock();
+  const b = await connectSock();
+
+  const created = await wcCreate(host, {
+    prompt: 'What snack?',
+    wordsPerPlayer: 3,
+    profanityFilter: true,
+  });
+  const { pin } = created;
+  console.log('wc pin:', pin);
+
+  const ja = await wcJoin(a, { pin, nickname: 'Alice' });
+  const jb = await wcJoin(b, { pin, nickname: 'Bob' });
+
+  await wcSetStatus(host, { pin, status: 'LIVE' });
+
+  const aliceWords = ['apples', 'bananas', 'cherries'];
+  const bobWords = ['donuts', 'eggrolls', 'fries'];
+
+  for (const w of aliceWords) {
+    const r = await wcSubmit(a, { pin, playerId: ja.playerId, word: w });
+    if (!r.accepted) {
+      throw new Error(`Alice submit '${w}' rejected: ${r.rejection?.reason}`);
+    }
+    await sleep(900);
+  }
+  for (const w of bobWords) {
+    const r = await wcSubmit(b, { pin, playerId: jb.playerId, word: w });
+    if (!r.accepted) {
+      throw new Error(`Bob submit '${w}' rejected: ${r.rejection?.reason}`);
+    }
+    await sleep(900);
+  }
+
+  await wcSetStatus(host, { pin, status: 'ENDED' });
+  // give fire-and-forget DB writes a moment to flush
+  await sleep(500);
+
+  const res = await fetch(`${URL}/host/wordcloud/${pin}/answers.csv`);
+  if (res.status !== 200) {
+    throw new Error(`expected 200, got ${res.status}`);
+  }
+  const ctype = res.headers.get('content-type') ?? '';
+  if (!ctype.toLowerCase().includes('text/csv')) {
+    throw new Error(`expected text/csv, got ${ctype}`);
+  }
+  const disposition = res.headers.get('content-disposition') ?? '';
+  if (!disposition.includes('wordcloud-') || !disposition.includes(pin)) {
+    throw new Error(`bad Content-Disposition: ${disposition}`);
+  }
+  const body = await res.text();
+  const rows = body.split(/\r\n|\n/).filter((line) => line.length > 0);
+  if (rows.length !== 7) {
+    throw new Error(`expected 7 lines (header + 6 data), got ${rows.length}:\n${body}`);
+  }
+  if (rows[0] !== 'timestamp,nickname,raw_text,normalized,removed') {
+    throw new Error(`bad header row: ${rows[0]}`);
+  }
+  const allWords = [...aliceWords, ...bobWords];
+  for (const w of allWords) {
+    if (!body.includes(`,${w},`)) {
+      throw new Error(`CSV missing rawText '${w}':\n${body}`);
+    }
+  }
+  for (const row of rows.slice(1)) {
+    if (!row.endsWith(',false')) {
+      throw new Error(`expected removed=false on every row, got: ${row}`);
+    }
+  }
+  console.log('✓ word cloud happy path + CSV export');
+
+  host.disconnect();
+  a.disconnect();
+  b.disconnect();
+}
+
+// --- scenario 16: word cloud profanity rejection ---
+
+async function assertWordCloudProfanityRejection() {
+  console.log('\n--- scenario 16: word cloud profanity rejection ---');
+  const host = await connectSock();
+  const a = await connectSock();
+
+  const { pin } = await wcCreate(host, {
+    prompt: 'Test prompt',
+    wordsPerPlayer: 3,
+    profanityFilter: true,
+  });
+  await wcSetStatus(host, { pin, status: 'LIVE' });
+  const ja = await wcJoin(a, { pin, nickname: 'Alice' });
+
+  // 'piss' is in lib/profanity.ts BAD_WORDS — short, mild, unambiguously filtered
+  const r = await wcSubmit(a, { pin, playerId: ja.playerId, word: 'piss' });
+  if (r.accepted) throw new Error('profane submit unexpectedly accepted');
+  if (r.rejection?.reason !== 'filter') {
+    throw new Error(`expected reason 'filter', got '${r.rejection?.reason}'`);
+  }
+
+  // attach as host to read state and verify zero words
+  const stateP = new Promise<{ words: { count: number }[] }>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('no wordcloud:state')), 3000);
+    host.once('wordcloud:state', (s: { words: { count: number }[] }) => {
+      clearTimeout(t);
+      resolve(s);
+    });
+  });
+  host.emit('wordcloud:display:attach', pin);
+  const wcState = await stateP;
+  if (wcState.words.length !== 0) {
+    throw new Error(`expected 0 words after filter, got ${wcState.words.length}`);
+  }
+  console.log('✓ word cloud profanity rejection');
+
+  host.disconnect();
+  a.disconnect();
+}
+
+// --- scenario 17: word cloud host trash + CSV preserves trashed rows ---
+
+async function assertWordCloudHostTrash() {
+  console.log('\n--- scenario 17: word cloud host trash + CSV removed=true ---');
+  const host = await connectSock();
+  const a = await connectSock();
+
+  const { pin } = await wcCreate(host, {
+    prompt: 'Trash test',
+    wordsPerPlayer: 3,
+    profanityFilter: true,
+  });
+  await wcSetStatus(host, { pin, status: 'LIVE' });
+  const ja = await wcJoin(a, { pin, nickname: 'Alice' });
+
+  const r1 = await wcSubmit(a, { pin, playerId: ja.playerId, word: 'pizza' });
+  if (!r1.accepted) throw new Error(`first submit rejected: ${r1.rejection?.reason}`);
+  await sleep(900);
+  const r2 = await wcSubmit(a, { pin, playerId: ja.playerId, word: 'salad' });
+  if (!r2.accepted) throw new Error(`second submit rejected: ${r2.rejection?.reason}`);
+  await sleep(300);
+
+  // listen for word:removed broadcast on the player socket
+  const removedP = new Promise<{ normalized: string }>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('no wordcloud:word:removed')), 3000);
+    a.once('wordcloud:word:removed', (payload: { normalized: string }) => {
+      clearTimeout(t);
+      resolve(payload);
+    });
+  });
+  host.emit('wordcloud:host:remove', { pin, normalized: 'pizza' });
+  const removed = await removedP;
+  if (removed.normalized !== 'pizza') {
+    throw new Error(`bad removed payload: ${JSON.stringify(removed)}`);
+  }
+
+  // verify in-memory state lost the word — re-attach host as display to inspect
+  const stateP = new Promise<{ words: { normalized: string }[] }>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('no wordcloud:state')), 3000);
+    host.once('wordcloud:state', (s: { words: { normalized: string }[] }) => {
+      clearTimeout(t);
+      resolve(s);
+    });
+  });
+  host.emit('wordcloud:display:attach', pin);
+  const wcState = await stateP;
+  if (wcState.words.some((w) => w.normalized === 'pizza')) {
+    throw new Error('pizza still in state after trash');
+  }
+  if (!wcState.words.some((w) => w.normalized === 'salad')) {
+    throw new Error('salad missing from state');
+  }
+
+  await wcSetStatus(host, { pin, status: 'ENDED' });
+  await sleep(500);
+
+  const res = await fetch(`${URL}/host/wordcloud/${pin}/answers.csv`);
+  if (res.status !== 200) {
+    throw new Error(`expected 200, got ${res.status}`);
+  }
+  const body = await res.text();
+  const rows = body.split(/\r\n|\n/).filter((line) => line.length > 0);
+  if (rows.length !== 3) {
+    throw new Error(`expected 3 lines (header + 2 data), got ${rows.length}:\n${body}`);
+  }
+  const pizzaRow = rows.find((r) => r.includes(',pizza,'));
+  const saladRow = rows.find((r) => r.includes(',salad,'));
+  if (!pizzaRow) throw new Error(`CSV missing pizza row:\n${body}`);
+  if (!saladRow) throw new Error(`CSV missing salad row:\n${body}`);
+  if (!pizzaRow.endsWith(',true')) {
+    throw new Error(`expected pizza removed=true, got: ${pizzaRow}`);
+  }
+  if (!saladRow.endsWith(',false')) {
+    throw new Error(`expected salad removed=false, got: ${saladRow}`);
+  }
+  console.log('✓ word cloud host trash + CSV removed=true');
+
+  host.disconnect();
+  a.disconnect();
 }

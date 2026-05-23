@@ -5,6 +5,7 @@ export type WordCloudStateStatus = 'LOBBY' | 'LIVE' | 'PAUSED' | 'ENDED';
 export type WordCloudPlayerEntry = {
   nickname: string;
   submissions: string[];
+  dbPlayerId: string | null;
 };
 
 export type WordCloudWordEntry = {
@@ -106,7 +107,7 @@ export function addPlayerToCloud(
     }
   }
   const playerId = `wcp_${Math.random().toString(36).slice(2, 9)}`;
-  state.players.set(playerId, { nickname: trimmed, submissions: [] });
+  state.players.set(playerId, { nickname: trimmed, submissions: [], dbPlayerId: null });
   return { playerId };
 }
 

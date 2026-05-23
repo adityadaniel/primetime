@@ -453,11 +453,14 @@ void app.prepare().then(() => {
       })
         .then((row) => {
           state.sessionId = row.id;
+          cb({ pin, sessionId: row.id });
+          wcEmitState(state);
         })
-        .catch((err) => console.error('[wordcloud-repo] createSession', err));
-
-      cb({ pin, sessionId });
-      wcEmitState(state);
+        .catch((err) => {
+          console.error('[wordcloud-repo] createSession', err);
+          cb({ pin, sessionId });
+          wcEmitState(state);
+        });
     });
 
     socket.on('wordcloud:player:join', (payload: unknown, ack: unknown) => {
@@ -535,19 +538,32 @@ void app.prepare().then(() => {
       socket.join(`wc:${state.pin}`);
 
       const nicknameForDb = trimmedNick;
-      repoAddPlayer({ sessionId: state.sessionId, nickname: nicknameForDb }).catch((err) =>
-        console.error('[wordcloud-repo] addPlayer', err),
-      );
-
-      cb({
-        playerId,
-        prompt: state.prompt,
-        wordsPerPlayer: state.wordsPerPlayer,
-        status: state.status,
-        mySubmissions: playerSubmissions(state, playerId),
-        words: snapshotWords(state),
-      });
-      wcEmitState(state);
+      repoAddPlayer({ sessionId: state.sessionId, nickname: nicknameForDb })
+        .then((row) => {
+          const entry = state.players.get(playerId);
+          if (entry) entry.dbPlayerId = row.id;
+          cb({
+            playerId,
+            prompt: state.prompt,
+            wordsPerPlayer: state.wordsPerPlayer,
+            status: state.status,
+            mySubmissions: playerSubmissions(state, playerId),
+            words: snapshotWords(state),
+          });
+          wcEmitState(state);
+        })
+        .catch((err) => {
+          console.error('[wordcloud-repo] addPlayer', err);
+          cb({
+            playerId,
+            prompt: state.prompt,
+            wordsPerPlayer: state.wordsPerPlayer,
+            status: state.status,
+            mySubmissions: playerSubmissions(state, playerId),
+            words: snapshotWords(state),
+          });
+          wcEmitState(state);
+        });
     });
 
     socket.on('wordcloud:player:submit', (payload: unknown) => {
@@ -599,12 +615,16 @@ void app.prepare().then(() => {
 
       const norm = normalizeWord(p.word);
       if (norm) {
-        repoAddSubmission({
-          sessionId: state.sessionId,
-          playerId: p.playerId,
-          rawText: norm.display,
-          normalized: norm.normalized,
-        }).catch((err) => console.error('[wordcloud-repo] addSubmission', err));
+        const player = state.players.get(p.playerId);
+        const dbPlayerId = player?.dbPlayerId ?? null;
+        if (dbPlayerId) {
+          repoAddSubmission({
+            sessionId: state.sessionId,
+            playerId: dbPlayerId,
+            rawText: norm.display,
+            normalized: norm.normalized,
+          }).catch((err) => console.error('[wordcloud-repo] addSubmission', err));
+        }
       }
     });
 

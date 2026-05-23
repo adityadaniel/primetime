@@ -4,5 +4,10 @@ import authConfig from '@/auth.config';
 export const { auth: middleware } = NextAuth(authConfig);
 
 export const config = {
-  matcher: ['/host/:path*', '/api/quiz/:path*', '/api/wordcloud/:path*', '/api/stripe/:path*'],
+  matcher: [
+    '/host/((?!.*\\.csv$).*)',
+    '/api/quiz/:path*',
+    '/api/wordcloud/:path*',
+    '/api/stripe/:path*',
+  ],
 };

@@ -68,6 +68,7 @@ The timer auto-locks when it hits zero, and locks early once every connected pla
 - **CSV export of session results** — `GET /host/[pin]/results.csv` once the game is in `final`; includes rank, nickname, score, correct count, total questions, average response time
 - **Light profanity filter** for nicknames — rejects with `nickname-rejected` code so the join page can show a friendly retry
 - Smoke test extended to cover reconnect, host pause, cap enforcement, CSV export, and profanity rejection: `npm run smoke`
+- Word Cloud activity (alternative to quiz): host posts a prompt, players submit words, real-time projection cloud with CSV export
 
 ## What's stubbed / deferred (M3)
 
