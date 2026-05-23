@@ -607,6 +607,15 @@ void app.prepare().then(() => {
       }).catch((err) => console.error('[wordcloud-repo] logModeration', err));
     });
 
+    socket.on('wordcloud:display:attach', (payload: unknown) => {
+      const pin = typeof payload === 'string' ? payload : null;
+      if (!pin || !isPin(pin)) return;
+      const state = wordCloudStates.get(pin);
+      if (!state) return;
+      socket.join(`wc:${pin}`);
+      socket.emit('wordcloud:state', wcSnapshot(state));
+    });
+
     socket.on('wordcloud:host:set-status', (payload: unknown) => {
       if (!payload || typeof payload !== 'object') return;
       const p = payload as Record<string, unknown>;
