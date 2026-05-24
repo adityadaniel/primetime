@@ -20,7 +20,6 @@ export const metadata: Metadata = {
     'classroom quiz',
     'real-time quiz',
     'kahoot alternative',
-    'broadcast',
     'input/output',
     'projector trivia',
   ],

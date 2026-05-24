@@ -121,7 +121,7 @@ Local Postgres 16 required.
 1. Download from <https://postgresapp.com> (already installed if `/Applications/Postgres.app` exists).
 2. Open the app, click "Initialize" on first run.
 3. Add to your shell: `export PATH="/Applications/Postgres.app/Contents/Versions/latest/bin:$PATH"`
-4. Create the dev database: `createdb inputoutput_dev`
+4. Create role + dev database: `createuser inputoutput && createdb -O inputoutput inputoutput_dev`
 
 ### Docker Compose
 
@@ -132,8 +132,9 @@ services:
     image: postgres:16
     ports: ["5432:5432"]
     environment:
+      POSTGRES_USER: inputoutput
+      POSTGRES_PASSWORD: inputoutput
       POSTGRES_DB: inputoutput_dev
-      POSTGRES_HOST_AUTH_METHOD: trust
     volumes:
       - pgdata:/var/lib/postgresql/data
 volumes: { pgdata: {} }
@@ -146,7 +147,7 @@ Then `docker compose up -d`.
 ```bash
 brew install postgresql@16
 brew services start postgresql@16
-createdb inputoutput_dev
+createuser inputoutput && createdb -O inputoutput inputoutput_dev
 ```
 
 ### After install
