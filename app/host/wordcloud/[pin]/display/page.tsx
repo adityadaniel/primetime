@@ -361,7 +361,7 @@ function Watermark() {
       style={{ color: 'var(--ink)', opacity: 0.5, letterSpacing: '0.18em' }}
       aria-hidden
     >
-      BROADCAST
+      INPUT/OUTPUT
     </span>
   );
 }

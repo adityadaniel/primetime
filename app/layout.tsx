@@ -9,12 +9,12 @@ function siteUrl(): string {
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
   title: {
-    default: 'BROADCAST — Live quizzes done well',
-    template: '%s — BROADCAST',
+    default: 'INPUT/OUTPUT — Live quizzes done well',
+    template: '%s — INPUT/OUTPUT',
   },
   description:
-    'BROADCAST is a real-time quiz network for classrooms, conference rooms, and the back of any room with a projector. Editorial brutalist by design — no purple gradient.',
-  applicationName: 'BROADCAST',
+    'INPUT/OUTPUT is a real-time quiz network for classrooms, conference rooms, and the back of any room with a projector. Editorial brutalist by design — no purple gradient.',
+  applicationName: 'INPUT/OUTPUT',
   keywords: [
     'live quiz',
     'classroom quiz',
@@ -26,15 +26,15 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     type: 'website',
-    siteName: 'BROADCAST',
-    title: 'BROADCAST — Live quizzes done well',
+    siteName: 'INPUT/OUTPUT',
+    title: 'INPUT/OUTPUT — Live quizzes done well',
     description:
       'A real-time quiz broadcast for classrooms and conference rooms. Editorial brutalist by design.',
     url: '/',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'BROADCAST — Live quizzes done well',
+    title: 'INPUT/OUTPUT — Live quizzes done well',
     description: 'A real-time quiz broadcast. Editorial brutalist by design.',
   },
 };
