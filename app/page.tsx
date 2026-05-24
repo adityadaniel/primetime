@@ -5,7 +5,7 @@ import { Shape } from '@/components/Shape';
 const DIFFERENTIATORS: Array<{ index: string; title: string; body: string }> = [
   {
     index: '01',
-    title: 'BROADCAST identity',
+    title: 'INPUT/OUTPUT identity',
     body: 'A coherent editorial-brutalist look across builder, control room, projector display, and player phones. No purple gradient. No Kahoot cosplay.',
   },
   {
@@ -59,7 +59,7 @@ export default function HomePage() {
       <CornerMarks />
 
       <header className="relative z-10 px-8 pt-6 flex items-center justify-between">
-        <Chyron label="BROADCAST / NETWORK MASTER" number="00" />
+        <Chyron label="INPUT/OUTPUT / NETWORK MASTER" number="00" />
         <div className="flex items-center gap-6">
           <FrameCounter index={0} />
           <Clock />
@@ -77,9 +77,9 @@ export default function HomePage() {
           </p>
 
           <h1 className="display-num" style={{ fontSize: 'clamp(96px, 18vw, 280px)' }}>
-            <span className="block">BROAD&shy;</span>
+            <span className="block">INPUT/</span>
             <span className="block" style={{ marginTop: '-0.18em', color: 'var(--vermilion)' }}>
-              CAST.
+              OUTPUT.
             </span>
           </h1>
 
@@ -133,7 +133,7 @@ export default function HomePage() {
           >
             <Chyron label="01 / WHAT IT IS" />
             <span className="ticker text-[11px] tracking-widest opacity-60">
-              THREE SURFACES · ONE BROADCAST
+              THREE SURFACES · ONE SIGNAL
             </span>
           </div>
 
@@ -252,7 +252,7 @@ export default function HomePage() {
                 <li>· Unlimited live games</li>
                 <li>· Up to 50 concurrent players</li>
                 <li>· Per-answer CSV export</li>
-                <li>· BROADCAST watermark on the projector</li>
+                <li>· INPUT/OUTPUT watermark on the projector</li>
               </ul>
             </article>
 
@@ -299,7 +299,7 @@ export default function HomePage() {
         >
           <div className="flex flex-col gap-2">
             <span className="ticker text-[11px] tracking-widest opacity-60">
-              © BROADCAST NETWORK · STUDIO 4 · TRANSMISSION 0001
+              © INPUT/OUTPUT NETWORK · STUDIO 4 · TRANSMISSION 0001
             </span>
             <span className="font-editorial italic opacity-70">"Roll tape."</span>
           </div>

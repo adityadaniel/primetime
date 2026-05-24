@@ -1,7 +1,7 @@
 [![PR](https://github.com/adityadaniel/broadcast/actions/workflows/pr.yml/badge.svg)](https://github.com/adityadaniel/broadcast/actions/workflows/pr.yml)
 [![Main](https://github.com/adityadaniel/broadcast/actions/workflows/main.yml/badge.svg)](https://github.com/adityadaniel/broadcast/actions/workflows/main.yml)
 
-# BROADCAST — Kahoot-style live quiz (M1 + M2)
+# INPUT/OUTPUT — Kahoot-style live quiz (M1 + M2)
 
 A real-time quiz game with a vintage broadcast-graphics aesthetic. Built end-to-end as the **M1 — Core Loop** and **M2 — Resilience & Scale** milestones described in `PRD.md` and `CLAUDE.md`.
 
@@ -61,7 +61,7 @@ The timer auto-locks when it hits zero, and locks early once every connected pla
 - Live answer distribution + correct-answer reveal
 - Top-3 podium between questions, full leaderboard at the end
 - Player feedback: locked-in confirmation, correct/incorrect, points awarded, current rank
-- Distinct **BROADCAST** visual identity executed across all five surfaces
+- Distinct **INPUT/OUTPUT** visual identity executed across all five surfaces
 - **Player reconnect grace window** — disconnected players have 30 s to rejoin and reclaim their score, nickname, and socket binding
 - **Host disconnect grace pause** — game pauses for 60 s on host drop; resumes seamlessly if the host returns, otherwise ends with `host-left`
 - **Player cap enforcement** — 10-player soft cap on free tier (upsell banner from 8), 150-player hard cap on pro tier
@@ -121,7 +121,7 @@ Local Postgres 16 required.
 1. Download from <https://postgresapp.com> (already installed if `/Applications/Postgres.app` exists).
 2. Open the app, click "Initialize" on first run.
 3. Add to your shell: `export PATH="/Applications/Postgres.app/Contents/Versions/latest/bin:$PATH"`
-4. Create the dev database: `createdb broadcast_dev`
+4. Create the dev database: `createdb inputoutput_dev`
 
 ### Docker Compose
 
@@ -132,7 +132,7 @@ services:
     image: postgres:16
     ports: ["5432:5432"]
     environment:
-      POSTGRES_DB: broadcast_dev
+      POSTGRES_DB: inputoutput_dev
       POSTGRES_HOST_AUTH_METHOD: trust
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -146,7 +146,7 @@ Then `docker compose up -d`.
 ```bash
 brew install postgresql@16
 brew services start postgresql@16
-createdb broadcast_dev
+createdb inputoutput_dev
 ```
 
 ### After install
