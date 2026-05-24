@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>INPUT/OUTPUT — OG image</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@900&family=JetBrains+Mono:wght@400;600&family=Newsreader:ital,wght@0,400;0,600;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bone: #f2ebdc;
+        --ink: #0f0f0f;
+        --vermilion: #e5341f;
+        --marigold: #f2a900;
+        --cobalt: #1b3a6b;
+        --ivy: #1f4d3a;
+        --ash: #b7b0a1;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        background: var(--bone);
+        color: var(--ink);
+        font-family: "Newsreader", ui-serif, Georgia, serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      body {
+        background-image: repeating-linear-gradient(
+          0deg,
+          transparent 0,
+          transparent 23px,
+          rgba(15, 15, 15, 0.04) 23px,
+          rgba(15, 15, 15, 0.04) 24px
+        );
+      }
+
+      .card {
+        width: 1200px;
+        height: 630px;
+        position: relative;
+        padding: 56px 64px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        overflow: hidden;
+      }
+
+      /* Corner marks */
+      .corner {
+        position: absolute;
+        width: 28px;
+        height: 28px;
+        border: 3px solid var(--ink);
+      }
+      .corner.tl {
+        top: 36px;
+        left: 44px;
+        border-right: none;
+        border-bottom: none;
+      }
+      .corner.tr {
+        top: 36px;
+        right: 44px;
+        border-left: none;
+        border-bottom: none;
+      }
+      .corner.bl {
+        bottom: 36px;
+        left: 44px;
+        border-right: none;
+        border-top: none;
+      }
+      .corner.br {
+        bottom: 36px;
+        right: 44px;
+        border-left: none;
+        border-top: none;
+      }
+
+      /* Header chyrons */
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .chyron {
+        font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+        font-size: 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.22em;
+        color: var(--ink);
+      }
+      .chyron .accent {
+        color: var(--vermilion);
+      }
+
+      /* Wordmark */
+      .wordmark {
+        font-family: "Big Shoulders Display", ui-sans-serif, system-ui;
+        font-weight: 900;
+        font-stretch: condensed;
+        letter-spacing: -0.02em;
+        line-height: 0.85;
+        font-size: 200px;
+        text-transform: uppercase;
+        margin: 0;
+        white-space: nowrap;
+      }
+      .wordmark .slash {
+        color: var(--vermilion);
+      }
+
+      /* Lede */
+      .lede {
+        font-size: 32px;
+        line-height: 1.4;
+        max-width: 880px;
+        margin-top: 16px;
+      }
+      .lede em {
+        font-style: italic;
+        opacity: 0.85;
+      }
+
+      /* SMPTE strip + footer */
+      .footer-block {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .smpte {
+        height: 14px;
+        background: linear-gradient(
+          to right,
+          var(--ash) 0 14.28%,
+          var(--marigold) 14.28% 28.56%,
+          #4ea1c4 28.56% 42.84%,
+          var(--ivy) 42.84% 57.12%,
+          #a06ba8 57.12% 71.4%,
+          var(--vermilion) 71.4% 85.68%,
+          var(--cobalt) 85.68% 100%
+        );
+      }
+      .footer-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <span class="corner tl"></span>
+      <span class="corner tr"></span>
+      <span class="corner bl"></span>
+      <span class="corner br"></span>
+
+      <header class="topbar">
+        <span class="chyron"><span class="accent">●</span>&nbsp;&nbsp;DIRECTOR · STANDING BY</span>
+        <span class="chyron">EST. 2026</span>
+      </header>
+
+      <div>
+        <h1 class="wordmark">INPUT<span class="slash">/</span>OUTPUT</h1>
+        <p class="lede">
+          Interactive activity tool for in-room workshops.<br />
+          <em>Word clouds, quizzes, live audience response.</em>
+        </p>
+      </div>
+
+      <div class="footer-block">
+        <div class="smpte"></div>
+        <div class="footer-row">
+          <span class="chyron">INPUTOUTPUT.ID</span>
+          <span class="chyron">MADE BY ADITYA DANIEL</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
