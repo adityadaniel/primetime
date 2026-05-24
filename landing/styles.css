@@ -1,0 +1,240 @@
+/* INPUT/OUTPUT landing page — placeholder
+   Mirrors design tokens from app/globals.css so this stays cohesive
+   with the live app. Pure HTML+CSS, no build step. */
+
+:root {
+  --bone: #f2ebdc;
+  --ink: #0f0f0f;
+  --vermilion: #e5341f;
+  --marigold: #f2a900;
+  --cobalt: #1b3a6b;
+  --ivy: #1f4d3a;
+  --ash: #b7b0a1;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  background: var(--bone);
+  color: var(--ink);
+  font-family: "Newsreader", ui-serif, Georgia, serif;
+  font-feature-settings: "kern" 1, "liga" 1, "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+body {
+  /* Notebook lines, same texture as the app. */
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent 0,
+    transparent 23px,
+    rgba(15, 15, 15, 0.04) 23px,
+    rgba(15, 15, 15, 0.04) 24px
+  );
+}
+
+a {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ink);
+}
+a:hover {
+  color: var(--vermilion);
+  border-bottom-color: var(--vermilion);
+}
+
+/* ============================================================
+   Frame: outer page chrome, like a TV monitor screen
+   ============================================================ */
+.frame {
+  position: relative;
+  min-height: 100vh;
+  padding: 24px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.corner-mark {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--ink);
+}
+.corner-mark.tl {
+  top: 16px;
+  left: 24px;
+  border-right: none;
+  border-bottom: none;
+}
+.corner-mark.tr {
+  top: 16px;
+  right: 24px;
+  border-left: none;
+  border-bottom: none;
+}
+.corner-mark.bl {
+  bottom: 16px;
+  left: 24px;
+  border-right: none;
+  border-top: none;
+}
+.corner-mark.br {
+  bottom: 16px;
+  right: 24px;
+  border-left: none;
+  border-top: none;
+}
+
+/* ============================================================
+   Chyron: monospace tag text used as eyebrows / status
+   ============================================================ */
+.chyron {
+  font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--ink);
+}
+.chyron.right {
+  text-align: right;
+}
+
+.ticker {
+  font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  font-feature-settings: "tnum" 1, "zero" 1;
+}
+
+/* ============================================================
+   Topbar + footer: thin bookends
+   ============================================================ */
+.topbar,
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 8px;
+}
+
+/* ============================================================
+   SMPTE color bars accent strip
+   ============================================================ */
+.smpte-bars {
+  height: 8px;
+  background: linear-gradient(
+    to right,
+    var(--ash) 0 14.28%,
+    var(--marigold) 14.28% 28.56%,
+    #4ea1c4 28.56% 42.84%,
+    var(--ivy) 42.84% 57.12%,
+    #a06ba8 57.12% 71.4%,
+    var(--vermilion) 71.4% 85.68%,
+    var(--cobalt) 85.68% 100%
+  );
+}
+
+/* ============================================================
+   Hero: oversized wordmark + lede
+   ============================================================ */
+.hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  padding: 48px 8px;
+  max-width: 980px;
+}
+
+.eyebrow {
+  color: var(--vermilion);
+}
+
+.display-num {
+  font-family: "Big Shoulders Display", ui-sans-serif, system-ui;
+  font-weight: 900;
+  font-stretch: condensed;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  letter-spacing: -0.02em;
+  line-height: 0.85;
+}
+
+.wordmark {
+  font-size: clamp(72px, 14vw, 220px);
+  text-transform: uppercase;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: 0;
+  row-gap: 0;
+}
+.wordmark .slash {
+  color: var(--vermilion);
+  padding: 0 0.04em;
+}
+
+.lede {
+  font-size: clamp(18px, 1.6vw, 24px);
+  line-height: 1.5;
+  max-width: 680px;
+  margin-top: 8px;
+}
+.lede em {
+  font-style: italic;
+  color: var(--ink);
+  opacity: 0.75;
+}
+
+.meta {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-top: 16px;
+}
+
+/* ============================================================
+   Mobile
+   ============================================================ */
+@media (max-width: 640px) {
+  .frame {
+    padding: 20px 20px 24px;
+  }
+  .corner-mark.tl,
+  .corner-mark.tr {
+    top: 12px;
+  }
+  .corner-mark.bl,
+  .corner-mark.br {
+    bottom: 12px;
+  }
+  .corner-mark.tl,
+  .corner-mark.bl {
+    left: 16px;
+  }
+  .corner-mark.tr,
+  .corner-mark.br {
+    right: 16px;
+  }
+  .topbar,
+  .footer {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .topbar .right,
+  .footer .right {
+    text-align: left;
+  }
+  .hero {
+    padding: 24px 4px;
+  }
+}
