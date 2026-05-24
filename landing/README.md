@@ -24,6 +24,28 @@ cd landing && python3 -m http.server 8000
 |------|---------|
 | `index.html` | Single-page landing |
 | `styles.css` | Mirrors design tokens from `app/globals.css` (vermilion, bone, ink, fonts) |
+| `og.html` | Source for the 1200×630 OG share image (HTML+CSS, then screenshotted) |
+| `og.png` | Generated 1200×630 PNG; referenced from `index.html` meta tags |
+
+## Regenerating `og.png`
+
+`og.png` is a screenshot of `og.html` rendered at exactly 1200×630 in headless Chrome. To regenerate after editing `og.html`:
+
+```bash
+cd ~/Developer/broadcast/landing
+python3 -m http.server 8765 &
+SERVER_PID=$!
+sleep 1
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless=new --disable-gpu --hide-scrollbars \
+  --window-size=1200,630 \
+  --screenshot="$(pwd)/og.png" \
+  --virtual-time-budget=4000 \
+  "http://localhost:8765/og.html"
+kill $SERVER_PID
+```
+
+The HTTP server is needed so Chrome can fetch Google Fonts referenced from `og.html`. `file://` URLs block external requests in headless mode.
 
 ## Design tokens (kept in sync with the app)
 
