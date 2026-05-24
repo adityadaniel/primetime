@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { decode as decodeAuthJwt } from '@auth/core/jwt';
 import next from 'next';
 import { Server, type Socket } from 'socket.io';
 import type { Tier } from './lib/game';
@@ -22,6 +23,27 @@ import {
   submitAnswer,
 } from './lib/game';
 import type { AnswerIndex, Quiz } from './lib/types';
+import {
+  addPlayerToCloud,
+  isValidTransition,
+  normalizeWord,
+  playerSubmissions,
+  removeWord,
+  setStatus as setCloudStatus,
+  snapshotWords,
+  submitWord,
+  type WordCloudState,
+  type WordCloudStateStatus,
+} from './lib/wordcloud';
+import { loadOrCreateState as loadOrCreateWcState } from './lib/wordcloud-hydrate';
+import {
+  addPlayer as repoAddPlayer,
+  addSubmission as repoAddSubmission,
+  getSessionByPin as repoGetSessionByPin,
+  logModeration as repoLogModeration,
+  markSubmissionRemoved as repoMarkRemoved,
+  setStatus as repoSetStatus,
+} from './lib/wordcloud-repo';
 
 const dev = process.env.NODE_ENV !== 'production';
 const port = Number(process.env.PORT ?? 4321);
@@ -136,9 +158,115 @@ void app.prepare().then(() => {
     transports: ['websocket', 'polling'],
   });
 
+  // Authenticate Socket.IO connections off the Next-Auth session cookie.
+  // Sets socket.data.userId for handlers to authorize against. Unauthenticated
+  // connections are still allowed (anonymous players) — handlers that require
+  // an owner enforce that explicitly.
+  const AUTH_SECRET = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? '';
+  const COOKIE_NAMES = ['authjs.session-token', '__Secure-authjs.session-token'];
+
+  io.use(async (socket, next) => {
+    try {
+      if (!AUTH_SECRET) {
+        socket.data.userId = null;
+        return next();
+      }
+      const cookieHeader = socket.handshake.headers.cookie ?? '';
+      const cookies = parseRawCookieHeader(cookieHeader);
+      let token: string | undefined;
+      for (const name of COOKIE_NAMES) {
+        if (cookies[name]) {
+          token = cookies[name];
+          break;
+        }
+      }
+      if (!token) {
+        socket.data.userId = null;
+        return next();
+      }
+      const decoded = await decodeAuthJwt({
+        token,
+        secret: AUTH_SECRET,
+        salt: cookieHeader.includes('__Secure-')
+          ? '__Secure-authjs.session-token'
+          : 'authjs.session-token',
+      });
+      const id = decoded && typeof decoded === 'object' ? (decoded as { id?: unknown }).id : null;
+      socket.data.userId = typeof id === 'string' ? id : null;
+      next();
+    } catch (err) {
+      console.warn('[socket auth] decode failed:', err);
+      socket.data.userId = null;
+      next();
+    }
+  });
+
   const lockTimers = new Map<string, NodeJS.Timeout>();
   const hostGraceTimers = new Map<string, NodeJS.Timeout>();
   const HOST_GRACE_MS = 60_000;
+
+  const wordCloudStates = new Map<string, WordCloudState>();
+  const wcSocketToPin = new Map<string, { pin: string; role: 'host' | 'player' }>();
+  const wcLastSubmitAt = new Map<string, number>();
+  const WC_RATE_LIMIT_MS = 800;
+
+  function isValidStatus(v: unknown): v is WordCloudStateStatus {
+    return v === 'LOBBY' || v === 'LIVE' || v === 'PAUSED' || v === 'ENDED';
+  }
+
+  function wcSnapshot(state: WordCloudState) {
+    return {
+      pin: state.pin,
+      prompt: state.prompt,
+      wordsPerPlayer: state.wordsPerPlayer,
+      profanityFilter: state.profanityFilter,
+      status: state.status,
+      joinerCount: state.players.size,
+      words: snapshotWords(state),
+    };
+  }
+
+  function rollbackSubmit(state: WordCloudState, playerId: string, normalized: string): void {
+    const player = state.players.get(playerId);
+    if (player) {
+      player.submissions = player.submissions.filter((n) => n !== normalized);
+    }
+    const entry = state.words.get(normalized);
+    if (entry) {
+      entry.count -= 1;
+      if (entry.count <= 0) state.words.delete(normalized);
+    }
+  }
+
+  function parseRawCookieHeader(header: string): Record<string, string> {
+    if (!header) return {};
+    const out: Record<string, string> = {};
+    for (const part of header.split(/;\s*/)) {
+      const eq = part.indexOf('=');
+      if (eq < 0) continue;
+      const k = part.slice(0, eq).trim();
+      const v = decodeURIComponent(part.slice(eq + 1).trim());
+      if (k) out[k] = v;
+    }
+    return out;
+  }
+
+  function wcEmitState(state: WordCloudState) {
+    io.to(`wc:${state.pin}`).emit('wordcloud:state', wcSnapshot(state));
+  }
+
+  // F2: a socket is authorized as host iff (a) it owns the host slot for this
+  // state AND (b) the authenticated user matches state.hostUserId, OR the
+  // session is anonymous (state.hostUserId === null) and any socket bound as
+  // host can drive it. Trusting hostSocketId alone is insufficient because
+  // sockets reconnect freely and another socket could race to claim the slot.
+  function isHostAuthorized(socket: Socket, state: WordCloudState): boolean {
+    const userId = (socket.data as { userId?: string | null }).userId ?? null;
+    if (state.hostUserId === null) {
+      return state.hostSocketId === socket.id;
+    }
+    return userId !== null && userId === state.hostUserId;
+  }
 
   function broadcast(pin: string) {
     const game = getGame(pin);
@@ -304,7 +432,340 @@ void app.prepare().then(() => {
       broadcast(pin);
     });
 
+    socket.on('wordcloud:host:create', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[wordcloud:host:create] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: { pin: string; sessionId: string } | { error: string }) => void;
+      if (!payload || typeof payload !== 'object') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const p = payload as Record<string, unknown>;
+      const userId = (socket.data as { userId?: string | null }).userId ?? null;
+
+      // API-allocated path is the only path we now support: the HTTP route at
+      // /api/wordcloud/route.ts is the single source of truth for PIN
+      // allocation, ownership, and persistence (F6 fail-closed: no socket
+      // fallback that runs an in-memory session detached from Prisma).
+      const providedPin = typeof p.pin === 'string' && /^\d{6}$/.test(p.pin) ? p.pin : null;
+      const providedSessionId =
+        typeof p.sessionId === 'string' && p.sessionId.length > 0 ? p.sessionId : null;
+      if (!providedPin || !providedSessionId) {
+        cb({ error: 'missing_session' });
+        return;
+      }
+
+      let session: Awaited<ReturnType<typeof repoGetSessionByPin>>;
+      try {
+        session = await repoGetSessionByPin(providedPin);
+      } catch (err) {
+        console.error('[wordcloud-repo] getSessionByPin', err);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      if (!session || session.id !== providedSessionId) {
+        cb({ error: 'session_mismatch' });
+        return;
+      }
+      // Anonymous sessions (hostUserId === null) can be bound by any socket —
+      // these come from the smoke harness and the legacy anonymous host flow.
+      // Owned sessions require the authenticated user to match the host.
+      if (session.hostUserId !== null && session.hostUserId !== userId) {
+        cb({ error: 'forbidden' });
+        return;
+      }
+
+      let state = wordCloudStates.get(providedPin);
+      if (!state) {
+        const hydrated = await loadOrCreateWcState(wordCloudStates, providedPin);
+        if (!hydrated) {
+          cb({ error: 'session_mismatch' });
+          return;
+        }
+        state = hydrated;
+      }
+      state.hostSocketId = socket.id;
+      state.hostUserId = session.hostUserId;
+      wcSocketToPin.set(socket.id, { pin: providedPin, role: 'host' });
+      socket.join(`wc:${providedPin}`);
+      cb({ pin: providedPin, sessionId: providedSessionId });
+      wcEmitState(state);
+    });
+
+    socket.on('wordcloud:player:join', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[wordcloud:player:join] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (
+        res:
+          | {
+              playerId: string;
+              prompt: string;
+              wordsPerPlayer: number;
+              status: WordCloudStateStatus;
+              mySubmissions: { normalized: string; display: string }[];
+              words: { normalized: string; display: string; count: number }[];
+            }
+          | { error: string },
+      ) => void;
+      if (!payload || typeof payload !== 'object') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const p = payload as Record<string, unknown>;
+      if (!isPin(p.pin)) {
+        cb({ error: 'invalid_pin' });
+        return;
+      }
+      if (!isNickname(p.nickname)) {
+        cb({ error: 'invalid_nickname' });
+        return;
+      }
+      let state: WordCloudState | null;
+      try {
+        state = await loadOrCreateWcState(wordCloudStates, p.pin);
+      } catch (err) {
+        console.error('[wordcloud-repo] loadOrCreateState (join)', err);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      if (!state) {
+        cb({ error: 'not_found' });
+        return;
+      }
+
+      // Reconnect path: if the client kept a playerId from a prior socket
+      // (page refresh, mobile sleep) and it still exists in memory under the
+      // same nickname, rebind the socket and return current state. Word cloud
+      // has no disconnect grace per PRD — submissions stick until session end.
+      const providedPlayerId = typeof p.playerId === 'string' ? p.playerId : null;
+      const trimmedNick = p.nickname.trim();
+      if (providedPlayerId) {
+        const existing = state.players.get(providedPlayerId);
+        if (existing && existing.nickname.toLowerCase() === trimmedNick.toLowerCase()) {
+          for (const [socketId, pid] of state.socketToPlayer.entries()) {
+            if (pid === providedPlayerId) state.socketToPlayer.delete(socketId);
+          }
+          state.socketToPlayer.set(socket.id, providedPlayerId);
+          wcSocketToPin.set(socket.id, { pin: state.pin, role: 'player' });
+          socket.join(`wc:${state.pin}`);
+          cb({
+            playerId: providedPlayerId,
+            prompt: state.prompt,
+            wordsPerPlayer: state.wordsPerPlayer,
+            status: state.status,
+            mySubmissions: playerSubmissions(state, providedPlayerId),
+            words: snapshotWords(state),
+          });
+          wcEmitState(state);
+          return;
+        }
+      }
+
+      const result = addPlayerToCloud(state, { nickname: trimmedNick });
+      if (result.error || !result.playerId) {
+        cb({ error: result.error ?? 'unknown' });
+        return;
+      }
+      const playerId = result.playerId;
+
+      // F6: await persistence before binding the in-memory socket so we
+      // never accept a player whose row failed to write.
+      try {
+        const row = await repoAddPlayer({ sessionId: state.sessionId, nickname: trimmedNick });
+        const entry = state.players.get(playerId);
+        if (entry) entry.dbPlayerId = row.id;
+      } catch (err) {
+        console.error('[wordcloud-repo] addPlayer', err);
+        state.players.delete(playerId);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+
+      state.socketToPlayer.set(socket.id, playerId);
+      wcSocketToPin.set(socket.id, { pin: state.pin, role: 'player' });
+      socket.join(`wc:${state.pin}`);
+      cb({
+        playerId,
+        prompt: state.prompt,
+        wordsPerPlayer: state.wordsPerPlayer,
+        status: state.status,
+        mySubmissions: playerSubmissions(state, playerId),
+        words: snapshotWords(state),
+      });
+      wcEmitState(state);
+    });
+
+    socket.on('wordcloud:player:submit', async (payload: unknown) => {
+      if (!payload || typeof payload !== 'object') return;
+      const p = payload as Record<string, unknown>;
+      if (!isPin(p.pin)) return;
+      if (typeof p.playerId !== 'string') return;
+      if (typeof p.word !== 'string') return;
+      const state = wordCloudStates.get(p.pin);
+      if (!state) {
+        socket.emit('wordcloud:player:rejected', { reason: 'session_not_live' });
+        return;
+      }
+      const ownPlayerId = state.socketToPlayer.get(socket.id);
+      if (!ownPlayerId || ownPlayerId !== p.playerId) {
+        socket.emit('wordcloud:player:rejected', { reason: 'unknown_player' });
+        return;
+      }
+
+      const now = Date.now();
+      const last = wcLastSubmitAt.get(p.playerId) ?? 0;
+      if (now - last < WC_RATE_LIMIT_MS) {
+        socket.emit('wordcloud:player:rejected', { reason: 'rate_limited' });
+        return;
+      }
+      wcLastSubmitAt.set(p.playerId, now);
+
+      const result = submitWord(state, { playerId: p.playerId, word: p.word });
+      if (!result.accepted) {
+        socket.emit('wordcloud:player:rejected', {
+          reason: result.reason,
+          normalized: result.normalized,
+        });
+        return;
+      }
+
+      const normalized = result.normalized as string;
+      const display = result.display as string;
+      const count = result.count as number;
+
+      // F5+F6: persist BEFORE broadcasting so a failed write rolls back the
+      // in-memory state and the live cloud stays consistent with Prisma. If
+      // the host already trashed this normalized word (race window), persist
+      // with removed=true so CSV reflects moderation correctly.
+      const norm = normalizeWord(p.word);
+      const player = state.players.get(p.playerId);
+      const dbPlayerId = player?.dbPlayerId ?? null;
+      if (norm && dbPlayerId) {
+        const wasTrashed = state.trashedNormalized.has(normalized);
+        try {
+          await repoAddSubmission({
+            sessionId: state.sessionId,
+            playerId: dbPlayerId,
+            rawText: norm.display,
+            normalized: norm.normalized,
+            removed: wasTrashed,
+          });
+        } catch (err) {
+          console.error('[wordcloud-repo] addSubmission', err);
+          rollbackSubmit(state, p.playerId, normalized);
+          socket.emit('wordcloud:player:rejected', { reason: 'persistence_failed' });
+          return;
+        }
+        if (wasTrashed) {
+          // Race lost: roll the in-memory accept back so the trashed word
+          // doesn't surface to the live cloud.
+          rollbackSubmit(state, p.playerId, normalized);
+          socket.emit('wordcloud:player:rejected', { reason: 'session_not_live' });
+          return;
+        }
+      }
+
+      io.to(`wc:${state.pin}`).emit('wordcloud:word:added', {
+        normalized,
+        display,
+        count,
+      });
+      socket.emit('wordcloud:player:my-submissions', {
+        submissions: playerSubmissions(state, p.playerId),
+      });
+    });
+
+    socket.on('wordcloud:host:remove', (payload: unknown) => {
+      if (!payload || typeof payload !== 'object') return;
+      const p = payload as Record<string, unknown>;
+      if (!isPin(p.pin)) return;
+      if (typeof p.normalized !== 'string') return;
+      const state = wordCloudStates.get(p.pin);
+      if (!state) return;
+      if (!isHostAuthorized(socket, state)) {
+        socket.emit('wordcloud:player:rejected', { reason: 'forbidden' });
+        return;
+      }
+      // F5: record the trash decision BEFORE the persist so a concurrent
+      // submit for the same normalized lands as removed=true.
+      state.trashedNormalized.add(p.normalized);
+      const result = removeWord(state, { normalized: p.normalized });
+      if (!result.removed) return;
+      io.to(`wc:${state.pin}`).emit('wordcloud:word:removed', { normalized: p.normalized });
+
+      repoMarkRemoved({
+        sessionId: state.sessionId,
+        normalized: p.normalized,
+        hostUserId: state.hostUserId,
+      }).catch((err) => console.error('[wordcloud-repo] markSubmissionRemoved', err));
+      repoLogModeration({
+        sessionId: state.sessionId,
+        hostUserId: state.hostUserId,
+        word: p.normalized,
+        reason: 'trash',
+      }).catch((err) => console.error('[wordcloud-repo] logModeration', err));
+    });
+
+    socket.on('wordcloud:display:attach', async (payload: unknown) => {
+      const pin = typeof payload === 'string' ? payload : null;
+      if (!pin || !isPin(pin)) return;
+      let state: WordCloudState | null;
+      try {
+        state = await loadOrCreateWcState(wordCloudStates, pin);
+      } catch (err) {
+        console.error('[wordcloud-repo] loadOrCreateState (display)', err);
+        return;
+      }
+      if (!state) return;
+      socket.join(`wc:${pin}`);
+      socket.emit('wordcloud:state', wcSnapshot(state));
+    });
+
+    socket.on('wordcloud:host:set-status', (payload: unknown) => {
+      if (!payload || typeof payload !== 'object') return;
+      const p = payload as Record<string, unknown>;
+      if (!isPin(p.pin)) return;
+      if (!isValidStatus(p.status)) return;
+      const state = wordCloudStates.get(p.pin);
+      if (!state) return;
+      if (!isHostAuthorized(socket, state)) {
+        socket.emit('wordcloud:player:rejected', { reason: 'forbidden' });
+        return;
+      }
+      if (!isValidTransition(state.status, p.status)) {
+        socket.emit('wordcloud:player:rejected', {
+          reason: 'invalid_transition',
+          from: state.status,
+          to: p.status,
+        });
+        return;
+      }
+      const transition = setCloudStatus(state, p.status);
+      if (!transition.ok) return;
+      io.to(`wc:${state.pin}`).emit('wordcloud:status:changed', { status: p.status });
+      wcEmitState(state);
+
+      repoSetStatus({ sessionId: state.sessionId, status: p.status }).catch((err) =>
+        console.error('[wordcloud-repo] setStatus', err),
+      );
+    });
+
     socket.on('disconnect', () => {
+      const wcLink = wcSocketToPin.get(socket.id);
+      if (wcLink) {
+        wcSocketToPin.delete(socket.id);
+        const wcState = wordCloudStates.get(wcLink.pin);
+        if (wcState) {
+          if (wcLink.role === 'player') {
+            wcState.socketToPlayer.delete(socket.id);
+          }
+        }
+      }
+
       const events = detachSocket(socket.id);
       const pins = new Set(events.map((e) => e.pin));
       for (const event of events) {
