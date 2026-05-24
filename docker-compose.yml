@@ -1,4 +1,4 @@
-# Local dev infrastructure for BROADCAST.
+# Local dev infrastructure for INPUT/OUTPUT.
 #
 # Postgres 16 matches Vercel Postgres (Neon) so dev/CI/prod run the same engine.
 # Adminer gives you a tiny web UI at http://localhost:8080 for poking at the DB.
@@ -11,21 +11,21 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: broadcast-postgres
+    container_name: inputoutput-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: broadcast
-      POSTGRES_PASSWORD: broadcast
-      POSTGRES_DB: broadcast_dev
+      POSTGRES_USER: inputoutput
+      POSTGRES_PASSWORD: inputoutput
+      POSTGRES_DB: inputoutput_dev
       # Use C locale for predictable sort order in tests
       POSTGRES_INITDB_ARGS: "--locale=C --encoding=UTF8"
     ports:
       # Bind to localhost only — never expose Postgres on LAN/Tailscale
       - "127.0.0.1:5432:5432"
     volumes:
-      - broadcast_pg_data:/var/lib/postgresql/data
+      - inputoutput_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U broadcast -d broadcast_dev"]
+      test: ["CMD-SHELL", "pg_isready -U inputoutput -d inputoutput_dev"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -33,7 +33,7 @@ services:
 
   adminer:
     image: adminer:5
-    container_name: broadcast-adminer
+    container_name: inputoutput-adminer
     restart: unless-stopped
     ports:
       - "127.0.0.1:8080:8080"
@@ -45,5 +45,5 @@ services:
         condition: service_healthy
 
 volumes:
-  broadcast_pg_data:
-    name: broadcast_pg_data
+  inputoutput_pg_data:
+    name: inputoutput_pg_data
