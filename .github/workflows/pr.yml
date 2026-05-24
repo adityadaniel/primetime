@@ -18,20 +18,20 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: broadcast
-          POSTGRES_PASSWORD: broadcast
-          POSTGRES_DB: broadcast_dev
+          POSTGRES_USER: inputoutput
+          POSTGRES_PASSWORD: inputoutput
+          POSTGRES_DB: inputoutput_dev
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U broadcast -d broadcast_dev"
+          --health-cmd "pg_isready -U inputoutput -d inputoutput_dev"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
           --health-start-period 5s
 
     env:
-      DATABASE_URL: postgresql://broadcast:broadcast@localhost:5432/broadcast_dev
+      DATABASE_URL: postgresql://inputoutput:inputoutput@localhost:5432/inputoutput_dev
       # Socket.IO host-auth middleware (server.ts) decodes the Auth.js JWT.
       # Smoke uses anonymous flows so the value just needs to be present.
       AUTH_SECRET: ci-test-secret-not-for-prod

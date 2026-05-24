@@ -44,7 +44,7 @@ export interface ExportableQuiz {
 
 export function serializeQuiz(quiz: ExportableQuiz): string {
   const payload = {
-    $schema: 'https://broadcast.example/quiz-v1.json',
+    $schema: 'https://inputoutput.id/quiz-v1.json',
     version: QUIZ_SCHEMA_VERSION,
     title: quiz.title,
     exportedAt: new Date().toISOString(),

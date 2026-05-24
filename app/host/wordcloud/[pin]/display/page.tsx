@@ -172,7 +172,7 @@ function LobbyHero({
 }
 
 function useJoinHost() {
-  const [host, setHost] = useState('broadcast.local');
+  const [host, setHost] = useState('inputoutput.local');
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setHost(window.location.host);
@@ -361,7 +361,7 @@ function Watermark() {
       style={{ color: 'var(--ink)', opacity: 0.5, letterSpacing: '0.18em' }}
       aria-hidden
     >
-      BROADCAST
+      INPUT/OUTPUT
     </span>
   );
 }

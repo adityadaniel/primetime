@@ -1,5 +1,5 @@
 {
-  "name": "kahoot-clone",
+  "name": "inputoutput",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -17,7 +17,7 @@
     "db:down": "docker compose down",
     "db:reset": "docker compose down -v && docker compose up -d --wait && prisma migrate dev",
     "db:logs": "docker compose logs -f postgres",
-    "db:psql": "docker compose exec postgres psql -U broadcast -d broadcast_dev",
+    "db:psql": "docker compose exec postgres psql -U inputoutput -d inputoutput_dev",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio"
   },

@@ -59,7 +59,7 @@ export default function SignInClient({ enableApple }: { enableApple: boolean }) 
 
       <section className="px-6 pt-8 pb-8 flex-1">
         <div className="max-w-[420px] mx-auto w-full">
-          <p className="ticker text-[11px] tracking-widest opacity-70 mb-2">▶ BROADCAST ◀</p>
+          <p className="ticker text-[11px] tracking-widest opacity-70 mb-2">▶ INPUT/OUTPUT ◀</p>
           <h1
             className="display-num"
             style={{ fontSize: 'clamp(56px, 12vw, 120px)', lineHeight: 0.9 }}
