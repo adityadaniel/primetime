@@ -23,7 +23,10 @@ body {
   background: var(--bone);
   color: var(--ink);
   font-family: "Newsreader", ui-serif, Georgia, serif;
-  font-feature-settings: "kern" 1, "liga" 1, "ss01" 1;
+  font-feature-settings:
+    "kern" 1,
+    "liga" 1,
+    "ss01" 1;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
@@ -110,7 +113,9 @@ a:hover {
 
 .ticker {
   font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
-  font-feature-settings: "tnum" 1, "zero" 1;
+  font-feature-settings:
+    "tnum" 1,
+    "zero" 1;
 }
 
 /* ============================================================
@@ -162,7 +167,9 @@ a:hover {
   font-family: "Big Shoulders Display", ui-sans-serif, system-ui;
   font-weight: 900;
   font-stretch: condensed;
-  font-feature-settings: "tnum" 1, "lnum" 1;
+  font-feature-settings:
+    "tnum" 1,
+    "lnum" 1;
   letter-spacing: -0.02em;
   line-height: 0.85;
 }
