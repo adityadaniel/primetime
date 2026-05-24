@@ -1,10 +1,124 @@
 # Decisions Log
 
-This file is the durable record of architectural and product decisions for BROADCAST.
+This file is the durable record of architectural and product decisions for INPUT/OUTPUT
+(formerly BROADCAST — see 2026-05-24 rebrand entry below).
 Each entry is dated. Latest first.
 
 When a decision is reversed, do not delete the original — append a "Superseded by" line
 and add a new entry below.
+
+---
+
+## 2026-05-24 · Rebrand BROADCAST → INPUT/OUTPUT (inputoutput.id)
+
+**Status:** Accepted
+
+**Context:** User acquired the domain `inputoutput.id` and wants to retire the
+working title BROADCAST in favor of a name that reads as a product, not a
+descriptor. The vintage broadcast-graphics visual identity stays — the rebrand
+is naming, not visual. The new name reframes the existing surfaces in signal-
+flow terms that are already in the design language: control surface = INPUT,
+projection display = OUTPUT, players = signal flowing through.
+
+**Decision (locked names):**
+
+- **Product name:** `INPUT/OUTPUT` (with the slash; the slash is part of the wordmark)
+- **Short form:** `I/O`
+- **Code identifier:** `inputoutput` (lowercase, no slash). Used for repo name,
+  npm package name, Postgres user/db, working-tree directory, env var prefixes,
+  CSS class prefixes if any.
+- **Domain:** `inputoutput.id`
+- **Tagline (suggested, not load-bearing):** "broadcast graphics for the I/O era"
+
+**What changes:**
+
+- Wordmark in every user-facing surface (builder, host control, projection
+  display, player, marketing landing, legal pages, README, DESIGN.md headers).
+- Code identifiers: `broadcast` → `inputoutput` in variable names, type names,
+  log prefixes (`[broadcast]` → `[io]`), env var prefixes (`BROADCAST_*` →
+  `INPUTOUTPUT_*` where the prefix is needed; drop the prefix where it isn't).
+- Postgres user/db: `broadcast` / `broadcast_dev` → `inputoutput` /
+  `inputoutput_dev`. Forces a `docker compose down -v` on dev (data is
+  throwaway).
+- `package.json` `name` field: `kahoot-clone` → `inputoutput`. (`kahoot-clone`
+  was always a placeholder — the rename retires it directly.)
+- GitHub repo: `adityadaniel/broadcast` → `adityadaniel/inputoutput`.
+  Working-tree path: `~/Developer/broadcast` → `~/Developer/inputoutput`.
+- Linear project: "Kahoot Clone (BROADCAST)" → "INPUT/OUTPUT (inputoutput.id)".
+- Hermes routing skill (`hermes-routing-daniel`): topic-tag `broadcast` →
+  `inputoutput`. Telegram topic ID itself stays the same.
+
+**What deliberately does NOT change:**
+
+- The visual identity. Vintage broadcast graphics (CRT, scanlines, test cards,
+  signal motifs, monospace, Riso/limited palette) is the product's design
+  language and the rebrand reinforces it rather than replacing it. DESIGN.md
+  body paragraphs describing visuals stay verbatim; only product-name tokens
+  flip.
+- Database schema, Prisma migrations, route shapes, URL paths inside the app,
+  WebSocket protocol, scoring rules, tier limits, M3 milestone scope.
+- Frozen `playtest/*` branches. The academy is running live games off
+  `playtest/with-sound` (and any sibling playtest branch). Those branches stay
+  on the BROADCAST name forever — the rebrand lands on `main` only and merges
+  forward to new feature branches off main. The academy host doesn't see a
+  rename mid-event.
+- Historical review docs and postmortems under `docs/reviews/`. They're
+  snapshots of work done under the old name and stay readable as such. A new
+  `docs/reviews/README.md` will note the rename for future readers.
+- The "Always delegate coding to Claude Code CLI" rule from 2026-05-20. That
+  rule applies to the rebrand work too — DECISIONS.md (this file) and the
+  Linear project metadata are orchestrator territory; everything under `app/`,
+  `lib/`, `server.ts`, `scripts/`, `prisma/`, `.github/workflows/`,
+  `docker-compose.yml`, `package.json`, `DESIGN.md`, `README.md` ships through
+  Claude.
+
+**Sequencing (4 phases, 9 Linear tickets MID-124 through MID-132):**
+
+1. **Phase 1 — Decisions.** This entry. Pin names + sequencing so every
+   downstream ticket cites a single source of truth. (MID-124, this commit.)
+2. **Phase 2 — Code rename.** Three parallel-safe tickets after Phase 1:
+   2a app code (`server.ts`, `app/`, `lib/`, `scripts/`); 2b tests + CI
+   workflows; 2c infra (`docker-compose.yml`, `.env.example`,
+   `package.json`, DB user/db rename). (MID-125 / MID-126 / MID-127.)
+3. **Phase 3 — Brand & copy.** Two parallel-safe tickets after Phase 1:
+   3a `DESIGN.md` brand update with one new paragraph bridging the I/O
+   metaphor and the existing vintage-broadcast aesthetic; 3b `README.md`,
+   marketing landing, privacy, terms. (MID-128 / MID-129.)
+4. **Phase 4 — Infra & ecosystem.** Sequential after Phase 2 + 3 are merged
+   to main: 4a GitHub repo rename + local directory move + remotes;
+   4b DNS for inputoutput.id + deploy target + canonical URL; 4c Linear
+   project rename + Hermes routing skill update + memory + cron sweep.
+   (MID-130 / MID-131 / MID-132.)
+
+**Risks accepted:**
+
+- Dev DB rename forces every dev's local volume to reset. Acceptable — dev DB
+  is throwaway, and `npm run db:reset` already documents the wipe-and-migrate
+  flow.
+- GitHub repo rename creates a redirect that Vercel/host integrations and
+  deploy webhooks may transiently mishandle. Phase 4a runs OUTSIDE academy
+  event windows and verifies the deploy URL before/after the rename.
+- Frozen playtest branches diverge from main forever. Their CI workflows still
+  reference the old name; that's fine because they don't run in CI anymore
+  (frozen = no pushes). If a hotfix is ever needed on a playtest branch, the
+  fix lands on the playtest branch as-is without rename.
+- The 28 source files containing "broadcast" include some intentional
+  references to "broadcast graphics" as a *visual style*. Phase 2a's
+  acceptance criteria explicitly preserve those — only the wordmark and code
+  identifiers flip.
+
+**Open questions (deferred to their tickets, not this decision):**
+
+- Hosting provider for inputoutput.id (Vercel? Fly? self-hosted?) — MID-131.
+- WWW vs apex redirect direction — MID-131.
+- Transactional email on inputoutput.id (MX/SPF/DKIM/DMARC) — deferred until
+  product launch unless MID-131 surfaces a real need sooner.
+
+**Implication:** every rebrand ticket from MID-125 onward references this
+entry. New tickets created during the rebrand work cite "Depends on: MID-124"
+in their description. After Phase 4c lands, this DECISIONS.md is the only
+remaining file in the repo that uses the old "BROADCAST" name in prose — and
+it stays that way as the historical record.
 
 ---
 
