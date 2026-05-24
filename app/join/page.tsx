@@ -31,25 +31,55 @@ export default function JoinPage() {
     }
     inFlight.current = true;
     setPending(true);
-    socket.emit(
-      'player:join',
-      pin,
-      nickname.trim(),
-      (res: { ok: boolean; error?: string; code?: string; playerId?: string }) => {
-        inFlight.current = false;
-        setPending(false);
-        if (!res.ok) {
-          setError(res.error ?? 'Could not join');
-          setErrorCode(res.code ?? null);
+
+    // Look up the session type FIRST so we know which player flow to follow.
+    // The /join socket event is quiz-only; a word-cloud PIN must redirect
+    // to /play/[pin]/wordcloud (which mounts its own socket join). Doing the
+    // lookup here over HTTP avoids a "is this a quiz or a wordcloud" guessing
+    // game at the socket layer (F1 from the codex review).
+    fetch('/api/lookup-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    })
+      .then((r) => r.json() as Promise<{ type: 'quiz' | 'wordcloud' | null }>)
+      .then((res) => {
+        if (res.type === 'wordcloud') {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem(`bc:nick:${pin}`, nickname.trim());
+          }
+          inFlight.current = false;
+          setPending(false);
+          router.push(`/play/${pin}/wordcloud`);
           return;
         }
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem(`bc:player:${pin}`, res.playerId ?? '');
-          sessionStorage.setItem(`bc:nick:${pin}`, nickname.trim());
-        }
-        router.push(`/play/${pin}`);
-      },
-    );
+        // Either an explicit quiz or no DB row (in-memory anonymous quiz):
+        // fall through to the existing quiz socket flow.
+        socket.emit(
+          'player:join',
+          pin,
+          nickname.trim(),
+          (sockRes: { ok: boolean; error?: string; code?: string; playerId?: string }) => {
+            inFlight.current = false;
+            setPending(false);
+            if (!sockRes.ok) {
+              setError(sockRes.error ?? 'Could not join');
+              setErrorCode(sockRes.code ?? null);
+              return;
+            }
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem(`bc:player:${pin}`, sockRes.playerId ?? '');
+              sessionStorage.setItem(`bc:nick:${pin}`, nickname.trim());
+            }
+            router.push(`/play/${pin}`);
+          },
+        );
+      })
+      .catch(() => {
+        inFlight.current = false;
+        setPending(false);
+        setError("Couldn't reach the server — try again.");
+      });
   }
 
   return (
