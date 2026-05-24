@@ -48,6 +48,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth(async () => {
     ...authConfig,
     adapter: PrismaAdapter(prisma),
     session: { strategy: 'jwt' },
+    // Trust X-Forwarded-* headers from upstream proxies (Cloudflare Tunnel,
+    // any reverse proxy in front of server.ts). Required for sign-in
+    // callbacks to redirect to the public origin instead of localhost
+    // when the app is reached through a tunnel/proxy. Set explicitly here
+    // because the AUTH_TRUST_HOST env var is only auto-honored on Vercel.
+    trustHost: true,
     providers,
     callbacks: {
       ...authConfig.callbacks,

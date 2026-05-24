@@ -60,7 +60,7 @@ async function main() {
     s.on('state', (st: State) => {
       states.set(name, st);
     });
-    s.on('personal', (_p: any) => {
+    s.on('personal', (_p: unknown) => {
       // optional: console.log(name, "personal", _p);
     });
   }
