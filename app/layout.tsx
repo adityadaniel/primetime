@@ -21,6 +21,7 @@ export const metadata: Metadata = {
     'real-time quiz',
     'kahoot alternative',
     'broadcast',
+    'input/output',
     'projector trivia',
   ],
   openGraph: {

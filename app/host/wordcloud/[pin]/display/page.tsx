@@ -172,7 +172,7 @@ function LobbyHero({
 }
 
 function useJoinHost() {
-  const [host, setHost] = useState('broadcast.local');
+  const [host, setHost] = useState('inputoutput.local');
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setHost(window.location.host);
