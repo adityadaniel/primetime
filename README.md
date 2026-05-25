@@ -159,3 +159,39 @@ npm run db:migrate    # creates schema + applies migrations
 npm run db:reset      # nuke and rebuild (no seed yet)
 npm run db:studio     # browse data at localhost:5555
 ```
+
+## For other academies
+
+This is the internal tool we use to run live in-room workshop activities at our academy. It's not a SaaS and there's no hosted version — but the install path is open, and the repo is set up so any other academy can clone it, point it at their own domain, and run their own instance.
+
+### What you need
+
+- A Mac (mini, Studio, or any modern MacBook) with at least 8 GB RAM — this is the machine that hosts the app during workshops
+- A domain you control, with DNS managed by Cloudflare (free tier is fine)
+- About 30 minutes for first-time setup
+
+### Steps
+
+1. Clone the repo on the Mac you want as the server.
+2. Run `bash scripts/setup.sh`. The script installs prerequisites (Node, Postgres), sets up the database, walks you through provisioning a Cloudflare Tunnel for your domain, and optionally seeds a sample quiz.
+3. Start the app: `npm run start`.
+4. In a separate terminal, start the tunnel: `cloudflared tunnel run <your-tunnel-name>`.
+5. Workshops happen at `https://live.<your-domain>` — players scan a QR code on the host's screen to join. The host machine stays in the room; players hit it through the tunnel from their phones.
+
+### Customize
+
+This fork is branded **INPUT/OUTPUT**. You'll want to swap that out for your own academy's identity. The things to change:
+
+- **Wordmark, colors, design tokens** — `landing/` and `app/globals.css`. Pick your own name, palette, and type stack.
+- **Page metadata** — `app/layout.tsx` (title, description, OG tags).
+- **Sample quiz content** — `prisma/seed.ts` (lands with MID-140; safe to edit once it exists).
+
+Everything else (game logic, scoring, real-time wiring, host/display/player surfaces) is generic and shouldn't need touching.
+
+### License
+
+MIT — fork it, modify it, ship it at your academy. See [LICENSE](./LICENSE).
+
+## License
+
+MIT. See [LICENSE](./LICENSE).
