@@ -31,7 +31,7 @@ Block budget: 30 min once domain is bought.
 ## 2. Vercel project (~10 min, do first)
 
 - [ ] Sign in to vercel.com (use GitHub account)
-- [ ] Import `adityadaniel/broadcast` repo
+- [ ] Import `adityadaniel/inputoutput` repo
 - [ ] Framework preset: Next.js (auto-detected)
 - [ ] Build command: leave default
 - [ ] Root directory: leave default

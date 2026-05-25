@@ -1,5 +1,5 @@
-[![PR](https://github.com/adityadaniel/broadcast/actions/workflows/pr.yml/badge.svg)](https://github.com/adityadaniel/broadcast/actions/workflows/pr.yml)
-[![Main](https://github.com/adityadaniel/broadcast/actions/workflows/main.yml/badge.svg)](https://github.com/adityadaniel/broadcast/actions/workflows/main.yml)
+[![PR](https://github.com/adityadaniel/inputoutput/actions/workflows/pr.yml/badge.svg)](https://github.com/adityadaniel/inputoutput/actions/workflows/pr.yml)
+[![Main](https://github.com/adityadaniel/inputoutput/actions/workflows/main.yml/badge.svg)](https://github.com/adityadaniel/inputoutput/actions/workflows/main.yml)
 
 # INPUT/OUTPUT — Kahoot-style live quiz (M1 + M2)
 
