@@ -1,0 +1,6 @@
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+  Cache-Control: public, max-age=300
+
+/checkin
+  Cache-Control: public, max-age=300

@@ -1,0 +1,2 @@
+# /checkin without query → fallback page
+# /checkin?station=<id> on iOS is intercepted by App Clip via AASA; this only fires on non-iOS or non-NFC traffic.
