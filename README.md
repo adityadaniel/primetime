@@ -108,10 +108,35 @@ DESIGN.md                        visual identity rationale
 
 ```bash
 npm run dev      # start everything on http://localhost:4321
+npm run qa       # vanilla Next dev on :4322 for /dev/fixtures (no socket, no DB)
 npm run build    # next build
 npm start        # production-ish start (still tsx-driven)
 npm run smoke    # end-to-end ws smoke test (server must be running)
+npm test         # vitest (lib/* unit tests + fixture × surface snapshots)
 ```
+
+## Dev fixtures
+
+For visual QA without standing up a real game, every presentational surface
+(`display`, `control`, `player`) accepts plain `PublicGameState` props and is
+catalogued under `lib/dev-fixtures/`.
+
+```bash
+npm run qa
+# open http://localhost:4322/dev/fixtures
+```
+
+The browser has a sidebar of edge-case scenarios (lobby cap, long stems,
+truncating answers, ties, host-left endings, paused-over-reveal, etc.) and a
+`Display | Control | Player` segmented control to switch surfaces. Selection
+is persisted in the URL (`?id=…&surface=…`) so refresh stays put.
+
+The route returns `notFound()` in production, so it ships only in dev builds.
+
+The same fixture catalog drives Vitest snapshot tests
+(`app/dev/fixtures/fixtures.test.tsx`) — run `npm test` and any unintended
+visual change shows up as a snapshot diff.
+
 
 ## Database setup
 
