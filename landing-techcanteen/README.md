@@ -34,7 +34,7 @@ Cloudflare will auto-provision a TLS cert. No proxy toggle needed beyond the def
 
 ## App Clip association
 
-The AASA file authorizes the Tech Canteen App Clip + parent app (Team ID `9H8AZ8D28D`, bundle prefix `id.inputoutput.techcanteen`) to handle universal links matching:
+The AASA file authorizes the Tech Canteen App Clip + parent app (Team ID `9H8AZ8D28D`, bundle prefix `com.adityadaniel.techcanteen`) to handle universal links matching:
 
 ```
 https://techcanteen.inputoutput.id/checkin?station=<id>

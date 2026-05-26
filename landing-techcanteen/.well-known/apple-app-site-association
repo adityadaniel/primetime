@@ -3,8 +3,8 @@
     "details": [
       {
         "appIDs": [
-          "9H8AZ8D28D.id.inputoutput.techcanteen",
-          "9H8AZ8D28D.id.inputoutput.techcanteen.Clip"
+          "9H8AZ8D28D.com.adityadaniel.techcanteen",
+          "9H8AZ8D28D.com.adityadaniel.techcanteen.Clip"
         ],
         "components": [
           {
@@ -17,6 +17,6 @@
     ]
   },
   "appclips": {
-    "apps": ["9H8AZ8D28D.id.inputoutput.techcanteen.Clip"]
+    "apps": ["9H8AZ8D28D.com.adityadaniel.techcanteen.Clip"]
   }
 }
