@@ -1,5 +1,6 @@
 'use client';
 
+import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useState } from 'react';
 import { Chyron, Clock, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
 import { Countdown } from '@/components/Countdown';
@@ -14,7 +15,7 @@ export function DisplayView({ state, pin }: { state: PublicGameState | null; pin
 
   return (
     <main
-      className={`relative min-h-screen w-full overflow-hidden grain ${dark ? 'ink-bg' : ''}`}
+      className={`relative h-screen w-full overflow-hidden grain flex flex-col ${dark ? 'ink-bg' : ''}`}
       style={{
         background: dark ? 'var(--ink)' : 'var(--bone)',
         color: dark ? 'var(--bone)' : 'var(--ink)',
@@ -33,7 +34,7 @@ export function DisplayView({ state, pin }: { state: PublicGameState | null; pin
 
       {state?.paused && <PausedOverlay resumeBy={state.paused.resumeBy} />}
 
-      <section className="px-10 pt-8 pb-12 max-w-[1800px] mx-auto">
+      <section className="px-10 pt-8 pb-12 max-w-[1800px] w-full mx-auto flex-1 min-h-0 flex flex-col">
         {phase === 'lobby' && state && <LobbyDisplay state={state} pin={pin} />}
         {(phase === 'question' || phase === 'reveal') && state && <QuestionDisplay state={state} />}
         {phase === 'leaderboard' && state && <PodiumDisplay state={state} />}
@@ -72,67 +73,102 @@ export function CornerMarksDark({ dark }: { dark: boolean }) {
 }
 
 export function LobbyDisplay({ state, pin }: { state: PublicGameState; pin: string }) {
+  const [joinUrl, setJoinUrl] = useState('');
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const base = window.location.origin;
+    setJoinUrl(pin ? `${base}/join?pin=${pin}` : `${base}/join`);
+  }, [pin]);
+
+  const ordered = [...state.players].map((p, i) => ({ p, no: i + 1 })).reverse();
+
   return (
-    <div className="flex flex-col gap-8">
-      <div>
-        <p className="chyron mb-3" style={{ color: 'var(--vermilion)' }}>
-          STAND BY · TRANSMITTING ON CHANNEL 4
-        </p>
-        <p className="ticker text-[14px] tracking-widest opacity-70">JOIN AT</p>
-        <p
-          className="display-num"
-          style={{ fontSize: 'clamp(48px, 8vw, 120px)', lineHeight: 0.85 }}
-        >
-          /JOIN
-        </p>
-        <p className="ticker text-[14px] tracking-widest opacity-70 mt-6">GAME PIN</p>
-        <p
-          className="display-num ticker"
-          style={{
-            fontSize: 'clamp(140px, 22vw, 360px)',
-            lineHeight: 0.82,
-            letterSpacing: '0.04em',
-          }}
-        >
-          {pin || '······'}
-        </p>
-        <p className="font-editorial italic text-2xl mt-6 max-w-2xl">
-          {state.players.length === 0
-            ? 'Waiting for the first player to check in…'
-            : `${state.players.length} on the floor — host signals ROLL TAPE to begin.`}
-        </p>
+    <div className="flex flex-col gap-8 flex-1 min-h-0">
+      <div className="flex flex-wrap items-center justify-between gap-10">
+        <div className="min-w-0 flex-1">
+          <p className="chyron mb-3" style={{ color: 'var(--vermilion)' }}>
+            STAND BY · TRANSMITTING ON CHANNEL 4
+          </p>
+          <p className="ticker text-[14px] tracking-widest opacity-70">GAME PIN</p>
+          <p
+            className="display-num ticker"
+            style={{
+              fontSize: 'clamp(80px, 12vw, 200px)',
+              lineHeight: 0.82,
+              letterSpacing: '0.04em',
+            }}
+          >
+            {pin || '······'}
+          </p>
+          <p className="font-editorial italic text-2xl mt-6 max-w-2xl">
+            {state.players.length === 0
+              ? 'Waiting for the first player to check in…'
+              : `${state.players.length} on the floor — host signals ROLL TAPE to begin.`}
+          </p>
+        </div>
+
+        <div className="flex flex-col items-center gap-3 shrink-0">
+          <div
+            className="ink-border p-4 grid place-items-center"
+            style={{ background: 'var(--bone)' }}
+          >
+            {joinUrl ? (
+              <QRCodeSVG
+                value={joinUrl}
+                size={220}
+                bgColor="transparent"
+                fgColor="var(--ink)"
+                level="M"
+                marginSize={0}
+              />
+            ) : (
+              <div style={{ width: 220, height: 220 }} aria-hidden />
+            )}
+          </div>
+          <p className="ticker text-[12px] tracking-widest opacity-70 text-center">
+            SCAN TO JOIN
+          </p>
+        </div>
       </div>
 
-      <aside>
-        <div className="ink-border p-5" style={{ background: 'var(--bone)' }}>
-          <div className="flex items-center justify-between">
+      <aside className="flex-1 min-h-0 flex flex-col">
+        <div
+          className="ink-border flex flex-col flex-1 min-h-[280px]"
+          style={{ background: 'var(--bone)' }}
+        >
+          <div
+            className="flex items-center justify-between px-5 py-4 border-b-2"
+            style={{ borderColor: 'var(--ink)' }}
+          >
             <span className="chyron">CHECK-IN</span>
             <span className="ticker text-[12px] tracking-widest">
               {String(state.players.length).padStart(2, '0')} /{' '}
               {String(state.cap?.soft ?? 150).padStart(2, '0')}
             </span>
           </div>
-          <ul className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-            {state.players.length === 0 && (
-              <li className="col-span-full font-editorial italic opacity-60">
-                No one on the floor.
-              </li>
-            )}
-            {state.players.map((p, i) => (
-              <li
-                key={p.id}
-                className="ink-border px-3 py-2 flex items-center gap-2 teleprompter"
-                style={{ background: 'var(--bone)' }}
-              >
-                <span className="ticker text-[11px] tracking-widest opacity-60">
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <span className="font-editorial truncate text-lg">{p.nickname}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
+            <ul className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              {ordered.length === 0 && (
+                <li className="col-span-full font-editorial italic opacity-60">
+                  No one on the floor.
+                </li>
+              )}
+              {ordered.map(({ p, no }) => (
+                <li
+                  key={p.id}
+                  className="ink-border px-3 py-2 flex items-center gap-2 teleprompter"
+                  style={{ background: 'var(--bone)' }}
+                >
+                  <span className="ticker text-[11px] tracking-widest opacity-60">
+                    {String(no).padStart(2, '0')}
+                  </span>
+                  <span className="font-editorial truncate text-lg">{p.nickname}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
-        <p className="ticker text-[11px] tracking-widest mt-4 opacity-70">
+        <p className="ticker text-[11px] tracking-widest mt-4 opacity-70 shrink-0">
           PLAYER UI: open <span className="opacity-100">/join</span> on a phone, enter the PIN, pick
           a name.
         </p>
@@ -154,8 +190,8 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
   const correct = state.reveal?.correct;
 
   return (
-    <div className="grid grid-cols-12 gap-6">
-      <div className="col-span-12 flex items-center justify-between">
+    <div className="flex flex-col gap-6 flex-1 min-h-0">
+      <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
           <span
             className="ticker text-[12px] tracking-widest px-2 py-[2px]"
@@ -170,10 +206,20 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
         <Countdown endsAt={state.endsAt} startedAt={state.startedAt} size={120} dark />
       </div>
 
-      <div className="col-span-12">
+      <div className="flex-1 min-h-0 overflow-hidden flex items-center">
         <p
-          className="font-editorial leading-[1.05] teleprompter"
-          style={{ fontSize: 'clamp(40px, 6.5vw, 108px)' }}
+          className="font-editorial teleprompter"
+          style={{
+            fontSize:
+              q.text.length >= 200
+                ? 'clamp(28px, 3.2vw, 54px)'
+                : q.text.length >= 120
+                  ? 'clamp(34px, 4.4vw, 76px)'
+                  : q.text.length >= 60
+                    ? 'clamp(40px, 5.5vw, 92px)'
+                    : 'clamp(44px, 6.5vw, 108px)',
+            lineHeight: q.text.length >= 120 ? 1.15 : 1.05,
+          }}
         >
           {q.text}
         </p>
@@ -181,7 +227,7 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
 
       {state.phase === 'reveal' && correct !== undefined && (
         <div
-          className="col-span-12 ink-border stamp px-6 py-5 flex items-center gap-5"
+          className="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0"
           style={{ background: 'var(--ivy)', color: 'var(--bone)' }}
         >
           <Shape
@@ -200,7 +246,7 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
         </div>
       )}
 
-      <div className="col-span-12 grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0">
         {q.options.map((opt, i) => {
           const ch = CHANNELS[i] ?? CHANNELS[0];
           const pct = Math.round((dist[i] / totalAns) * 100);
