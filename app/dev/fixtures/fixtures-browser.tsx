@@ -82,7 +82,7 @@ export default function FixturesBrowser() {
     const exitHref = `/dev/fixtures?${exitParams.toString()}`;
 
     return (
-      <div className="min-h-screen w-screen" style={{ background: '#000' }}>
+      <div className="min-h-screen w-screen" style={{ background: 'var(--bone)' }}>
         {surfaceEl}
         <a
           href={exitHref}
