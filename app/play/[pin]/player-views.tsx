@@ -73,7 +73,7 @@ export function PlayerView({
         </div>
       )}
       <header className="px-5 pt-4 flex items-center justify-between gap-3">
-        <Chyron number="B" />
+        <Chyron number="B" label="TALENT" />
         <div className="flex items-center gap-4">
           <Clock />
           <OnAir live={live} />
