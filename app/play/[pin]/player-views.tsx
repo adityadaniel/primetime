@@ -304,7 +304,16 @@ export function PlayerReveal({
         <span className="chyron" style={{ color: banner.fg, opacity: 0.85 }}>
           REVEAL
         </span>
-        <p className="display-num mt-1" style={{ fontSize: 'clamp(64px, 16vw, 130px)' }}>
+        <p
+          className="display-num mt-1"
+          style={{
+            fontSize:
+              banner.label.length >= 9
+                ? 'clamp(48px, 12vw, 96px)'
+                : 'clamp(64px, 16vw, 130px)',
+            letterSpacing: banner.label.length >= 9 ? '-0.01em' : undefined,
+          }}
+        >
           {banner.label}
         </p>
         {!noAnswer && isCorrect && (
