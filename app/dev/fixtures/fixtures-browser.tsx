@@ -89,7 +89,7 @@ export default function FixturesBrowser() {
           style={{
             position: 'fixed',
             bottom: 12,
-            right: 12,
+            left: 12,
             zIndex: 9999,
             padding: '4px 10px',
             fontSize: 11,

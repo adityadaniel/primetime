@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Clock, CornerMarks, OnAir, SmpteBars } from '@/components/Broadcast';
 import { Countdown } from '@/components/Countdown';
 import { CHANNELS, Shape } from '@/components/Shape';
 import type { AnswerIndex, PublicGameState } from '@/lib/types';
@@ -44,7 +44,6 @@ export function PlayerView({
 }: PlayerViewProps) {
   const phase = state?.phase ?? 'lobby';
   const live = phase !== 'lobby' && phase !== 'final';
-  const currentNo = Math.max(0, (state?.questionIndex ?? -1) + 1);
 
   return (
     <main className="relative min-h-screen pb-10 flex flex-col">
@@ -54,7 +53,7 @@ export function PlayerView({
         onClick={onToggleMute}
         aria-label={muted ? 'Unmute' : 'Mute'}
         aria-pressed={muted}
-        className="fixed top-3 right-3 z-50 ink-border ticker text-[11px] tracking-widest grid place-items-center"
+        className="fixed bottom-3 right-3 z-50 ink-border ticker text-[11px] tracking-widest grid place-items-center"
         style={{
           width: 44,
           height: 44,
@@ -73,13 +72,9 @@ export function PlayerView({
           ✓ {toast}
         </div>
       )}
-      <header className="px-5 pt-4 flex items-center justify-between gap-3">
-        <Chyron label="ON AIR · TALENT" number="B" />
-        <div className="flex items-center gap-4">
-          <FrameCounter index={currentNo} />
-          <Clock />
-          <OnAir live={live} />
-        </div>
+      <header className="px-5 pt-4 flex items-center justify-end gap-4">
+        <Clock />
+        <OnAir live={live} />
       </header>
       <SmpteBars className="h-1.5 mt-3" />
 
