@@ -131,6 +131,24 @@ truncating answers, ties, host-left endings, paused-over-reveal, etc.) and a
 `Display | Control | Player` segmented control to switch surfaces. Selection
 is persisted in the URL (`?id=…&surface=…`) so refresh stays put.
 
+### Bare mode (recommended for visual QA)
+
+Append `&bare=1` to any fixtures URL to hide the sidebar, tab bar, notes
+ribbon, and wrapping card. The surface renders edge-to-edge at full viewport
+so what you see matches the real `/host/[pin]/display`,
+`/host/[pin]/control`, and `/play/[pin]` routes — no harness distortion.
+
+```
+http://localhost:4322/dev/fixtures?id=question-long-stem&surface=display&bare=1
+```
+
+This is the mode QA agents should use when checking layout, font clamps,
+or anything `vw`-based — the regular harness wraps the surface in chrome
+that eats viewport width and height and skews `clamp()` math.
+
+A small `← exit bare` pill in the bottom-right returns you to the regular
+harness with the same fixture and surface preselected.
+
 The route returns `notFound()` in production, so it ships only in dev builds.
 
 The same fixture catalog drives Vitest snapshot tests

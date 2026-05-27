@@ -13,6 +13,12 @@ function isSurface(v: string | null): v is Surface {
   return v === 'display' || v === 'control' || v === 'player';
 }
 
+function isBare(v: string | null): boolean {
+  if (!v) return false;
+  const normalized = v.toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
+
 export default function FixturesBrowser() {
   const router = useRouter();
   const params = useSearchParams();
@@ -43,9 +49,64 @@ export default function FixturesBrowser() {
     router.replace(`/dev/fixtures?${sp.toString()}`);
   }
 
+  const bare = isBare(params.get('bare'));
+
   const showPlayer = surface === 'player';
   const showControl = surface === 'control';
   const showDisplay = surface === 'display';
+
+  const surfaceEl = selected ? (
+    <>
+      {showDisplay && (
+        <DisplayView state={selected.state} pin={selected.pin ?? selected.state.pin} />
+      )}
+      {showControl && (
+        <ControlView state={selected.state} pin={selected.pin ?? selected.state.pin} />
+      )}
+      {showPlayer && (
+        <PlayerView
+          state={selected.state}
+          personal={selected.personal ?? null}
+          nickname="QA"
+          pin={selected.pin ?? selected.state.pin}
+        />
+      )}
+    </>
+  ) : (
+    <p className="p-6 text-sm opacity-60">No fixture selected.</p>
+  );
+
+  if (bare) {
+    const exitParams = new URLSearchParams(params.toString());
+    exitParams.delete('bare');
+    const exitHref = `/dev/fixtures?${exitParams.toString()}`;
+
+    return (
+      <div className="min-h-screen w-screen" style={{ background: '#000' }}>
+        {surfaceEl}
+        <a
+          href={exitHref}
+          style={{
+            position: 'fixed',
+            bottom: 12,
+            right: 12,
+            zIndex: 9999,
+            padding: '4px 10px',
+            fontSize: 11,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            background: 'rgba(0,0,0,0.6)',
+            color: '#fff',
+            border: '1px solid rgba(255,255,255,0.3)',
+            borderRadius: 999,
+            textDecoration: 'none',
+          }}
+        >
+          ← exit bare
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex" style={{ background: '#fafafa', color: '#111' }}>
@@ -150,20 +211,7 @@ export default function FixturesBrowser() {
                   maxWidth: showPlayer ? 480 : 1600,
                 }}
               >
-                {showDisplay && (
-                  <DisplayView state={selected.state} pin={selected.pin ?? selected.state.pin} />
-                )}
-                {showControl && (
-                  <ControlView state={selected.state} pin={selected.pin ?? selected.state.pin} />
-                )}
-                {showPlayer && (
-                  <PlayerView
-                    state={selected.state}
-                    personal={selected.personal ?? null}
-                    nickname="QA"
-                    pin={selected.pin ?? selected.state.pin}
-                  />
-                )}
+                {surfaceEl}
               </div>
             </div>
           ) : (
