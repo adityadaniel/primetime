@@ -335,9 +335,7 @@ async function main(): Promise<void> {
   await mkdir(OUT_DIR, { recursive: true });
   const manifest = await readManifest();
 
-  const targets = args.only
-    ? SOUNDS.filter((s) => args.only!.includes(s.slug))
-    : SOUNDS;
+  const targets = args.only ? SOUNDS.filter((s) => args.only!.includes(s.slug)) : SOUNDS;
   if (args.only && targets.length !== args.only.length) {
     const known = new Set(SOUNDS.map((s) => s.slug));
     const missing = args.only.filter((s) => !known.has(s));
