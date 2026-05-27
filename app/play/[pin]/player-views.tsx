@@ -309,9 +309,9 @@ export function PlayerReveal({
           style={{
             fontSize:
               banner.label.length >= 9
-                ? 'clamp(48px, 12vw, 96px)'
+                ? 'clamp(44px, 10vw, 78px)'
                 : 'clamp(64px, 16vw, 130px)',
-            letterSpacing: banner.label.length >= 9 ? '-0.01em' : undefined,
+            letterSpacing: banner.label.length >= 9 ? '-0.02em' : undefined,
           }}
         >
           {banner.label}
