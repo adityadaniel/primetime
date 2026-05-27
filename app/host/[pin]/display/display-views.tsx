@@ -212,13 +212,13 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
           style={{
             fontSize:
               q.text.length >= 200
-                ? 'clamp(28px, 3.2vw, 54px)'
+                ? 'clamp(22px, 2.4vw, 34px)'
                 : q.text.length >= 120
-                  ? 'clamp(34px, 4.4vw, 76px)'
+                  ? 'clamp(30px, 3.6vw, 56px)'
                   : q.text.length >= 60
                     ? 'clamp(40px, 5.5vw, 92px)'
                     : 'clamp(44px, 6.5vw, 108px)',
-            lineHeight: q.text.length >= 120 ? 1.15 : 1.05,
+            lineHeight: q.text.length >= 120 ? 1.2 : 1.05,
           }}
         >
           {q.text}
