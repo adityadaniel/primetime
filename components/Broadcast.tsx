@@ -116,7 +116,7 @@ export function Chyron({
   number,
   dark = false,
 }: {
-  label: string;
+  label?: string;
   number?: string;
   dark?: boolean;
 }) {
@@ -133,12 +133,14 @@ export function Chyron({
           {number}
         </span>
       )}
-      <span
-        className="ticker tracking-widest text-[11px]"
-        style={{ color: dark ? 'var(--bone)' : 'var(--ink)' }}
-      >
-        {label}
-      </span>
+      {label && (
+        <span
+          className="ticker tracking-widest text-[11px]"
+          style={{ color: dark ? 'var(--bone)' : 'var(--ink)' }}
+        >
+          {label}
+        </span>
+      )}
     </div>
   );
 }

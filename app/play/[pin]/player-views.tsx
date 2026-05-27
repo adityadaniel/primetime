@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Clock, CornerMarks, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Chyron, Clock, CornerMarks, OnAir, SmpteBars } from '@/components/Broadcast';
 import { Countdown } from '@/components/Countdown';
 import { CHANNELS, Shape } from '@/components/Shape';
 import type { AnswerIndex, PublicGameState } from '@/lib/types';
@@ -72,9 +72,12 @@ export function PlayerView({
           ✓ {toast}
         </div>
       )}
-      <header className="px-5 pt-4 flex items-center justify-end gap-4">
-        <Clock />
-        <OnAir live={live} />
+      <header className="px-5 pt-4 flex items-center justify-between gap-3">
+        <Chyron number="B" />
+        <div className="flex items-center gap-4">
+          <Clock />
+          <OnAir live={live} />
+        </div>
       </header>
       <SmpteBars className="h-1.5 mt-3" />
 
