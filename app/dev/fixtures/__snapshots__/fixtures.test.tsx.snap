@@ -66,7 +66,7 @@ exports[`fixture × surface snapshots > control · final-champion 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -553,7 +553,7 @@ exports[`fixture × surface snapshots > control · final-host-left 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -1040,7 +1040,7 @@ exports[`fixture × surface snapshots > control · final-single 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -1401,7 +1401,7 @@ exports[`fixture × surface snapshots > control · leaderboard-1 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -1734,7 +1734,7 @@ exports[`fixture × surface snapshots > control · leaderboard-3-close 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -2155,7 +2155,7 @@ exports[`fixture × surface snapshots > control · leaderboard-10 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -2723,7 +2723,7 @@ exports[`fixture × surface snapshots > control · leaderboard-tie 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -3144,7 +3144,7 @@ exports[`fixture × surface snapshots > control · lobby-cap 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -10491,7 +10491,7 @@ exports[`fixture × surface snapshots > control · lobby-empty 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -10793,7 +10793,7 @@ exports[`fixture × surface snapshots > control · lobby-fifty 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -13440,7 +13440,7 @@ exports[`fixture × surface snapshots > control · lobby-one 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -13784,7 +13784,7 @@ exports[`fixture × surface snapshots > control · paused-over-reveal 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -14422,7 +14422,7 @@ exports[`fixture × surface snapshots > control · question-double-points 1`] = 
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -15038,7 +15038,7 @@ exports[`fixture × surface snapshots > control · question-long-options 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -15654,7 +15654,7 @@ exports[`fixture × surface snapshots > control · question-long-stem 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -16270,7 +16270,7 @@ exports[`fixture × surface snapshots > control · question-short 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -16922,7 +16922,7 @@ exports[`fixture × surface snapshots > control · question-truefalse 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -17413,7 +17413,7 @@ exports[`fixture × surface snapshots > control · reveal-all-wrong 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -18051,7 +18051,7 @@ exports[`fixture × surface snapshots > control · reveal-correct-0 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -18689,7 +18689,7 @@ exports[`fixture × surface snapshots > control · reveal-correct-1 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -19327,7 +19327,7 @@ exports[`fixture × surface snapshots > control · reveal-correct-2 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -19965,7 +19965,7 @@ exports[`fixture × surface snapshots > control · reveal-correct-3 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -20603,7 +20603,7 @@ exports[`fixture × surface snapshots > control · reveal-even 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -21241,7 +21241,7 @@ exports[`fixture × surface snapshots > control · reveal-long-answer 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -21879,7 +21879,7 @@ exports[`fixture × surface snapshots > control · reveal-skew 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -22517,7 +22517,7 @@ exports[`fixture × surface snapshots > control · reveal-zero 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -23156,7 +23156,7 @@ exports[`fixture × surface snapshots > display · final-champion 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -23399,7 +23399,7 @@ exports[`fixture × surface snapshots > display · final-host-left 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -23642,7 +23642,7 @@ exports[`fixture × surface snapshots > display · final-single 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -23822,7 +23822,7 @@ exports[`fixture × surface snapshots > display · leaderboard-1 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -24001,7 +24001,7 @@ exports[`fixture × surface snapshots > display · leaderboard-3-close 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -24190,7 +24190,7 @@ exports[`fixture × surface snapshots > display · leaderboard-10 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -24379,7 +24379,7 @@ exports[`fixture × surface snapshots > display · leaderboard-tie 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -24568,7 +24568,7 @@ exports[`fixture × surface snapshots > display · lobby-cap 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -27030,7 +27030,7 @@ exports[`fixture × surface snapshots > display · lobby-empty 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -27247,7 +27247,7 @@ exports[`fixture × surface snapshots > display · lobby-fifty 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -28209,7 +28209,7 @@ exports[`fixture × surface snapshots > display · lobby-one 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -28436,7 +28436,7 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--bone);"
         >
-          19
+          12
           :
           00
           :
@@ -28874,7 +28874,7 @@ exports[`fixture × surface snapshots > display · question-double-points 1`] = 
           class="ticker tracking-widest text-[11px]"
           style="color: var(--bone);"
         >
-          19
+          12
           :
           00
           :
@@ -29139,7 +29139,7 @@ exports[`fixture × surface snapshots > display · question-long-options 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--bone);"
         >
-          19
+          12
           :
           00
           :
@@ -29404,7 +29404,7 @@ exports[`fixture × surface snapshots > display · question-long-stem 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--bone);"
         >
-          19
+          12
           :
           00
           :
@@ -29669,7 +29669,7 @@ exports[`fixture × surface snapshots > display · question-short 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--bone);"
         >
-          19
+          12
           :
           00
           :
@@ -29975,7 +29975,7 @@ exports[`fixture × surface snapshots > display · question-truefalse 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--bone);"
         >
-          19
+          12
           :
           00
           :
@@ -30177,7 +30177,7 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--bone);"
         >
-          19
+          12
           :
           00
           :
@@ -30581,7 +30581,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--bone);"
         >
-          19
+          12
           :
           00
           :
@@ -30985,7 +30985,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--bone);"
         >
-          19
+          12
           :
           00
           :
@@ -31389,7 +31389,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--bone);"
         >
-          19
+          12
           :
           00
           :
@@ -31794,7 +31794,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--bone);"
         >
-          19
+          12
           :
           00
           :
@@ -32200,7 +32200,7 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--bone);"
         >
-          19
+          12
           :
           00
           :
@@ -32604,7 +32604,7 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--bone);"
         >
-          19
+          12
           :
           00
           :
@@ -33008,7 +33008,7 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--bone);"
         >
-          19
+          12
           :
           00
           :
@@ -33412,7 +33412,7 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--bone);"
         >
-          19
+          12
           :
           00
           :
@@ -33809,7 +33809,7 @@ exports[`fixture × surface snapshots > player · final-champion 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -33984,7 +33984,7 @@ exports[`fixture × surface snapshots > player · final-host-left 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -34159,7 +34159,7 @@ exports[`fixture × surface snapshots > player · final-single 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -34334,7 +34334,7 @@ exports[`fixture × surface snapshots > player · leaderboard-1 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -34501,7 +34501,7 @@ exports[`fixture × surface snapshots > player · leaderboard-3-close 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -34668,7 +34668,7 @@ exports[`fixture × surface snapshots > player · leaderboard-10 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -34835,7 +34835,7 @@ exports[`fixture × surface snapshots > player · leaderboard-tie 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -35002,7 +35002,7 @@ exports[`fixture × surface snapshots > player · lobby-cap 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -35165,7 +35165,7 @@ exports[`fixture × surface snapshots > player · lobby-empty 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -35328,7 +35328,7 @@ exports[`fixture × surface snapshots > player · lobby-fifty 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -35491,7 +35491,7 @@ exports[`fixture × surface snapshots > player · lobby-one 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -35688,7 +35688,7 @@ exports[`fixture × surface snapshots > player · paused-over-reveal 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -35899,7 +35899,7 @@ exports[`fixture × surface snapshots > player · player-locked-correct 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -36210,7 +36210,7 @@ exports[`fixture × surface snapshots > player · player-reveal-correct 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -36421,7 +36421,7 @@ exports[`fixture × surface snapshots > player · player-reveal-incorrect 1`] = 
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -36626,7 +36626,7 @@ exports[`fixture × surface snapshots > player · player-reveal-timeout 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -36831,7 +36831,7 @@ exports[`fixture × surface snapshots > player · question-double-points 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -37126,7 +37126,7 @@ exports[`fixture × surface snapshots > player · question-long-options 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -37421,7 +37421,7 @@ exports[`fixture × surface snapshots > player · question-long-stem 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -37716,7 +37716,7 @@ exports[`fixture × surface snapshots > player · question-short 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -38052,7 +38052,7 @@ exports[`fixture × surface snapshots > player · question-truefalse 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -38272,7 +38272,7 @@ exports[`fixture × surface snapshots > player · reveal-all-wrong 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -38477,7 +38477,7 @@ exports[`fixture × surface snapshots > player · reveal-correct-0 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -38682,7 +38682,7 @@ exports[`fixture × surface snapshots > player · reveal-correct-1 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -38887,7 +38887,7 @@ exports[`fixture × surface snapshots > player · reveal-correct-2 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -39093,7 +39093,7 @@ exports[`fixture × surface snapshots > player · reveal-correct-3 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -39300,7 +39300,7 @@ exports[`fixture × surface snapshots > player · reveal-even 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -39505,7 +39505,7 @@ exports[`fixture × surface snapshots > player · reveal-long-answer 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -39710,7 +39710,7 @@ exports[`fixture × surface snapshots > player · reveal-skew 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
@@ -39915,7 +39915,7 @@ exports[`fixture × surface snapshots > player · reveal-zero 1`] = `
           class="ticker tracking-widest text-[11px]"
           style="color: var(--ink);"
         >
-          19
+          12
           :
           00
           :
