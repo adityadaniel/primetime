@@ -1,10 +1,14 @@
 import path from 'node:path';
+import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, '.'),
+    },
+  },
   test: {
-    environment: 'node',
-    include: ['lib/**/*.test.ts', 'lib/**/*.integration.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
@@ -16,10 +20,33 @@ export default defineConfig({
         lines: 80,
       },
     },
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, '.'),
-    },
+    projects: [
+      {
+        resolve: {
+          alias: {
+            '@': path.resolve(__dirname, '.'),
+          },
+        },
+        test: {
+          name: 'node',
+          environment: 'node',
+          include: ['lib/**/*.test.ts', 'lib/**/*.integration.ts'],
+        },
+      },
+      {
+        plugins: [react()],
+        resolve: {
+          alias: {
+            '@': path.resolve(__dirname, '.'),
+          },
+        },
+        test: {
+          name: 'dom',
+          environment: 'jsdom',
+          include: ['app/**/*.test.tsx', 'app/**/*.test.ts'],
+          setupFiles: ['./vitest.setup.ts'],
+        },
+      },
+    ],
   },
 });
