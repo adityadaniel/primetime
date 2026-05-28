@@ -17,18 +17,17 @@
     },
     "lobby-ambience": {
       "slug": "lobby-ambience",
-      "label": "Lobby ambience",
+      "label": "Lobby jazz",
       "surface": "host display + player lobby",
-      "file": "/sounds/lobby-ambience.mp3",
+      "file": "/sounds/lobby-jazz.mp3",
       "loop": true,
-      "durationSec": 12.96,
+      "durationSec": 259.06,
       "bpm": 70,
       "key": "Am",
-      "prompt": "Warm vintage 1970s broadcast control room ambience. Distant teletype machine ticking, faint reel-to-reel tape hiss, soft analog hum at 60Hz, subtle sub-bass swell, no melody, no vocals. Loops cleanly. Calm but expectant — pre-show studio before a live broadcast.",
-      "taskId": "b44869c9b69f5e8a5419f13b39c67c10",
-      "trackId": "746996e9-95cb-424a-9f9f-688e03665abc",
-      "model": "V5_5",
-      "generatedAt": "2026-05-27T15:08:41.649Z"
+      "prompt": "Manual lobby jazz replacement for the host display + player lobby ambience.",
+      "taskId": "manual",
+      "model": "manual",
+      "generatedAt": "2026-05-28T16:15:00.000Z"
     },
     "question-tension": {
       "slug": "question-tension",

@@ -437,6 +437,22 @@ export const fixtures: Fixture[] = [
     }),
   },
   {
+    id: 'player-reveal-high-score',
+    label: 'Player — reveal: high score',
+    category: 'player',
+    state: revealState({ correct: 0, distribution: [3, 1, 0, 0] }),
+    personal: makePersonal({
+      hasAnswered: true,
+      lastAnswer: 0 as AnswerIndex,
+      lastCorrect: true,
+      lastAwarded: 965,
+      rank: 1,
+      total: 1,
+      score: 10_316,
+    }),
+    notes: 'Exercises five-digit score fitting inside the reveal stat card.',
+  },
+  {
     id: 'player-reveal-incorrect',
     label: 'Player — reveal: incorrect',
     category: 'player',
