@@ -11,7 +11,7 @@ import type { AnswerIndex, Question, Quiz } from '@/lib/types';
 
 type Draft = Quiz & { questions: Question[] };
 
-const TIME_LIMITS = [10, 20, 30, 60, 90, 120];
+const TIME_LIMITS = [10, 20, 30, 60];
 
 function q() {
   return `q_${Math.random().toString(36).slice(2, 9)}`;
@@ -64,6 +64,8 @@ export default function QuizNew() {
   const [savedId, setSavedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -138,15 +140,22 @@ export default function QuizNew() {
     setActiveIdx((idx) => Math.max(0, Math.min(idx, draft.questions.length - 2)));
   }
 
-  function move(i: number, dir: -1 | 1) {
+  function reorder(from: number, to: number) {
+    if (from === to) return;
     setDraft((d) => {
-      const j = i + dir;
-      if (j < 0 || j >= d.questions.length) return d;
+      if (from < 0 || from >= d.questions.length) return d;
+      if (to < 0 || to >= d.questions.length) return d;
       const qs = [...d.questions];
-      [qs[i], qs[j]] = [qs[j], qs[i]];
+      const [moved] = qs.splice(from, 1);
+      qs.splice(to, 0, moved);
       return { ...d, questions: qs };
     });
-    setActiveIdx(i + dir);
+    setActiveIdx((idx) => {
+      if (idx === from) return to;
+      if (from < idx && to >= idx) return idx - 1;
+      if (from > idx && to <= idx) return idx + 1;
+      return idx;
+    });
   }
 
   function changeType(t: 'multiple' | 'truefalse') {
@@ -262,25 +271,27 @@ export default function QuizNew() {
       </header>
       <SmpteBars className="h-2 mt-4" />
 
-      <section className="px-8 pt-8 max-w-[1400px] mx-auto">
-        <div className="flex items-end justify-between gap-6 flex-wrap">
-          <div>
-            <p className="chyron mb-2" style={{ color: 'var(--vermilion)' }}>
-              CUE SHEET / WORKING DRAFT
-            </p>
-            <input
-              value={draft.title}
-              onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-              className="display-num bg-transparent outline-none border-b-2 pb-1 max-w-[900px] w-full"
-              style={{ borderColor: 'var(--ink)', fontSize: 'clamp(40px, 6vw, 84px)' }}
-            />
-          </div>
-          <div
-            className="ink-border p-4 flex items-center gap-6"
-            style={{ background: 'var(--bone)' }}
-          >
+      <section className="px-8 pt-8 max-w-[1400px] mx-auto space-y-6">
+        <div>
+          <p className="chyron mb-2" style={{ color: 'var(--vermilion)' }}>
+            CUE SHEET / WORKING DRAFT
+          </p>
+          <input
+            value={draft.title}
+            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+            className="display-num bg-transparent outline-none border-b-2 pb-1 w-full"
+            style={{ borderColor: 'var(--ink)', fontSize: 'clamp(40px, 6vw, 84px)' }}
+          />
+        </div>
+        <div
+          className="ink-border p-4 flex items-center justify-between gap-6 flex-wrap"
+          style={{ background: 'var(--bone)' }}
+        >
+          <div className="flex items-center gap-6">
             <Stat label="QUESTIONS" value={String(draft.questions.length).padStart(2, '0')} />
             <Stat label="RUNTIME" value={`${totalSeconds}s`} />
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
             <button
               type="button"
               onClick={save}
@@ -344,60 +355,85 @@ export default function QuizNew() {
             </span>
           </div>
           <ol className="divide-y-2" style={{ borderColor: 'var(--ink)' }}>
-            {draft.questions.map((qq, i) => (
-              <li key={qq.id} className="flex items-start gap-3 px-4 py-3">
-                <button
-                  type="button"
-                  className={`flex-1 text-left flex gap-3 items-start ${
-                    i === activeIdx ? '' : 'hover:opacity-90'
-                  }`}
+            {draft.questions.map((qq, i) => {
+              const isDragging = dragIdx === i;
+              const isDragOver = dragOverIdx === i && dragIdx !== null && dragIdx !== i;
+              return (
+                <li
+                  key={qq.id}
+                  className="flex items-stretch gap-2 px-2 py-2"
                   style={{
-                    background: i === activeIdx ? 'var(--ink)' : 'transparent',
-                    color: i === activeIdx ? 'var(--bone)' : 'var(--ink)',
+                    background: isDragOver ? 'var(--marigold)' : undefined,
+                    opacity: isDragging ? 0.4 : 1,
                   }}
-                  onClick={() => setActiveIdx(i)}
+                  onDragOver={(e) => {
+                    if (dragIdx === null) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (dragOverIdx !== i) setDragOverIdx(i);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (dragIdx === null) return;
+                    reorder(dragIdx, i);
+                    setDragIdx(null);
+                    setDragOverIdx(null);
+                  }}
                 >
-                  <span className="display-num text-3xl" style={{ minWidth: 36 }}>
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-editorial truncate text-[15px]">
-                      {qq.text || <span className="opacity-50 italic">untitled cue</span>}
-                    </p>
-                    <p className="ticker text-[10px] tracking-widest mt-1 opacity-70">
-                      {qq.type === 'truefalse' ? 'T/F' : 'MC'} · {qq.timeLimit}s
-                      {qq.doublePoints ? ' · 2× PTS' : ''}
-                    </p>
-                  </div>
-                </button>
-                <div className="flex flex-col gap-1">
                   <button
                     type="button"
-                    aria-label="Move up"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      move(i, -1);
+                    aria-label="Drag to reorder"
+                    title="Drag to reorder"
+                    draggable
+                    onDragStart={(e) => {
+                      setDragIdx(i);
+                      e.dataTransfer.effectAllowed = 'move';
+                      e.dataTransfer.setData('text/plain', String(i));
                     }}
-                    className="ticker text-[10px] tracking-widest px-1"
-                    disabled={i === 0}
+                    onDragEnd={() => {
+                      setDragIdx(null);
+                      setDragOverIdx(null);
+                    }}
+                    className="shrink-0 grid place-items-center w-6 ticker text-[12px] tracking-widest cursor-grab active:cursor-grabbing opacity-60 hover:opacity-100"
+                    style={{ touchAction: 'none' }}
                   >
-                    ▲
+                    ⋮⋮
                   </button>
                   <button
                     type="button"
-                    aria-label="Move down"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      move(i, 1);
+                    className={`flex-1 min-w-0 text-left flex gap-3 items-start px-3 py-2 ${
+                      i === activeIdx ? '' : 'hover:opacity-90'
+                    }`}
+                    style={{
+                      background: i === activeIdx ? 'var(--ink)' : 'transparent',
+                      color: i === activeIdx ? 'var(--bone)' : 'var(--ink)',
                     }}
-                    className="ticker text-[10px] tracking-widest px-1"
-                    disabled={i === draft.questions.length - 1}
+                    onClick={() => setActiveIdx(i)}
                   >
-                    ▼
+                    <span className="display-num text-3xl" style={{ minWidth: 36 }}>
+                      {String(i + 1).padStart(2, '0')}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="font-editorial text-[15px] leading-snug break-words"
+                        style={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {qq.text || <span className="opacity-50 italic">untitled cue</span>}
+                      </p>
+                      <p className="ticker text-[10px] tracking-widest mt-1 opacity-70">
+                        {qq.type === 'truefalse' ? 'T/F' : 'MC'} · {qq.timeLimit}s
+                        {qq.doublePoints ? ' · 2× PTS' : ''}
+                      </p>
+                    </div>
                   </button>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ol>
           <div className="p-3 flex gap-2 border-t-2" style={{ borderColor: 'var(--ink)' }}>
             <button
@@ -453,124 +489,112 @@ export default function QuizNew() {
             {active.text.length}/120
           </div>
 
-          <div className="grid grid-cols-12 gap-6 mt-8">
-            <div className="col-span-12 md:col-span-7">
-              <span className="chyron">ANSWER OPTIONS</span>
-              <div className="mt-3 space-y-3">
-                {active.options.map((opt, i) => {
-                  const ch = CHANNELS[i] ?? CHANNELS[0];
-                  const isCorrect = active.correct === i;
-                  return (
-                    <div
-                      key={i}
-                      className="flex items-center gap-3 ink-border"
-                      style={{
-                        background: isCorrect ? ch.color : 'var(--bone)',
-                        color: isCorrect ? 'var(--bone)' : 'var(--ink)',
-                      }}
-                    >
-                      <div
-                        className="grid place-items-center w-14 h-14 shrink-0 border-r-2"
-                        style={{ borderColor: 'var(--ink)', background: ch.color }}
-                      >
-                        <Shape kind={ch.key} fill="var(--bone)" stroke="var(--ink)" size={32} />
-                      </div>
-                      <input
-                        value={opt}
-                        onChange={(e) => {
-                          const opts = [...active.options];
-                          opts[i] = e.target.value;
-                          patch('options', opts);
-                        }}
-                        placeholder={`Option ${i + 1}`}
-                        readOnly={active.type === 'truefalse'}
-                        className="flex-1 bg-transparent outline-none py-3 pr-3 font-editorial text-lg"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => patch('correct', i as AnswerIndex)}
-                        className="ticker text-[11px] tracking-widest px-3 mr-3 py-1 ink-border"
-                        style={{
-                          background: isCorrect ? 'var(--ink)' : 'transparent',
-                          color: isCorrect ? 'var(--bone)' : 'var(--ink)',
-                        }}
-                      >
-                        {isCorrect ? '✓ CORRECT' : 'MARK CORRECT'}
-                      </button>
-                    </div>
-                  );
-                })}
+          <div className="mt-8 grid grid-cols-12 gap-6">
+            <div className="col-span-12 md:col-span-5">
+              <span className="chyron">TYPE</span>
+              <div className="flex mt-2 ink-border h-10">
+                {(['multiple', 'truefalse'] as const).map((t) => (
+                  <button
+                    type="button"
+                    key={t}
+                    onClick={() => changeType(t)}
+                    className="flex-1 ticker text-[11px] tracking-widest border-r-2 last:border-r-0"
+                    style={{
+                      background: active.type === t ? 'var(--ink)' : 'transparent',
+                      color: active.type === t ? 'var(--bone)' : 'var(--ink)',
+                      borderColor: 'var(--ink)',
+                    }}
+                  >
+                    {t === 'multiple' ? 'MULTIPLE CHOICE' : 'TRUE / FALSE'}
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div className="col-span-12 md:col-span-5 space-y-6">
-              <div>
-                <span className="chyron">TYPE</span>
-                <div className="flex mt-2 ink-border">
-                  {(['multiple', 'truefalse'] as const).map((t) => (
-                    <button
-                      type="button"
-                      key={t}
-                      onClick={() => changeType(t)}
-                      className="flex-1 py-2 ticker text-[11px] tracking-widest border-r-2 last:border-r-0"
-                      style={{
-                        background: active.type === t ? 'var(--ink)' : 'transparent',
-                        color: active.type === t ? 'var(--bone)' : 'var(--ink)',
-                        borderColor: 'var(--ink)',
-                      }}
-                    >
-                      {t === 'multiple' ? 'MULTIPLE CHOICE' : 'TRUE / FALSE'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <span className="chyron">TIME LIMIT</span>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {TIME_LIMITS.map((s) => (
-                    <button
-                      type="button"
-                      key={s}
-                      onClick={() => patch('timeLimit', s)}
-                      className="ink-border ticker text-[11px] tracking-widest px-3 py-2"
-                      style={{
-                        background: active.timeLimit === s ? 'var(--ink)' : 'transparent',
-                        color: active.timeLimit === s ? 'var(--bone)' : 'var(--ink)',
-                      }}
-                    >
-                      {s}s
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <span className="chyron">SCORING</span>
+            <div className="col-span-12 md:col-span-7">
+              <span className="chyron">TIME LIMIT</span>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {TIME_LIMITS.map((s) => (
+                  <button
+                    type="button"
+                    key={s}
+                    onClick={() => patch('timeLimit', s)}
+                    className="ink-border ticker text-[11px] tracking-widest px-3 h-10"
+                    style={{
+                      background: active.timeLimit === s ? 'var(--ink)' : 'transparent',
+                      color: active.timeLimit === s ? 'var(--bone)' : 'var(--ink)',
+                    }}
+                  >
+                    {s}s
+                  </button>
+                ))}
                 <button
                   type="button"
                   onClick={() => patch('doublePoints', !active.doublePoints)}
-                  className="mt-2 w-full ink-border py-3 ticker text-[12px] tracking-widest flex items-center justify-between px-3"
+                  className="ink-border ticker text-[11px] tracking-widest px-3 h-10 flex items-center gap-2"
                   style={{
                     background: active.doublePoints ? 'var(--marigold)' : 'transparent',
                     color: 'var(--ink)',
                   }}
+                  title="Toggle double points"
                 >
-                  <span>DOUBLE POINTS</span>
-                  <span>{active.doublePoints ? 'ON · 2×' : 'OFF · 1×'}</span>
+                  <span>2×</span>
+                  <span className="opacity-70">{active.doublePoints ? 'ON' : 'OFF'}</span>
                 </button>
               </div>
+            </div>
+          </div>
 
-              <div className="ink-border p-4 halftone" style={{ background: 'var(--bone)' }}>
-                <p className="chyron mb-1">SCORING FORMULA</p>
-                <p className="ticker text-[12px] leading-relaxed">
-                  pts = 1000 × (½ + ½ × t<sub>left</sub>/t<sub>limit</sub>) ×{' '}
-                  {active.doublePoints ? '2' : '1'}
-                </p>
-                <p className="ticker text-[10px] tracking-widest mt-2 opacity-60">
-                  MAX {active.doublePoints ? 2000 : 1000} · MIN {active.doublePoints ? 1000 : 500}
-                </p>
-              </div>
+          <div className="mt-8">
+            <span className="chyron">ANSWER OPTIONS</span>
+            <div
+              className={`mt-3 grid gap-3 ${
+                active.type === 'truefalse' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2'
+              }`}
+            >
+              {active.options.map((opt, i) => {
+                const ch = CHANNELS[i] ?? CHANNELS[0];
+                const isCorrect = active.correct === i;
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 ink-border"
+                    style={{
+                      background: isCorrect ? ch.color : 'var(--bone)',
+                      color: isCorrect ? 'var(--bone)' : 'var(--ink)',
+                    }}
+                  >
+                    <div
+                      className="grid place-items-center w-14 h-14 shrink-0 border-r-2"
+                      style={{ borderColor: 'var(--ink)', background: ch.color }}
+                    >
+                      <Shape kind={ch.key} fill="var(--bone)" stroke="var(--ink)" size={32} />
+                    </div>
+                    <input
+                      value={opt}
+                      onChange={(e) => {
+                        const opts = [...active.options];
+                        opts[i] = e.target.value;
+                        patch('options', opts);
+                      }}
+                      placeholder={`Option ${i + 1}`}
+                      readOnly={active.type === 'truefalse'}
+                      className="flex-1 min-w-0 bg-transparent outline-none py-3 pr-3 font-editorial text-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => patch('correct', i as AnswerIndex)}
+                      className="ticker text-[11px] tracking-widest px-3 mr-3 py-1 ink-border shrink-0"
+                      style={{
+                        background: isCorrect ? 'var(--ink)' : 'transparent',
+                        color: isCorrect ? 'var(--bone)' : 'var(--ink)',
+                      }}
+                    >
+                      {isCorrect ? '✓ CORRECT' : 'MARK CORRECT'}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </article>
