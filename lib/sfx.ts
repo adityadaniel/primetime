@@ -11,10 +11,13 @@ let masterGain: GainNode | null = null;
 let muted = false;
 let masterVolume = DEFAULT_VOLUME;
 
-const loops: { [k: string]: { stop: () => void } | null } = {
+type LoopHandle = { stop: (fadeMs?: number) => void };
+
+const loops: { [k: string]: LoopHandle | null } = {
   lobby: null,
   question: null,
   final: null,
+  urgent: null,
 };
 
 // Per-slug AudioBuffer cache. Stores the in-flight promise so concurrent calls
@@ -189,7 +192,10 @@ function playBufferOnce(c: AudioContext, master: GainNode, buf: AudioBuffer): vo
  * Start a looped MP3 sample. Returns a stop handle, or null if the sample is
  * unavailable so the caller can fall back to the oscillator loop.
  */
-function tryStartLoop(slug: string): { stop: () => void } | null {
+function tryStartLoop(
+  slug: string,
+  opts: { peak?: number; fadeInMs?: number } = {},
+): LoopHandle | null {
   const asset = getAsset(slug);
   if (!asset?.loop) return null;
   if (unavailable.has(slug)) return null;
@@ -197,10 +203,19 @@ function tryStartLoop(slug: string): { stop: () => void } | null {
   if (!env) return null;
   const { ctx: c, master } = env;
 
+  const peak = opts.peak ?? 1;
+  const fadeInMs = Math.max(0, opts.fadeInMs ?? 0);
+
   // Per-loop gain so we can fade out without touching masterGain (which carries
   // mute/volume).
   const loopGain = c.createGain();
-  loopGain.gain.value = 1;
+  const startT = c.currentTime;
+  if (fadeInMs > 0) {
+    loopGain.gain.setValueAtTime(0, startT);
+    loopGain.gain.linearRampToValueAtTime(peak, startT + fadeInMs / 1000);
+  } else {
+    loopGain.gain.value = peak;
+  }
   loopGain.connect(master);
 
   let src: AudioBufferSourceNode | null = null;
@@ -223,14 +238,15 @@ function tryStartLoop(slug: string): { stop: () => void } | null {
   loadBuffer(slug, asset).then(startWithBuffer);
 
   return {
-    stop: () => {
+    stop: (fadeMs = 80) => {
       if (stopped) return;
       stopped = true;
       const t = c.currentTime;
+      const fade = Math.max(0, fadeMs) / 1000;
       try {
         loopGain.gain.cancelScheduledValues(t);
         loopGain.gain.setValueAtTime(loopGain.gain.value, t);
-        loopGain.gain.linearRampToValueAtTime(0, t + 0.08);
+        loopGain.gain.linearRampToValueAtTime(0, t + fade);
       } catch {}
       const cleanup = () => {
         try {
@@ -242,7 +258,7 @@ function tryStartLoop(slug: string): { stop: () => void } | null {
       };
       if (src) {
         try {
-          src.stop(t + 0.1);
+          src.stop(t + fade + 0.02);
           src.onended = cleanup;
         } catch {
           cleanup();
@@ -690,8 +706,8 @@ export function startQuestionTension(): void {
   loops.question = tryStartLoop('question-tension') ?? fallbackStartQuestion();
 }
 
-export function stopQuestionTension(): void {
-  loops.question?.stop();
+export function stopQuestionTension(fadeMs?: number): void {
+  loops.question?.stop(fadeMs);
   loops.question = null;
 }
 
@@ -706,8 +722,58 @@ export function stopFinalLoop(): void {
   loops.final = null;
 }
 
+// ---------------------------------------------------------------------------
+// Urgent tick loop — last 3 seconds of the question countdown.
+//
+// The Suno-generated `tick-urgent.mp3` is a ~12s continuous ticking loop, not
+// a 60ms one-shot. We loop it under a higher-than-bed gain so the ticking
+// itself carries the urgency, replacing the old per-second `sfxTick(true)`
+// which stacked overlapping copies of the long buffer.
+// ---------------------------------------------------------------------------
+
+const URGENT_PEAK = 1.6;
+
+function startUrgentFallbackInterval(): LoopHandle {
+  fallbackTick(true);
+  const id =
+    typeof window !== 'undefined'
+      ? window.setInterval(() => fallbackTick(true), 1000)
+      : (setInterval(() => fallbackTick(true), 1000) as unknown as number);
+  return {
+    stop: () => {
+      if (typeof window !== 'undefined') window.clearInterval(id);
+      else clearInterval(id);
+    },
+  };
+}
+
+export function startUrgentTickLoop(durMs = 400): void {
+  if (muted) return;
+  if (loops.urgent) return;
+  loops.urgent =
+    tryStartLoop('tick-urgent', { peak: URGENT_PEAK, fadeInMs: durMs }) ??
+    startUrgentFallbackInterval();
+}
+
+export function stopUrgentTickLoop(fadeMs?: number): void {
+  loops.urgent?.stop(fadeMs);
+  loops.urgent = null;
+}
+
+/**
+ * Crossfade the question-tension bed into the tick-urgent loop over the given
+ * duration. Idempotent — callers should arm a per-question flag and only fire
+ * this once when the countdown first crosses the urgency threshold.
+ */
+export function crossfadeToUrgent(durMs = 400): void {
+  if (muted) return;
+  stopQuestionTension(durMs);
+  startUrgentTickLoop(durMs);
+}
+
 export function stopAllLoops(): void {
   stopLobbyAmbience();
   stopQuestionTension();
   stopFinalLoop();
+  stopUrgentTickLoop();
 }

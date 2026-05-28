@@ -29,6 +29,7 @@ export default function QuizClient({ pin }: { pin: string }) {
   const prevPhaseRef = useRef<string>('');
   const prevAnsweredRef = useRef(false);
   const lastTickSecRef = useRef(-1);
+  const urgentArmedRef = useRef(false);
 
   useEffect(() => {
     if (!state) return;
@@ -55,11 +56,17 @@ export default function QuizClient({ pin }: { pin: string }) {
 
   useEffect(() => {
     if (state?.phase !== 'question' || !state?.endsAt) return;
+    urgentArmedRef.current = false;
+    lastTickSecRef.current = -1;
     const id = window.setInterval(() => {
       const msLeft = Math.max(0, (state.endsAt ?? 0) - Date.now());
       const sec = Math.ceil(msLeft / 1000);
-      if (sec !== lastTickSecRef.current && sec > 0 && sec <= 3) {
-        sfx.sfxTick(true);
+      if (sec !== lastTickSecRef.current && sec > 0 && sec <= 3 && !urgentArmedRef.current) {
+        urgentArmedRef.current = true;
+        sfx.crossfadeToUrgent();
+      }
+      if (sec === 0 && lastTickSecRef.current !== 0) {
+        sfx.stopUrgentTickLoop();
       }
       lastTickSecRef.current = sec;
     }, 100);

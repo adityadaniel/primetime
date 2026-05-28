@@ -104,7 +104,7 @@
       "label": "Countdown tick (last 5 seconds)",
       "surface": "host display + player — last 5 ticks of countdown",
       "file": "/sounds/tick-urgent.mp3",
-      "loop": false,
+      "loop": true,
       "durationSec": 11.96,
       "prompt": "A sharper, harder analog studio clock tick. Mechanical, slightly metallic, close-mic, no reverb. About 80 milliseconds. Tense, last-five-seconds-of-countdown energy. 1970s broadcast control-room style.",
       "taskId": "00f2b54d0e0715c593bbabb9e36cfd5f",

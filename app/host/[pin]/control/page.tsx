@@ -16,6 +16,7 @@ export default function ControlPanel({ params }: { params: Promise<{ pin: string
 
   const prevPhaseRef = useRef<string>('');
   const lastTickSecRef = useRef(-1);
+  const urgentArmedRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -74,11 +75,17 @@ export default function ControlPanel({ params }: { params: Promise<{ pin: string
 
   useEffect(() => {
     if (state?.phase !== 'question' || !state?.endsAt) return;
+    urgentArmedRef.current = false;
+    lastTickSecRef.current = -1;
     const id = window.setInterval(() => {
       const msLeft = Math.max(0, (state.endsAt ?? 0) - Date.now());
       const sec = Math.ceil(msLeft / 1000);
-      if (sec !== lastTickSecRef.current && sec > 0 && sec <= 3) {
-        sfx.sfxTick(true);
+      if (sec !== lastTickSecRef.current && sec > 0 && sec <= 3 && !urgentArmedRef.current) {
+        urgentArmedRef.current = true;
+        sfx.crossfadeToUrgent();
+      }
+      if (sec === 0 && lastTickSecRef.current !== 0) {
+        sfx.stopUrgentTickLoop();
       }
       lastTickSecRef.current = sec;
     }, 100);
