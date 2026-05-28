@@ -549,7 +549,9 @@ export default function QuizNew() {
             <span className="chyron">ANSWER OPTIONS</span>
             <div
               className={`mt-3 grid gap-3 ${
-                active.type === 'truefalse' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2'
+                active.type === 'truefalse'
+                  ? 'grid-cols-1 md:grid-cols-2'
+                  : 'grid-cols-1 md:grid-cols-2'
               }`}
             >
               {active.options.map((opt, i) => {
