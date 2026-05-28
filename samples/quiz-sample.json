@@ -14,7 +14,7 @@
         "A web-native MP4"
       ],
       "correct": 1,
-      "timeLimit": 20,
+      "timeLimit": 10,
       "doublePoints": false
     },
     {
@@ -30,7 +30,7 @@
       "text": "Which channel is the diamond, in this network's signal kit?",
       "options": ["CH.01", "CH.02", "CH.03", "CH.04"],
       "correct": 1,
-      "timeLimit": 20,
+      "timeLimit": 10,
       "doublePoints": true
     }
   ]

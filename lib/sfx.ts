@@ -27,9 +27,21 @@ const bufferCache = new Map<string, Promise<AudioBuffer | null>>();
 // the oscillator path.
 const unavailable = new Set<string>();
 
+function preloadLoop(slug: string): void {
+  const asset = getAsset(slug);
+  if (!asset?.loop || unavailable.has(slug)) return;
+  void loadBuffer(slug, asset);
+}
+
 function readPersisted() {
   if (typeof window === 'undefined') return;
   try {
+    if (
+      localStorage.getItem('bc:sfx:muted-host') !== null &&
+      localStorage.getItem(MUTE_KEY) === '1'
+    ) {
+      localStorage.removeItem(MUTE_KEY);
+    }
     const m = localStorage.getItem(MUTE_KEY);
     if (m === '1') muted = true;
     else if (m === '0') muted = false;
@@ -72,11 +84,14 @@ export function isUnlocked(): boolean {
   return !!ctx && ctx.state === 'running';
 }
 
-export function setMuted(m: boolean): void {
+export function setMuted(m: boolean, opts: { persist?: boolean } = {}): void {
+  const persist = opts.persist ?? true;
   muted = m;
-  try {
-    localStorage.setItem(MUTE_KEY, m ? '1' : '0');
-  } catch {}
+  if (persist) {
+    try {
+      localStorage.setItem(MUTE_KEY, m ? '1' : '0');
+    } catch {}
+  }
   if (masterGain && ctx) {
     masterGain.gain.cancelScheduledValues(ctx.currentTime);
     masterGain.gain.setTargetAtTime(m ? 0 : masterVolume, ctx.currentTime, 0.01);
@@ -702,8 +717,9 @@ export function stopLobbyAmbience(): void {
 
 export function startQuestionTension(): void {
   if (muted) return;
+  preloadLoop('tick-urgent');
   if (loops.question) return;
-  loops.question = tryStartLoop('question-tension') ?? fallbackStartQuestion();
+  loops.question = tryStartLoop('question-tension-long') ?? fallbackStartQuestion();
 }
 
 export function stopQuestionTension(fadeMs?: number): void {
@@ -727,8 +743,7 @@ export function stopFinalLoop(): void {
 //
 // The Suno-generated `tick-urgent.mp3` is a ~12s continuous ticking loop, not
 // a 60ms one-shot. We loop it under a higher-than-bed gain so the ticking
-// itself carries the urgency, replacing the old per-second `sfxTick(true)`
-// which stacked overlapping copies of the long buffer.
+// itself carries the urgency without stacking overlapping one-shot ticks.
 // ---------------------------------------------------------------------------
 
 const URGENT_PEAK = 1.6;

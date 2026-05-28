@@ -12,6 +12,7 @@ import type { AnswerIndex, Question, Quiz } from '@/lib/types';
 type Draft = Quiz & { questions: Question[] };
 
 const TIME_LIMITS = [10, 20, 30, 60];
+const DEFAULT_TIME_LIMIT = 10;
 
 function q() {
   return `q_${Math.random().toString(36).slice(2, 9)}`;
@@ -31,7 +32,7 @@ const STARTER: Draft = {
         'A web-native MP4',
       ],
       correct: 1,
-      timeLimit: 20,
+      timeLimit: DEFAULT_TIME_LIMIT,
       doublePoints: false,
     },
     {
@@ -40,7 +41,7 @@ const STARTER: Draft = {
       text: 'The first commercial color TV broadcast was in 1965.',
       options: ['TRUE', 'FALSE'],
       correct: 1,
-      timeLimit: 10,
+      timeLimit: DEFAULT_TIME_LIMIT,
       doublePoints: false,
     },
     {
@@ -49,7 +50,7 @@ const STARTER: Draft = {
       text: "Which channel is the diamond, in this network's signal kit?",
       options: ['CH.01', 'CH.02', 'CH.03', 'CH.04'],
       correct: 1,
-      timeLimit: 20,
+      timeLimit: DEFAULT_TIME_LIMIT,
       doublePoints: true,
     },
   ],
@@ -123,7 +124,7 @@ export default function QuizNew() {
         text: '',
         options: type === 'truefalse' ? ['TRUE', 'FALSE'] : ['', '', '', ''],
         correct: 0,
-        timeLimit: 20,
+        timeLimit: DEFAULT_TIME_LIMIT,
         doublePoints: false,
       };
       return { ...d, questions: [...d.questions, newQ] };

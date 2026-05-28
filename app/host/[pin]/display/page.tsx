@@ -69,9 +69,11 @@ export default function DisplayPage({ params }: { params: Promise<{ pin: string 
     const id = window.setInterval(() => {
       const msLeft = Math.max(0, (state.endsAt ?? 0) - Date.now());
       const sec = Math.ceil(msLeft / 1000);
-      if (sec !== lastTickSecRef.current && sec > 0 && sec <= 3 && !urgentArmedRef.current) {
-        urgentArmedRef.current = true;
-        sfx.crossfadeToUrgent();
+      if (sec !== lastTickSecRef.current && sec > 0 && sec <= 3) {
+        if (!urgentArmedRef.current) {
+          urgentArmedRef.current = true;
+          sfx.crossfadeToUrgent();
+        }
       }
       if (sec === 0 && lastTickSecRef.current !== 0) {
         sfx.sfxTimeUp();
@@ -88,13 +90,21 @@ export default function DisplayPage({ params }: { params: Promise<{ pin: string 
     };
   }, [sfx]);
 
+  async function enableSound() {
+    await sfx.unlockAudio();
+    setNeedsUnlock(false);
+    if (state?.phase === 'lobby') sfx.startLobbyAmbience();
+    if (state?.phase === 'question') sfx.startQuestionTension();
+    if (state?.phase === 'final') sfx.startFinalLoop();
+  }
+
   return (
     <>
       <DisplayView state={state} pin={pin} />
       {needsUnlock && (
         <button
           type="button"
-          onClick={() => sfx.unlockAudio().then(() => setNeedsUnlock(false))}
+          onClick={enableSound}
           className="fixed inset-0 z-50 grid place-items-center"
           style={{ background: 'rgba(15,15,15,0.55)', color: 'var(--bone)' }}
           aria-label="Enable sound"

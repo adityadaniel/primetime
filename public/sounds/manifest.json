@@ -45,6 +45,20 @@
       "model": "V5_5",
       "generatedAt": "2026-05-27T15:09:12.915Z"
     },
+    "question-tension-long": {
+      "slug": "question-tension-long",
+      "label": "Question tension bed (long)",
+      "surface": "host display + player + control during question phase",
+      "file": "/sounds/question-tension-long.mp3",
+      "loop": true,
+      "durationSec": 36.75,
+      "bpm": 120,
+      "key": "Cm",
+      "prompt": "Tense pulsing broadcast sub-bass loop. Slow heartbeat-like analog synth pulse on every beat, faint metallic ride cymbal accent, distant ticking metronome. Urgent but restrained — like a 1970s game show countdown bed. No melody, no vocals, no drums. Loops cleanly.",
+      "taskId": "manual",
+      "model": "manual",
+      "generatedAt": "2026-05-28T15:20:00.000Z"
+    },
     "final-bed": {
       "slug": "final-bed",
       "label": "Final / podium bed",

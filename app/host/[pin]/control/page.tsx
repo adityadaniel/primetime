@@ -22,9 +22,10 @@ export default function ControlPanel({ params }: { params: Promise<{ pin: string
     if (typeof window === 'undefined') return;
     if (localStorage.getItem('bc:sfx:muted-host') === null) {
       localStorage.setItem('bc:sfx:muted-host', '1');
-      sfx.setMuted(true);
     }
-    setMutedState(sfx.isMuted());
+    const hostMuted = localStorage.getItem('bc:sfx:muted-host') !== '0';
+    sfx.setMuted(hostMuted, { persist: false });
+    setMutedState(hostMuted);
   }, [sfx]);
 
   useEffect(() => {
@@ -80,9 +81,11 @@ export default function ControlPanel({ params }: { params: Promise<{ pin: string
     const id = window.setInterval(() => {
       const msLeft = Math.max(0, (state.endsAt ?? 0) - Date.now());
       const sec = Math.ceil(msLeft / 1000);
-      if (sec !== lastTickSecRef.current && sec > 0 && sec <= 3 && !urgentArmedRef.current) {
-        urgentArmedRef.current = true;
-        sfx.crossfadeToUrgent();
+      if (sec !== lastTickSecRef.current && sec > 0 && sec <= 3) {
+        if (!urgentArmedRef.current) {
+          urgentArmedRef.current = true;
+          sfx.crossfadeToUrgent();
+        }
       }
       if (sec === 0 && lastTickSecRef.current !== 0) {
         sfx.stopUrgentTickLoop();
@@ -98,13 +101,19 @@ export default function ControlPanel({ params }: { params: Promise<{ pin: string
     };
   }, [sfx]);
 
-  function toggleMute() {
+  async function toggleMute() {
     const next = !sfx.isMuted();
-    sfx.setMuted(next);
+    await sfx.unlockAudio();
+    sfx.setMuted(next, { persist: false });
     try {
       localStorage.setItem('bc:sfx:muted-host', next ? '1' : '0');
     } catch {}
     setMutedState(next);
+    if (!next) {
+      if (state?.phase === 'lobby') sfx.startLobbyAmbience();
+      if (state?.phase === 'question') sfx.startQuestionTension();
+      if (state?.phase === 'final') sfx.startFinalLoop();
+    }
   }
 
   function startGame() {
