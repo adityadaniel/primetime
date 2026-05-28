@@ -1,5 +1,7 @@
 'use client';
 
+import { getAsset, type SoundAsset } from './sfx-assets';
+
 const MUTE_KEY = 'bc:sfx:muted';
 const VOL_KEY = 'bc:sfx:vol';
 const DEFAULT_VOLUME = 0.6;
@@ -14,6 +16,13 @@ const loops: { [k: string]: { stop: () => void } | null } = {
   question: null,
   final: null,
 };
+
+// Per-slug AudioBuffer cache. Stores the in-flight promise so concurrent calls
+// share one fetch/decode pass.
+const bufferCache = new Map<string, Promise<AudioBuffer | null>>();
+// Slugs whose fetch/decode failed once — we won't retry, just fall through to
+// the oscillator path.
+const unavailable = new Set<string>();
 
 function readPersisted() {
   if (typeof window === 'undefined') return;
@@ -90,6 +99,165 @@ export function setMasterVolume(v: number): void {
 export function getMasterVolume(): number {
   return masterVolume;
 }
+
+// ---------------------------------------------------------------------------
+// MP3 sample playback
+// ---------------------------------------------------------------------------
+
+function loadBuffer(slug: string, asset: SoundAsset): Promise<AudioBuffer | null> {
+  const cached = bufferCache.get(slug);
+  if (cached) return cached;
+  const env = ensureCtx();
+  if (!env) return Promise.resolve(null);
+  const { ctx: c } = env;
+  const promise = (async () => {
+    try {
+      const res = await fetch(asset.url);
+      if (!res.ok) throw new Error(`fetch ${asset.url} -> ${res.status}`);
+      const arr = await res.arrayBuffer();
+      // Use callback signature for Safari compatibility (older WebKit).
+      const buf = await new Promise<AudioBuffer>((resolve, reject) => {
+        try {
+          const maybe = c.decodeAudioData(arr, resolve, reject);
+          if (maybe && typeof (maybe as Promise<AudioBuffer>).then === 'function') {
+            (maybe as Promise<AudioBuffer>).then(resolve, reject);
+          }
+        } catch (err) {
+          reject(err);
+        }
+      });
+      return buf;
+    } catch {
+      unavailable.add(slug);
+      return null;
+    }
+  })();
+  bufferCache.set(slug, promise);
+  return promise;
+}
+
+/**
+ * Try to play an MP3 sample for this slug. Returns true if the sample is being
+ * played (or is queued to play after decode), false if no sample is available
+ * and the caller should fall back to the oscillator path.
+ *
+ * If the buffer is already decoded, playback starts synchronously. If not, the
+ * sample plays as soon as decoding finishes — for one-shot UI cues this means
+ * the very first trigger may have a small latency, subsequent triggers are
+ * instant.
+ */
+function tryPlaySample(slug: string): boolean {
+  if (muted) return true; // pretend we played; nothing to do
+  const asset = getAsset(slug);
+  if (!asset || asset.loop) return false;
+  if (unavailable.has(slug)) return false;
+  const env = ensureCtx();
+  if (!env) return false;
+  const { ctx: c, master } = env;
+
+  const cached = bufferCache.get(slug);
+  if (cached === undefined) {
+    // Kick off decode; play when it finishes.
+    loadBuffer(slug, asset).then((buf) => {
+      if (!buf || muted) return;
+      playBufferOnce(c, master, buf);
+    });
+    return true;
+  }
+
+  // We have a pending or resolved entry; play when ready.
+  cached.then((buf) => {
+    if (!buf || muted) return;
+    playBufferOnce(c, master, buf);
+  });
+  return true;
+}
+
+function playBufferOnce(c: AudioContext, master: GainNode, buf: AudioBuffer): void {
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  src.connect(master);
+  src.start();
+  src.onended = () => {
+    try {
+      src.disconnect();
+    } catch {}
+  };
+}
+
+/**
+ * Start a looped MP3 sample. Returns a stop handle, or null if the sample is
+ * unavailable so the caller can fall back to the oscillator loop.
+ */
+function tryStartLoop(slug: string): { stop: () => void } | null {
+  const asset = getAsset(slug);
+  if (!asset?.loop) return null;
+  if (unavailable.has(slug)) return null;
+  const env = ensureCtx();
+  if (!env) return null;
+  const { ctx: c, master } = env;
+
+  // Per-loop gain so we can fade out without touching masterGain (which carries
+  // mute/volume).
+  const loopGain = c.createGain();
+  loopGain.gain.value = 1;
+  loopGain.connect(master);
+
+  let src: AudioBufferSourceNode | null = null;
+  let stopped = false;
+
+  const startWithBuffer = (buf: AudioBuffer | null) => {
+    if (!buf || stopped) {
+      try {
+        loopGain.disconnect();
+      } catch {}
+      return;
+    }
+    src = c.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    src.connect(loopGain);
+    src.start();
+  };
+
+  loadBuffer(slug, asset).then(startWithBuffer);
+
+  return {
+    stop: () => {
+      if (stopped) return;
+      stopped = true;
+      const t = c.currentTime;
+      try {
+        loopGain.gain.cancelScheduledValues(t);
+        loopGain.gain.setValueAtTime(loopGain.gain.value, t);
+        loopGain.gain.linearRampToValueAtTime(0, t + 0.08);
+      } catch {}
+      const cleanup = () => {
+        try {
+          src?.disconnect();
+        } catch {}
+        try {
+          loopGain.disconnect();
+        } catch {}
+      };
+      if (src) {
+        try {
+          src.stop(t + 0.1);
+          src.onended = cleanup;
+        } catch {
+          cleanup();
+        }
+      } else {
+        // Source hadn't started yet; just clean up the gain node.
+        cleanup();
+      }
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Oscillator fallback primitives (unchanged)
+// ---------------------------------------------------------------------------
 
 type EnvOpts = {
   attack?: number;
@@ -180,18 +348,64 @@ function noiseBurst(dur: number, peak: number, lpFreq: number) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Public one-shot API — try MP3 first, fall back to oscillator.
+// ---------------------------------------------------------------------------
+
 export function sfxClick(): void {
+  // No MP3 sample for click — straight to oscillator.
   blip(4000, 0.03, 'sine', { peak: 0.25, attack: 0.002, release: 0.028 });
 }
 
 export function sfxLockIn(): void {
+  if (tryPlaySample('lock-in')) return;
+  fallbackLockIn();
+}
+
+export function sfxTick(urgent = false): void {
+  if (tryPlaySample(urgent ? 'tick-urgent' : 'tick')) return;
+  fallbackTick(urgent);
+}
+
+export function sfxCorrect(): void {
+  if (tryPlaySample('correct')) return;
+  fallbackCorrect();
+}
+
+export function sfxWrong(): void {
+  if (tryPlaySample('wrong')) return;
+  fallbackWrong();
+}
+
+export function sfxTimeUp(): void {
+  if (tryPlaySample('time-up')) return;
+  fallbackTimeUp();
+}
+
+export function sfxLeaderboardSweep(): void {
+  if (tryPlaySample('leaderboard-sweep')) return;
+  fallbackLeaderboardSweep();
+}
+
+export function sfxFinalFanfare(): void {
+  // The reveal-flash sample is a camera-shutter snap that doubles as the
+  // fanfare cue here; the final-bed loop carries the held pad underneath.
+  if (tryPlaySample('reveal-flash')) return;
+  fallbackFinalFanfare();
+}
+
+// ---------------------------------------------------------------------------
+// Oscillator fallbacks for one-shots (extracted from prior public functions).
+// ---------------------------------------------------------------------------
+
+function fallbackLockIn(): void {
   const env = ensureCtx();
   if (!env || muted) return;
   blip(880, 0.06, 'square', { peak: 0.3, attack: 0.003, release: 0.057 }, undefined, 0);
   blip(1320, 0.06, 'square', { peak: 0.3, attack: 0.003, release: 0.057 }, undefined, 0.06);
 }
 
-export function sfxTick(urgent = false): void {
+function fallbackTick(urgent: boolean): void {
   if (urgent) {
     blip(
       1320,
@@ -205,7 +419,7 @@ export function sfxTick(urgent = false): void {
   }
 }
 
-export function sfxCorrect(): void {
+function fallbackCorrect(): void {
   const notes = [523, 659, 784];
   notes.forEach((f, i) => {
     blip(
@@ -219,7 +433,7 @@ export function sfxCorrect(): void {
   });
 }
 
-export function sfxWrong(): void {
+function fallbackWrong(): void {
   noiseBurst(0.05, 0.25, 800);
   blip(
     220,
@@ -239,7 +453,7 @@ export function sfxWrong(): void {
   );
 }
 
-export function sfxTimeUp(): void {
+function fallbackTimeUp(): void {
   const pattern = [0, 0.1, 0.2, 0.3];
   for (const t of pattern) {
     blip(220, 0.06, 'square', { peak: 0.35, attack: 0.001, release: 0.058 }, undefined, t);
@@ -247,7 +461,7 @@ export function sfxTimeUp(): void {
   }
 }
 
-export function sfxLeaderboardSweep(): void {
+function fallbackLeaderboardSweep(): void {
   const env = ensureCtx();
   if (!env || muted) return;
   const { ctx: c, master } = env;
@@ -273,7 +487,7 @@ export function sfxLeaderboardSweep(): void {
   };
 }
 
-export function sfxFinalFanfare(): void {
+function fallbackFinalFanfare(): void {
   const chords = [
     [261.63, 329.63, 392.0], // C major
     [349.23, 440.0, 523.25], // F major
@@ -295,6 +509,10 @@ export function sfxFinalFanfare(): void {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Loop helpers (oscillator) — used as fallback when no MP3 is present.
+// ---------------------------------------------------------------------------
+
 function makeLoopGain(peak: number) {
   const env = ensureCtx();
   if (!env) return null;
@@ -306,11 +524,9 @@ function makeLoopGain(peak: number) {
   return { ctx: c, gain: g };
 }
 
-export function startLobbyAmbience(): void {
-  if (muted) return;
-  if (loops.lobby) return;
+function fallbackStartLobby(): { stop: () => void } | null {
   const made = makeLoopGain(0.06);
-  if (!made) return;
+  if (!made) return null;
   const { ctx: c, gain } = made;
   const o1 = c.createOscillator();
   o1.type = 'sine';
@@ -336,7 +552,7 @@ export function startLobbyAmbience(): void {
   o1.start(now);
   o2.start(now);
   lfo.start(now);
-  loops.lobby = {
+  return {
     stop: () => {
       const t = c.currentTime;
       gain.gain.cancelScheduledValues(t);
@@ -360,16 +576,9 @@ export function startLobbyAmbience(): void {
   };
 }
 
-export function stopLobbyAmbience(): void {
-  loops.lobby?.stop();
-  loops.lobby = null;
-}
-
-export function startQuestionTension(): void {
-  if (muted) return;
-  if (loops.question) return;
+function fallbackStartQuestion(): { stop: () => void } | null {
   const made = makeLoopGain(0.12);
-  if (!made) return;
+  if (!made) return null;
   const { ctx: c, gain } = made;
   const o = c.createOscillator();
   o.type = 'sine';
@@ -390,7 +599,7 @@ export function startQuestionTension(): void {
     pulse.gain.linearRampToValueAtTime(1, t + 0.01);
     pulse.gain.linearRampToValueAtTime(0, t + onTime);
   }
-  loops.question = {
+  return {
     stop: () => {
       const t = c.currentTime;
       pulse.gain.cancelScheduledValues(t);
@@ -411,16 +620,9 @@ export function startQuestionTension(): void {
   };
 }
 
-export function stopQuestionTension(): void {
-  loops.question?.stop();
-  loops.question = null;
-}
-
-export function startFinalLoop(): void {
-  if (muted) return;
-  if (loops.final) return;
+function fallbackStartFinal(): { stop: () => void } | null {
   const made = makeLoopGain(0.06);
-  if (!made) return;
+  if (!made) return null;
   const { ctx: c, gain } = made;
   const freqs = [130.81, 164.81, 196.0, 261.63]; // C3 E3 G3 C4
   const oscs = freqs.map((f) => {
@@ -442,7 +644,7 @@ export function startFinalLoop(): void {
     o.start(now);
   });
   lfo.start(now);
-  loops.final = {
+  return {
     stop: () => {
       const t = c.currentTime;
       gain.gain.cancelScheduledValues(t);
@@ -465,6 +667,38 @@ export function startFinalLoop(): void {
       oscs[0].onended = cleanup;
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Public loop API — try MP3 loop first, fall back to oscillator loop.
+// ---------------------------------------------------------------------------
+
+export function startLobbyAmbience(): void {
+  if (muted) return;
+  if (loops.lobby) return;
+  loops.lobby = tryStartLoop('lobby-ambience') ?? fallbackStartLobby();
+}
+
+export function stopLobbyAmbience(): void {
+  loops.lobby?.stop();
+  loops.lobby = null;
+}
+
+export function startQuestionTension(): void {
+  if (muted) return;
+  if (loops.question) return;
+  loops.question = tryStartLoop('question-tension') ?? fallbackStartQuestion();
+}
+
+export function stopQuestionTension(): void {
+  loops.question?.stop();
+  loops.question = null;
+}
+
+export function startFinalLoop(): void {
+  if (muted) return;
+  if (loops.final) return;
+  loops.final = tryStartLoop('final-bed') ?? fallbackStartFinal();
 }
 
 export function stopFinalLoop(): void {
