@@ -125,9 +125,7 @@ export function LobbyDisplay({ state, pin }: { state: PublicGameState; pin: stri
               <div style={{ width: 220, height: 220 }} aria-hidden />
             )}
           </div>
-          <p className="ticker text-[12px] tracking-widest opacity-70 text-center">
-            SCAN TO JOIN
-          </p>
+          <p className="ticker text-[12px] tracking-widest opacity-70 text-center">SCAN TO JOIN</p>
         </div>
       </div>
 

@@ -306,9 +306,7 @@ export function PlayerReveal({
           className="display-num mt-1"
           style={{
             fontSize:
-              banner.label.length >= 9
-                ? 'clamp(44px, 10vw, 78px)'
-                : 'clamp(64px, 16vw, 130px)',
+              banner.label.length >= 9 ? 'clamp(44px, 10vw, 78px)' : 'clamp(64px, 16vw, 130px)',
             letterSpacing: banner.label.length >= 9 ? '-0.02em' : undefined,
           }}
         >
