@@ -219,7 +219,7 @@ export default function WordCloudControl({ params }: { params: Promise<{ pin: st
             <button
               type="button"
               onClick={copyPin}
-              className="col-span-12 md:col-span-7 ink-border text-left p-4 transition-colors hover:bg-[var(--ink)] hover:text-[var(--bone)] focus:bg-[var(--ink)] focus:text-[var(--bone)] outline-none"
+              className="col-span-12 ink-border text-left p-4 transition-colors hover:bg-[var(--ink)] hover:text-[var(--bone)] focus:bg-[var(--ink)] focus:text-[var(--bone)] outline-none"
               style={{ background: 'var(--bone)', minHeight: 56 }}
               aria-label="Copy PIN to clipboard"
             >
@@ -232,12 +232,12 @@ export default function WordCloudControl({ params }: { params: Promise<{ pin: st
               </p>
             </button>
             <PanelStat
-              cols="col-span-6 md:col-span-3"
+              cols="col-span-6"
               label="PLAYERS"
               value={String(joinerCount).padStart(2, '0')}
             />
             <PanelStat
-              cols="col-span-6 md:col-span-2"
+              cols="col-span-6"
               label="WORDS"
               value={String(state?.words.length ?? 0).padStart(2, '0')}
             />
