@@ -1,0 +1,138 @@
+{
+  "$schema": "https://inputoutput.id/quiz-v1.json",
+  "version": 1,
+  "title": "Academy Trivia — Apple, Mentors & Inside Jokes",
+  "exportedAt": "2026-05-28T09:52:00.000Z",
+  "questions": [
+    {
+      "type": "multiple",
+      "text": "What specific problem-solving framework does Apple use to structure the entire 9-to-10 month curriculum at the academy?",
+      "options": [
+        "Agile Development",
+        "Challenge-Based Learning (CBL)",
+        "Scrum Master Method",
+        "Waterfall Framework"
+      ],
+      "correct": 1,
+      "timeLimit": 20,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "What is Ackyl's full name?",
+      "options": [
+        "Ackyl Mohamad Dimas",
+        "Mohamad Dimas Ackyl",
+        "Mohamad Ackyl Gaddafi",
+        "Dimas Ackyl Mohamad"
+      ],
+      "correct": 3,
+      "timeLimit": 20,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Which programming language did Apple design Swift to replace?",
+      "options": [
+        "Ruby",
+        "Python",
+        "Objective-C",
+        "C++"
+      ],
+      "correct": 2,
+      "timeLimit": 20,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Before becoming a mentor in Jakarta, Farid was a mentor in which academy?",
+      "options": [
+        "Surabaya",
+        "Batam",
+        "Riyadh",
+        "Kuala Lumpur"
+      ],
+      "correct": 1,
+      "timeLimit": 20,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "What was Apple's very first official company logo?",
+      "options": [
+        "A minimalist rainbow apple",
+        "Isaac Newton sitting under a tree",
+        "A glowing lightbulb with wires",
+        "A stylized Macintosh computer terminal"
+      ],
+      "correct": 1,
+      "timeLimit": 20,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "In almost all of Apple's official product marketing images, the time on the devices is set to 9:41 AM. Why?",
+      "options": [
+        "It is the exact time Apple stock went public.",
+        "It is the time Steve Jobs unveiled the original iPhone in 2007.",
+        "It represents the optimal lighting for product photography.",
+        "It's a tribute to the time when Steve Jobs passed away"
+      ],
+      "correct": 1,
+      "timeLimit": 30,
+      "doublePoints": true
+    },
+    {
+      "type": "multiple",
+      "text": "Where in the world did Apple launch its very first Apple Developer Academy in 2013?",
+      "options": [
+        "Cupertino, California",
+        "Brazil",
+        "Italy",
+        "Tangerang, Indonesia"
+      ],
+      "correct": 1,
+      "timeLimit": 20,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Which mentor likes to sew in her spare time?",
+      "options": [
+        "Keke",
+        "Mande",
+        "Zozo",
+        "Nadya"
+      ],
+      "correct": 0,
+      "timeLimit": 20,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Which group of academy staff commute with KRL green line every day?",
+      "options": [
+        "Keke, Zozo & Dea",
+        "Belen, Keke & Habib",
+        "Habib, Farid & Dimas",
+        "Farid, Zozo & Dimas"
+      ],
+      "correct": 3,
+      "timeLimit": 20,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Which Guiding Activity in Challenge 2 started with Alicia Keys' song?",
+      "options": [
+        "Concept Statement",
+        "State & Binding",
+        "User Journey Map",
+        "Synthesis"
+      ],
+      "correct": 1,
+      "timeLimit": 20,
+      "doublePoints": false
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://inputoutput.id/quiz-v1.json",
+  "version": 1,
+  "title": "Studio Pilot — Sample Import",
+  "exportedAt": "2026-05-28T09:48:00.000Z",
+  "questions": [
+    {
+      "type": "multiple",
+      "text": "Which of these is broadcast in NTSC at 29.97 frames per second?",
+      "options": [
+        "A 35mm film print",
+        "A US color TV broadcast",
+        "A PAL video signal",
+        "A web-native MP4"
+      ],
+      "correct": 1,
+      "timeLimit": 20,
+      "doublePoints": false
+    },
+    {
+      "type": "truefalse",
+      "text": "The first commercial color TV broadcast was in 1965.",
+      "options": ["TRUE", "FALSE"],
+      "correct": 1,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Which channel is the diamond, in this network's signal kit?",
+      "options": ["CH.01", "CH.02", "CH.03", "CH.04"],
+      "correct": 1,
+      "timeLimit": 20,
+      "doublePoints": true
+    }
+  ]
+}
