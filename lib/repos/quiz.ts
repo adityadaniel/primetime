@@ -17,10 +17,13 @@ function validateQuestionInput(q: QuestionInput, idx: number): string | null {
   return null;
 }
 
-export async function createQuiz(input: {
-  title: string;
-  questions: QuestionInput[];
-}): Promise<QuizWithQuestions> {
+export async function createQuiz(
+  userId: string,
+  input: {
+    title: string;
+    questions: QuestionInput[];
+  },
+): Promise<QuizWithQuestions> {
   if (!input.title?.trim()) throw new Error('Title required');
   if (!input.questions?.length) throw new Error('At least one question required');
   for (const [i, q] of input.questions.entries()) {
@@ -29,6 +32,7 @@ export async function createQuiz(input: {
   }
   return prisma.quiz.create({
     data: {
+      userId,
       title: input.title.trim(),
       questions: {
         create: input.questions.map((q, ordinal) => ({
@@ -46,15 +50,16 @@ export async function createQuiz(input: {
   });
 }
 
-export async function getQuiz(id: string): Promise<QuizWithQuestions | null> {
-  return prisma.quiz.findUnique({
-    where: { id },
+export async function getQuiz(id: string, userId: string): Promise<QuizWithQuestions | null> {
+  return prisma.quiz.findFirst({
+    where: { id, userId },
     include: { questions: { orderBy: { ordinal: 'asc' } } },
   });
 }
 
-export async function listQuizzes(): Promise<QuizSummary[]> {
+export async function listQuizzes(userId: string): Promise<QuizSummary[]> {
   const rows = await prisma.quiz.findMany({
+    where: { userId },
     orderBy: { updatedAt: 'desc' },
     select: {
       id: true,
@@ -73,8 +78,9 @@ export async function listQuizzes(): Promise<QuizSummary[]> {
 
 export async function updateQuiz(
   id: string,
+  userId: string,
   input: { title: string; questions: QuestionInput[] },
-): Promise<QuizWithQuestions> {
+): Promise<QuizWithQuestions | null> {
   if (!input.title?.trim()) throw new Error('Title required');
   if (!input.questions?.length) throw new Error('At least one question required');
   for (const [i, q] of input.questions.entries()) {
@@ -82,8 +88,8 @@ export async function updateQuiz(
     if (err) throw new Error(err);
   }
   return prisma.$transaction(async (tx) => {
-    const existing = await tx.quiz.findUnique({ where: { id } });
-    if (!existing) throw new Error('Quiz not found');
+    const existing = await tx.quiz.findFirst({ where: { id, userId }, select: { id: true } });
+    if (!existing) return null;
     await tx.question.deleteMany({ where: { quizId: id } });
     return tx.quiz.update({
       where: { id },
@@ -106,6 +112,7 @@ export async function updateQuiz(
   });
 }
 
-export async function deleteQuiz(id: string): Promise<void> {
-  await prisma.quiz.delete({ where: { id } });
+export async function deleteQuiz(id: string, userId: string): Promise<boolean> {
+  const result = await prisma.quiz.deleteMany({ where: { id, userId } });
+  return result.count > 0;
 }
