@@ -78,6 +78,7 @@ export interface PersonalState {
   lastCorrect?: boolean;
   rank?: number;
   total?: number;
+  score?: number;
 }
 
 export type JoinErrorCode = 'full' | 'nickname-rejected';

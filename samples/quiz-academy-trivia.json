@@ -14,7 +14,7 @@
         "Waterfall Framework"
       ],
       "correct": 1,
-      "timeLimit": 20,
+      "timeLimit": 10,
       "doublePoints": false
     },
     {
@@ -27,33 +27,23 @@
         "Dimas Ackyl Mohamad"
       ],
       "correct": 3,
-      "timeLimit": 20,
+      "timeLimit": 10,
       "doublePoints": false
     },
     {
       "type": "multiple",
       "text": "Which programming language did Apple design Swift to replace?",
-      "options": [
-        "Ruby",
-        "Python",
-        "Objective-C",
-        "C++"
-      ],
+      "options": ["Ruby", "Python", "Objective-C", "C++"],
       "correct": 2,
-      "timeLimit": 20,
+      "timeLimit": 10,
       "doublePoints": false
     },
     {
       "type": "multiple",
       "text": "Before becoming a mentor in Jakarta, Farid was a mentor in which academy?",
-      "options": [
-        "Surabaya",
-        "Batam",
-        "Riyadh",
-        "Kuala Lumpur"
-      ],
+      "options": ["Surabaya", "Batam", "Riyadh", "Kuala Lumpur"],
       "correct": 1,
-      "timeLimit": 20,
+      "timeLimit": 10,
       "doublePoints": false
     },
     {
@@ -66,7 +56,7 @@
         "A stylized Macintosh computer terminal"
       ],
       "correct": 1,
-      "timeLimit": 20,
+      "timeLimit": 10,
       "doublePoints": false
     },
     {
@@ -79,33 +69,23 @@
         "It's a tribute to the time when Steve Jobs passed away"
       ],
       "correct": 1,
-      "timeLimit": 30,
+      "timeLimit": 10,
       "doublePoints": true
     },
     {
       "type": "multiple",
       "text": "Where in the world did Apple launch its very first Apple Developer Academy in 2013?",
-      "options": [
-        "Cupertino, California",
-        "Brazil",
-        "Italy",
-        "Tangerang, Indonesia"
-      ],
+      "options": ["Cupertino, California", "Brazil", "Italy", "Tangerang, Indonesia"],
       "correct": 1,
-      "timeLimit": 20,
+      "timeLimit": 10,
       "doublePoints": false
     },
     {
       "type": "multiple",
       "text": "Which mentor likes to sew in her spare time?",
-      "options": [
-        "Keke",
-        "Mande",
-        "Zozo",
-        "Nadya"
-      ],
+      "options": ["Keke", "Mande", "Zozo", "Nadya"],
       "correct": 0,
-      "timeLimit": 20,
+      "timeLimit": 10,
       "doublePoints": false
     },
     {
@@ -118,20 +98,15 @@
         "Farid, Zozo & Dimas"
       ],
       "correct": 3,
-      "timeLimit": 20,
+      "timeLimit": 10,
       "doublePoints": false
     },
     {
       "type": "multiple",
       "text": "Which Guiding Activity in Challenge 2 started with Alicia Keys' song?",
-      "options": [
-        "Concept Statement",
-        "State & Binding",
-        "User Journey Map",
-        "Synthesis"
-      ],
+      "options": ["Concept Statement", "State & Binding", "User Journey Map", "Synthesis"],
       "correct": 1,
-      "timeLimit": 20,
+      "timeLimit": 10,
       "doublePoints": false
     }
   ]

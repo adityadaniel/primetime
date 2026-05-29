@@ -318,13 +318,27 @@ export function PlayerReveal({
       </div>
 
       <div className="grid grid-cols-2 gap-3 mt-5">
-        <div className="ink-border p-4" style={{ background: 'var(--bone)' }}>
+        <div
+          className="ink-border p-4 min-w-0 overflow-hidden"
+          style={{ background: 'var(--bone)' }}
+        >
           <span className="chyron opacity-70">YOUR SCORE</span>
-          <p className="display-num text-5xl mt-1 ticker">{score.toLocaleString()}</p>
+          <p
+            className="display-num mt-1 ticker tabular-nums whitespace-nowrap"
+            style={{ fontSize: 'clamp(36px, 10vw, 56px)' }}
+          >
+            {score.toLocaleString()}
+          </p>
         </div>
-        <div className="ink-border p-4" style={{ background: 'var(--bone)' }}>
+        <div
+          className="ink-border p-4 min-w-0 overflow-hidden"
+          style={{ background: 'var(--bone)' }}
+        >
           <span className="chyron opacity-70">RANK</span>
-          <p className="display-num text-5xl mt-1 ticker">
+          <p
+            className="display-num mt-1 ticker tabular-nums whitespace-nowrap"
+            style={{ fontSize: 'clamp(36px, 10vw, 56px)' }}
+          >
             {rank ? `${rank}/${total ?? '—'}` : '—'}
           </p>
         </div>

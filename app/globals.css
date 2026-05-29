@@ -131,18 +131,22 @@ body {
   }
 
   .flash-cut {
-    animation: flash-cut 220ms ease-out both;
+    animation: flash-cut 220ms ease-out;
+    transform-origin: center;
   }
 
   @keyframes flash-cut {
     0% {
-      background-color: #ffffff;
+      filter: brightness(1.8);
+      transform: scale(1.015);
     }
     60% {
-      background-color: #ffffff;
+      filter: brightness(1.8);
+      transform: scale(1.015);
     }
     100% {
-      background-color: transparent;
+      filter: brightness(1);
+      transform: scale(1);
     }
   }
 

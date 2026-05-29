@@ -29,8 +29,10 @@ describe('sfx-assets', () => {
     expect(SOUND_ASSETS['lobby-ambience'].loop).toBe(true);
     expect(SOUND_ASSETS['question-tension'].loop).toBe(true);
     expect(SOUND_ASSETS['final-bed'].loop).toBe(true);
+    expect(SOUND_ASSETS['tick-urgent'].loop).toBe(true);
     expect(SOUND_ASSETS['lock-in'].loop).toBe(false);
     expect(SOUND_ASSETS.correct.loop).toBe(false);
+    expect(SOUND_ASSETS.tick.loop).toBe(false);
     expect(SOUND_ASSETS['leaderboard-sweep'].loop).toBe(false);
   });
 

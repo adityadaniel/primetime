@@ -17,18 +17,17 @@
     },
     "lobby-ambience": {
       "slug": "lobby-ambience",
-      "label": "Lobby ambience",
+      "label": "Lobby jazz",
       "surface": "host display + player lobby",
-      "file": "/sounds/lobby-ambience.mp3",
+      "file": "/sounds/lobby-jazz.mp3",
       "loop": true,
-      "durationSec": 12.96,
+      "durationSec": 259.06,
       "bpm": 70,
       "key": "Am",
-      "prompt": "Warm vintage 1970s broadcast control room ambience. Distant teletype machine ticking, faint reel-to-reel tape hiss, soft analog hum at 60Hz, subtle sub-bass swell, no melody, no vocals. Loops cleanly. Calm but expectant — pre-show studio before a live broadcast.",
-      "taskId": "b44869c9b69f5e8a5419f13b39c67c10",
-      "trackId": "746996e9-95cb-424a-9f9f-688e03665abc",
-      "model": "V5_5",
-      "generatedAt": "2026-05-27T15:08:41.649Z"
+      "prompt": "Manual lobby jazz replacement for the host display + player lobby ambience.",
+      "taskId": "manual",
+      "model": "manual",
+      "generatedAt": "2026-05-28T16:15:00.000Z"
     },
     "question-tension": {
       "slug": "question-tension",
@@ -44,6 +43,20 @@
       "trackId": "861e3b25-7834-4977-8553-9477bf939d10",
       "model": "V5_5",
       "generatedAt": "2026-05-27T15:09:12.915Z"
+    },
+    "question-tension-long": {
+      "slug": "question-tension-long",
+      "label": "Question tension bed (long)",
+      "surface": "host display + player + control during question phase",
+      "file": "/sounds/question-tension-long.mp3",
+      "loop": true,
+      "durationSec": 36.75,
+      "bpm": 120,
+      "key": "Cm",
+      "prompt": "Tense pulsing broadcast sub-bass loop. Slow heartbeat-like analog synth pulse on every beat, faint metallic ride cymbal accent, distant ticking metronome. Urgent but restrained — like a 1970s game show countdown bed. No melody, no vocals, no drums. Loops cleanly.",
+      "taskId": "manual",
+      "model": "manual",
+      "generatedAt": "2026-05-28T15:20:00.000Z"
     },
     "final-bed": {
       "slug": "final-bed",
@@ -104,7 +117,7 @@
       "label": "Countdown tick (last 5 seconds)",
       "surface": "host display + player — last 5 ticks of countdown",
       "file": "/sounds/tick-urgent.mp3",
-      "loop": false,
+      "loop": true,
       "durationSec": 11.96,
       "prompt": "A sharper, harder analog studio clock tick. Mechanical, slightly metallic, close-mic, no reverb. About 80 milliseconds. Tense, last-five-seconds-of-countdown energy. 1970s broadcast control-room style.",
       "taskId": "00f2b54d0e0715c593bbabb9e36cfd5f",

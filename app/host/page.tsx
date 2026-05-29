@@ -1,10 +1,42 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import AccountMenu from '@/components/AccountMenu';
 import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import type { QuizSummary } from '@/lib/types';
 
 export default function HostMenu() {
+  const [quizzes, setQuizzes] = useState<QuizSummary[]>([]);
+  const [loadingQuizzes, setLoadingQuizzes] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deletingQuizId, setDeletingQuizId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/quiz')
+      .then(async (res) => {
+        if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? res.statusText);
+        return (await res.json()) as QuizSummary[];
+      })
+      .then((list) => {
+        if (!alive) return;
+        setQuizzes(list);
+        setLoadError(null);
+      })
+      .catch((err: Error) => {
+        if (!alive) return;
+        setLoadError(err.message || 'Could not load saved quizzes');
+      })
+      .finally(() => {
+        if (alive) setLoadingQuizzes(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   return (
     <main className="relative min-h-screen pb-24">
       <CornerMarks />
@@ -89,6 +121,149 @@ export default function HostMenu() {
           </Link>
         </div>
       </section>
+
+      <section className="px-8 pt-10 max-w-[1400px] mx-auto">
+        <div className="flex items-end justify-between gap-4 mb-3">
+          <div>
+            <p className="chyron mb-2" style={{ color: 'var(--vermilion)' }}>
+              SAVED QUIZZES · CUE SHEETS
+            </p>
+            <h2
+              className="font-editorial leading-none"
+              style={{ fontSize: 'clamp(30px, 4vw, 52px)' }}
+            >
+              Pick up where you left off.
+            </h2>
+          </div>
+          <Link
+            href="/host/quiz/new"
+            className="hidden sm:inline-flex ink-border ticker text-[11px] tracking-widest px-4 py-3"
+            style={{ background: 'var(--ink)', color: 'var(--bone)' }}
+          >
+            + NEW QUIZ
+          </Link>
+        </div>
+
+        <div className="ink-border" style={{ background: 'var(--bone)' }}>
+          <div
+            className="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_120px_190px_240px] gap-3 px-4 py-2 border-b-2 ticker text-[10px] tracking-widest opacity-70"
+            style={{ borderColor: 'var(--ink)' }}
+          >
+            <span>TITLE</span>
+            <span className="hidden md:block">QUESTIONS</span>
+            <span className="hidden md:block">UPDATED</span>
+            <span>ACTIONS</span>
+          </div>
+
+          {loadingQuizzes && (
+            <p className="p-4 ticker text-[12px] tracking-widest opacity-70">LOADING CUE SHEETS…</p>
+          )}
+
+          {!loadingQuizzes && loadError && (
+            <p
+              className="p-4 ticker text-[12px] tracking-widest"
+              style={{ color: 'var(--vermilion)' }}
+            >
+              {loadError}
+            </p>
+          )}
+
+          {!loadingQuizzes && !loadError && deleteError && (
+            <p
+              className="p-4 border-b-2 ticker text-[12px] tracking-widest"
+              style={{ borderColor: 'var(--ink)', color: 'var(--vermilion)' }}
+            >
+              {deleteError}
+            </p>
+          )}
+
+          {!loadingQuizzes && !loadError && quizzes.length === 0 && (
+            <div className="p-5">
+              <p className="font-editorial italic text-lg">No saved quizzes yet.</p>
+              <p className="ticker text-[11px] tracking-widest opacity-70 mt-2">
+                BUILD A QUIZ, HIT SAVE, AND IT WILL APPEAR HERE.
+              </p>
+            </div>
+          )}
+
+          {!loadingQuizzes &&
+            !loadError &&
+            quizzes.map((quiz) => (
+              <div
+                key={quiz.id}
+                className="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_120px_190px_240px] gap-3 px-4 py-3 border-b-2 last:border-b-0 items-center"
+                style={{ borderColor: 'var(--ink)' }}
+              >
+                <div className="min-w-0">
+                  <p className="font-editorial text-xl leading-tight truncate">{quiz.title}</p>
+                  <p className="md:hidden ticker text-[10px] tracking-widest opacity-70 mt-1">
+                    {quiz.questionCount} Q · {formatUpdated(quiz.updatedAt)}
+                  </p>
+                </div>
+                <span className="hidden md:block ticker text-[12px] tracking-widest">
+                  {String(quiz.questionCount).padStart(2, '0')}
+                </span>
+                <span className="hidden md:block ticker text-[12px] tracking-widest opacity-70">
+                  {formatUpdated(quiz.updatedAt)}
+                </span>
+                <div className="flex items-center justify-end gap-2">
+                  <Link
+                    href={`/host/quiz/new?quiz=${quiz.id}`}
+                    className="ink-border ticker text-[11px] tracking-widest px-3 py-2"
+                    style={{ background: 'var(--ink)', color: 'var(--bone)' }}
+                  >
+                    EDIT
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => deleteQuiz(quiz)}
+                    disabled={deletingQuizId === quiz.id}
+                    className="ticker text-[11px] tracking-widest px-3 py-2 disabled:opacity-50"
+                    style={{
+                      background: 'transparent',
+                      border: '2px solid var(--vermilion)',
+                      color: 'var(--vermilion)',
+                    }}
+                  >
+                    {deletingQuizId === quiz.id ? 'DELETING' : 'DELETE'}
+                  </button>
+                </div>
+              </div>
+            ))}
+        </div>
+      </section>
     </main>
   );
+
+  async function deleteQuiz(quiz: QuizSummary) {
+    const ok = window.confirm(`Delete "${quiz.title}"? This cannot be undone.`);
+    if (!ok) return;
+    setDeletingQuizId(quiz.id);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/quiz/${quiz.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? res.statusText);
+      }
+      setQuizzes((list) => list.filter((item) => item.id !== quiz.id));
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete quiz');
+    } finally {
+      setDeletingQuizId(null);
+    }
+  }
+}
+
+function formatUpdated(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'UNKNOWN';
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+    .format(date)
+    .toUpperCase();
 }
