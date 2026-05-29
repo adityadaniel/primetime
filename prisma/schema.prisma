@@ -30,6 +30,7 @@ model User {
   sessions           Session[]
   hostedSessions     GameSession[]
   wordCloudSessions  WordCloudSession[]
+  quizzes            Quiz[]
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 }
@@ -80,10 +81,14 @@ model PasswordResetToken {
 
 model Quiz {
   id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   questions Question[]
+
+  @@index([userId])
 }
 
 model Question {
