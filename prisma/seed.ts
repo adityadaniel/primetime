@@ -50,6 +50,15 @@ const sampleQuestions: SeedQuestion[] = [
 ];
 
 async function main() {
+  const owner =
+    (await prisma.user.findFirst({ orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] })) ??
+    (await prisma.user.create({
+      data: {
+        email: 'host@example.com',
+        name: 'Sample Host',
+      },
+    }));
+
   const existing = await prisma.quiz.findFirst({
     where: { title: SAMPLE_QUIZ_TITLE },
     select: { id: true },
@@ -62,6 +71,7 @@ async function main() {
 
   const created = await prisma.quiz.create({
     data: {
+      userId: owner.id,
       title: SAMPLE_QUIZ_TITLE,
       questions: {
         create: sampleQuestions.map((q) => ({

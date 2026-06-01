@@ -6,7 +6,8 @@ const RUN_INTEGRATION = process.env.INTEGRATION_DB === 'true';
 
 const dbName = `inputoutput_test_${randomBytes(4).toString('hex')}`;
 const baseUrl =
-  process.env.DATABASE_URL ?? 'postgresql://adityadaniel@localhost:5432/inputoutput_dev';
+  process.env.DATABASE_URL ?? 'postgresql://broadcast:broadcast@localhost:5432/broadcast_dev';
+const maintenanceUrl = baseUrl.replace(/\/[^/?]+(\?|$)/, '/postgres$1');
 const testUrl = baseUrl.replace(/\/[^/?]+(\?|$)/, `/${dbName}$1`);
 
 const describeIfIntegration = RUN_INTEGRATION ? describe : describe.skip;
@@ -17,9 +18,13 @@ describeIfIntegration('session-persistence integration', () => {
   let recordPlayerJoin: typeof import('../session-repo').recordPlayerJoin;
   let recordAnswer: typeof import('../session-repo').recordAnswer;
   let finalizeSession: typeof import('../session-repo').finalizeSession;
+  let createQuiz: typeof import('../repos/quiz').createQuiz;
+  let getQuiz: typeof import('../repos/quiz').getQuiz;
+  let listQuizzes: typeof import('../repos/quiz').listQuizzes;
+  let deleteQuiz: typeof import('../repos/quiz').deleteQuiz;
 
   beforeAll(async () => {
-    execSync(`createdb ${dbName}`, { stdio: 'pipe' });
+    execSync(`createdb --maintenance-db="${maintenanceUrl}" ${dbName}`, { stdio: 'pipe' });
     process.env.DATABASE_URL = testUrl;
     execSync(`npx prisma migrate deploy`, {
       env: { ...process.env, DATABASE_URL: testUrl },
@@ -32,12 +37,17 @@ describeIfIntegration('session-persistence integration', () => {
     recordPlayerJoin = repo.recordPlayerJoin;
     recordAnswer = repo.recordAnswer;
     finalizeSession = repo.finalizeSession;
+    const quizRepo = await import('../repos/quiz');
+    createQuiz = quizRepo.createQuiz;
+    getQuiz = quizRepo.getQuiz;
+    listQuizzes = quizRepo.listQuizzes;
+    deleteQuiz = quizRepo.deleteQuiz;
   }, 60_000);
 
   afterAll(async () => {
     if (prisma) await prisma.$disconnect();
     try {
-      execSync(`dropdb ${dbName}`, { stdio: 'pipe' });
+      execSync(`dropdb --maintenance-db="${maintenanceUrl}" ${dbName}`, { stdio: 'pipe' });
     } catch {
       // best-effort cleanup
     }
@@ -87,5 +97,40 @@ describeIfIntegration('session-persistence integration', () => {
     const row = await prisma.gameSession.findUnique({ where: { id: sessionId } });
     expect(row?.status).toBe('finished');
     expect(row?.endedAt).toBeInstanceOf(Date);
+  }, 30_000);
+
+  it('isolates saved quizzes by owner for list, get, and delete', async () => {
+    const alice = await prisma.user.create({ data: { email: 'alice@test' } });
+    const bob = await prisma.user.create({ data: { email: 'bob@test' } });
+    const input = (title: string) => ({
+      title,
+      questions: [
+        {
+          type: 'multiple' as const,
+          text: `${title} question`,
+          options: ['A', 'B'],
+          correct: 0 as const,
+          timeLimit: 10,
+          doublePoints: false,
+        },
+      ],
+    });
+
+    const aliceQuiz = await createQuiz(alice.id, input('Alice quiz'));
+    const bobQuiz = await createQuiz(bob.id, input('Bob quiz'));
+
+    await expect(listQuizzes(alice.id)).resolves.toMatchObject([
+      { id: aliceQuiz.id, title: 'Alice quiz' },
+    ]);
+    await expect(listQuizzes(bob.id)).resolves.toMatchObject([
+      { id: bobQuiz.id, title: 'Bob quiz' },
+    ]);
+
+    await expect(getQuiz(aliceQuiz.id, bob.id)).resolves.toBeNull();
+    await expect(deleteQuiz(aliceQuiz.id, bob.id)).resolves.toBe(false);
+    await expect(prisma.quiz.findUnique({ where: { id: aliceQuiz.id } })).resolves.not.toBeNull();
+
+    await expect(deleteQuiz(aliceQuiz.id, alice.id)).resolves.toBe(true);
+    await expect(prisma.quiz.findUnique({ where: { id: aliceQuiz.id } })).resolves.toBeNull();
   }, 30_000);
 });

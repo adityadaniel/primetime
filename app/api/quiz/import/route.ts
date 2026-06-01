@@ -1,8 +1,16 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/auth';
 import { parseQuiz } from '@/lib/quiz-io';
 import { createQuiz } from '@/lib/repos/quiz';
 
+function getSessionUserId(session: { user?: { id?: string } } | null): string | null {
+  return (session?.user as { id?: string } | undefined)?.id ?? null;
+}
+
 export async function POST(req: NextRequest) {
+  const userId = getSessionUserId(await auth());
+  if (!userId) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
+
   const contentType = req.headers.get('content-type') ?? '';
   let json: string;
 
@@ -26,7 +34,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
   try {
-    const quiz = await createQuiz(parsed.data);
+    const quiz = await createQuiz(userId, parsed.data);
     return NextResponse.json({ id: quiz.id });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'create failed';
