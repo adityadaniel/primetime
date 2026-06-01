@@ -90,7 +90,11 @@ export default function SignInClient({ enableApple }: { enableApple: boolean }) 
             </>
           )}
 
-          <form onSubmit={submit} className={enableApple ? 'space-y-3' : 'mt-6 space-y-3'} noValidate>
+          <form
+            onSubmit={submit}
+            className={enableApple ? 'space-y-3' : 'mt-6 space-y-3'}
+            noValidate
+          >
             <label className="block">
               <span className="chyron">EMAIL</span>
               <input

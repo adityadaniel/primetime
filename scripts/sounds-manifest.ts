@@ -37,8 +37,7 @@ export const SOUNDS: SoundSpec[] = [
     slug: 'lobby-ambience',
     label: 'Lobby jazz',
     surface: 'host display + player lobby',
-    prompt:
-      'Manual lobby jazz replacement for the host display + player lobby ambience.',
+    prompt: 'Manual lobby jazz replacement for the host display + player lobby ambience.',
     soundLoop: true,
     soundTempo: 70,
     soundKey: 'Am',
