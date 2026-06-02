@@ -73,3 +73,59 @@ jobs:
             kill $(cat /tmp/dev.pid) || true
           fi
           tail -100 /tmp/dev.log || true
+
+  # Browser-level E2E (Playwright): auth + quiz lifecycle (MID-81). Runs in its
+  # own job so it gets a clean port 4321 and DB — Playwright boots the server
+  # itself (reuseExistingServer is false when CI=true) against a dedicated
+  # inputoutput_e2e database created by `npm run db:e2e:reset`.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: inputoutput
+          POSTGRES_PASSWORD: inputoutput
+          POSTGRES_DB: inputoutput_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U inputoutput -d inputoutput_dev"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+          --health-start-period 5s
+
+    env:
+      # Base URL the E2E DB name is derived from (→ inputoutput_e2e).
+      DATABASE_URL: postgresql://inputoutput:inputoutput@localhost:5432/inputoutput_dev
+      AUTH_SECRET: ci-test-secret-not-for-prod
+      NEXTAUTH_URL: http://localhost:4321
+      NEXT_PUBLIC_SITE_URL: http://localhost:4321
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-main
+          path: playwright-report/
+          retention-days: 7

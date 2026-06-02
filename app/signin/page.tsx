@@ -9,5 +9,8 @@ export default function SignInPage() {
   // AUTH_MODE=password+oauth AND ENABLE_APPLE_SIGNIN=true AND the APPLE_* vars
   // are present — the OSS default is password-only, so no OAuth button shows.
   const enableApple = config.appleEnabled;
-  return <SignInClient enableApple={enableApple} />;
+  // emailEnabled is computed server-side and passed as a prop so the client
+  // bundle never imports lib/config (which pulls in node:path and breaks the
+  // browser build). Mirrors how enableApple is already prop-drilled.
+  return <SignInClient enableApple={enableApple} emailEnabled={config.emailEnabled} />;
 }

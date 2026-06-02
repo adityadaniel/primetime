@@ -220,7 +220,6 @@ The timer auto-locks when it hits zero, and locks early once every connected pla
 - **Session history & analytics** — results vanish at process exit
 - **Redis pub/sub for multi-node** — single-node only; would need the Socket.IO Redis adapter to scale horizontally
 - **Image uploads in questions** — text-only questions for now (upload endpoint exists but isn't wired into the question builder yet)
-- **Playwright E2E** — coverage today is the headless smoke test
 - **Browser tested:** Chrome on macOS. Should work in modern Safari/Firefox but not exhaustively verified.
 
 ---
@@ -249,6 +248,15 @@ lib/
   mailer.ts                      email transport (SMTP / token-print)
   reset.ts                       password reset email wrapper
 server.ts                        Next.js + Socket.IO on one port
+scripts/
+  smoke.ts                       Socket.IO realtime smoke test
+  e2e-db-reset.ts                create + migrate the inputoutput_e2e database
+tests/e2e/
+  auth.spec.ts                   signup / signin / reset / first-run / duplicate
+  quiz-lifecycle.spec.ts         quiz CRUD, socket game, upload, word-cloud CSV
+  helpers/                       db reset/seed, auth flows, socket client
+  e2e-env.ts                     shared E2E env (DB URL derivation, server env)
+playwright.config.ts             E2E runner config (boots the server)
 DESIGN.md                        visual identity rationale
 ```
 
@@ -263,12 +271,69 @@ npm run build    # next build
 npm run start    # production-ish start (still tsx-driven)
 npm run smoke    # end-to-end ws smoke test (server must be running)
 npm test         # vitest (lib/* unit tests + fixture × surface snapshots)
+npm run test:e2e # Playwright browser E2E (auth + quiz lifecycle); boots its own server
+npm run test:e2e:ui   # same, in Playwright's interactive UI
 npm run db:up    # start Postgres via Docker Compose
 npm run db:down  # stop Postgres
 npm run db:reset # nuke and rebuild DB
 npm run db:migrate  # apply Prisma migrations
+npm run db:e2e:reset # create + migrate the dedicated inputoutput_e2e database
 npm run db:studio   # browse data at localhost:5555
 ```
+
+---
+
+## Testing
+
+Three layers, each with a distinct job:
+
+| Layer | Command | Covers |
+| --- | --- | --- |
+| Unit | `npm test` / `npm run test:coverage` | `lib/*` logic, scoring, config parsing, fixture × surface snapshots |
+| Smoke | `npm run smoke` | Socket.IO realtime: full game loop, reconnect/pause, cap, CSV, profanity, word cloud (server must already be running) |
+| E2E | `npm run test:e2e` | Browser-level auth (signup → signin → reset) + quiz/game/upload lifecycle via Playwright |
+
+### End-to-end (Playwright)
+
+The E2E suite (`tests/e2e/`) drives a real Chromium browser through the OSS
+auth flows and the authenticated quiz lifecycle. It is self-contained — you
+only need Postgres running:
+
+```bash
+npm run db:up        # Postgres (if not already up)
+npm run test:e2e     # installs nothing; boots the app itself
+```
+
+What it does for you:
+
+- **Dedicated database.** Tests run against `inputoutput_e2e` (derived from your
+  `DATABASE_URL`, same Postgres server), created + migrated by
+  `npm run db:e2e:reset`. Your dev DB is never touched. Tables are truncated
+  between tests, so order never matters.
+- **Boots the server.** Playwright's `webServer` runs `db:e2e:reset` then
+  `npm run dev`, pinning a known OSS profile via env (`EMAIL_PROVIDER=token-print`,
+  `UPLOAD_PROVIDER=local`, `PLAYER_CAP=3`, session persistence on). Locally it
+  reuses an already-running server on `:4321`; in CI it always boots a fresh one.
+- **No SaaS, no real email.** Password-reset links are captured from the
+  `devUrl` the reset endpoint returns in non-production mode — no SMTP, no log
+  scraping.
+
+First run only, install the browser:
+
+```bash
+npx playwright install chromium
+```
+
+Coverage:
+
+- `tests/e2e/auth.spec.ts` — signup, sign out + sign back in, forgot/reset
+  (UI + dev-token capture), first-run admin banner, duplicate signup rejected
+- `tests/e2e/quiz-lifecycle.spec.ts` — create quiz + see it in the library, run
+  a full game over Socket.IO and assert a finished `GameSession` row, player-cap
+  rejection, local image upload, word-cloud CSV export
+
+The HTML report lands in `playwright-report/` (open with
+`npx playwright show-report`).
 
 ---
 
