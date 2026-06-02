@@ -31,8 +31,7 @@ async function sendWithSmtp(params: SendResetEmailParams): Promise<SendResetEmai
   } catch {
     return {
       ok: false,
-      error:
-        'nodemailer is not installed. Run `npm install nodemailer` to enable SMTP email.',
+      error: 'nodemailer is not installed. Run `npm install nodemailer` to enable SMTP email.',
     };
   }
 
