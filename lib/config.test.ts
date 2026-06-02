@@ -12,6 +12,8 @@ describe('loadConfig — OSS defaults', () => {
     expect(c.uploadProvider).toBe('local');
     expect(c.billingEnabled).toBe(false);
     expect(c.playerCap).toBe(10);
+    expect(c.uploadMaxBytes).toBe(5 * 1024 * 1024);
+    expect(c.uploadDir).toContain('uploads');
     expect(c.oauthEnabled).toBe(false);
     expect(c.appleEnabled).toBe(false);
     expect(c.emailEnabled).toBe(false);
@@ -151,6 +153,35 @@ describe('loadConfig — upload provider vars', () => {
 
   it('does not require upload vars on the default (local) provider', () => {
     expect(() => loadConfig({})).not.toThrow();
+  });
+
+  it('default uploadMaxBytes is 5 MB', () => {
+    const c = loadConfig({});
+    expect(c.uploadMaxBytes).toBe(5 * 1024 * 1024);
+  });
+
+  it('parses UPLOAD_MAX_BYTES override', () => {
+    const c = loadConfig({ UPLOAD_MAX_BYTES: '1048576' });
+    expect(c.uploadMaxBytes).toBe(1048576);
+  });
+
+  it('rejects non-numeric UPLOAD_MAX_BYTES', () => {
+    expect(() => loadConfig({ UPLOAD_MAX_BYTES: 'big' })).toThrow(/UPLOAD_MAX_BYTES/);
+  });
+
+  it('rejects zero UPLOAD_MAX_BYTES', () => {
+    expect(() => loadConfig({ UPLOAD_MAX_BYTES: '0' })).toThrow(/UPLOAD_MAX_BYTES/);
+  });
+
+  it('default uploadDir is <cwd>/public/uploads', () => {
+    const c = loadConfig({});
+    expect(c.uploadDir).toContain('public');
+    expect(c.uploadDir).toContain('uploads');
+  });
+
+  it('parses UPLOAD_DIR override', () => {
+    const c = loadConfig({ UPLOAD_DIR: '/tmp/my-uploads' });
+    expect(c.uploadDir).toBe('/tmp/my-uploads');
   });
 });
 
