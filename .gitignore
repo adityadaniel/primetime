@@ -9,3 +9,4 @@ node_modules/
 tsconfig.tsbuildinfo
 coverage/
 public/sounds/.tasks/
+public/uploads/

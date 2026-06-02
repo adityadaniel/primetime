@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { z } from 'zod';
 
 // ============================================================================
@@ -40,6 +41,10 @@ export interface AppConfig {
   billingEnabled: boolean;
   /** PLAYER_CAP — max players per game. Integer ≥ 1, default 10. */
   playerCap: number;
+  /** UPLOAD_MAX_BYTES — max upload file size in bytes. Default 5 MB. */
+  uploadMaxBytes: number;
+  /** UPLOAD_DIR — absolute path to upload directory. Default: <cwd>/public/uploads. */
+  uploadDir: string;
 
   // ---- derived helper booleans (cheap to read at call sites) ----
   /** True when AUTH_MODE=password+oauth, i.e. OAuth providers may attach. */
@@ -125,6 +130,16 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   }
   const playerCap = capParsed.data;
 
+  // Upload settings
+  const uploadMaxBytesRaw = env.UPLOAD_MAX_BYTES ?? '';
+  const uploadMaxBytes = uploadMaxBytesRaw === '' ? 5 * 1024 * 1024 : Number(uploadMaxBytesRaw);
+  if (!Number.isFinite(uploadMaxBytes) || uploadMaxBytes < 1) {
+    throw new ConfigError(
+      `UPLOAD_MAX_BYTES must be a positive integer (got "${env.UPLOAD_MAX_BYTES}")`,
+    );
+  }
+  const uploadDir = env.UPLOAD_DIR ?? join(process.cwd(), 'public', 'uploads');
+
   // ---- provider-specific var validation (only when explicitly selected) ----
   if (emailProvider === 'smtp') {
     requireVars('EMAIL_PROVIDER=smtp', env, [
@@ -170,6 +185,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     uploadProvider,
     billingEnabled,
     playerCap,
+    uploadMaxBytes,
+    uploadDir,
     oauthEnabled,
     appleEnabled: appleRequested,
     emailEnabled: emailProvider !== 'none',
