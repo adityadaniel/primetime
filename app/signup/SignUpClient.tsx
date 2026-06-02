@@ -12,7 +12,13 @@ type ErrorState =
   | { kind: 'invite' }
   | { kind: 'message'; text: string };
 
-export default function SignUpClient({ requireInviteCode }: { requireInviteCode: boolean }) {
+export default function SignUpClient({
+  requireInviteCode,
+  isFirstRun,
+}: {
+  requireInviteCode: boolean;
+  isFirstRun: boolean;
+}) {
   const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -114,6 +120,15 @@ export default function SignUpClient({ requireInviteCode }: { requireInviteCode:
           <p className="font-editorial italic text-base mt-2 opacity-80">
             Take the producer&apos;s chair.
           </p>
+
+          {isFirstRun && (
+            <div
+              className="mt-4 ink-border px-4 py-3 ticker text-[12px] tracking-widest"
+              style={{ background: 'var(--marigold)', color: 'var(--ink)' }}
+            >
+              ★ FIRST RUN — YOU WILL BE THE FIRST ADMIN. CREATE YOUR ACCOUNT TO GET STARTED.
+            </div>
+          )}
 
           <form onSubmit={submit} className="mt-6 space-y-3" noValidate>
             <label className="block">
