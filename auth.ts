@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import NextAuth, { type NextAuthConfig } from 'next-auth';
 import Apple from 'next-auth/providers/apple';
@@ -7,6 +8,17 @@ import { getAppleClientSecret } from '@/lib/apple-secret';
 import { verifyCredentials } from '@/lib/auth-helpers';
 import { config } from '@/lib/config';
 import { prisma } from '@/lib/db';
+
+// DEV-ONLY: auto-generate AUTH_SECRET when missing in non-production.
+// This lets `npm run dev` boot without any .env file on a fresh clone.
+// Production deployments MUST set AUTH_SECRET explicitly.
+if (!process.env.AUTH_SECRET && process.env.NODE_ENV !== 'production') {
+  const devSecret = randomBytes(32).toString('hex');
+  process.env.AUTH_SECRET = devSecret;
+  console.warn(
+    '[auth] AUTH_SECRET not set — generated a dev secret for this session. Set AUTH_SECRET in .env for persistent sessions.',
+  );
+}
 
 // Apple is enabled only when AUTH_MODE=password+oauth AND ENABLE_APPLE_SIGNIN=true
 // (see lib/config.ts). OSS default is password-only, so Apple stays off.

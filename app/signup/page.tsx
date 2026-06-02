@@ -1,10 +1,14 @@
+import { prisma } from '@/lib/db';
 import SignUpClient from './SignUpClient';
 
 export const dynamic = 'force-dynamic';
 
-export default function SignUpPage() {
-  // Default OFF for self-host: open signup. Operators can flip
-  // REQUIRE_INVITE_CODE=true to gate signups behind a beta code.
+export default async function SignUpPage() {
   const requireInviteCode = (process.env.REQUIRE_INVITE_CODE ?? 'false').toLowerCase() === 'true';
-  return <SignUpClient requireInviteCode={requireInviteCode} />;
+
+  // First-run detector: if no users exist, this is a fresh install.
+  const userCount = await prisma.user.count();
+  const isFirstRun = userCount === 0;
+
+  return <SignUpClient requireInviteCode={requireInviteCode} isFirstRun={isFirstRun} />;
 }
