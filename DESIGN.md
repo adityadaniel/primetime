@@ -72,3 +72,13 @@ Animations are present and intentional but never twee.
 | `/join` & `/play/[pin]` | Talent confidence monitor — bone, large tap targets, single column, thumb-zone |
 
 Coherent across all five surfaces: same palette, same type stack, same frame counter, same "ON AIR" treatment, same answer shapes.
+
+## OSS vs SaaS feature surface
+
+This codebase ships two modes via environment flags:
+
+- **OSS (default):** Password auth, no email, local file uploads, no billing, player cap 10. Zero SaaS dependencies.
+- **SaaS:** Add OAuth, SMTP/Resend email, S3/UploadThing cloud uploads, Stripe billing, higher player caps by tier.
+
+The visual identity is identical in both modes — only the feature surface changes. See the [environment reference in README](README.md#environment-reference) for all flags.
+
