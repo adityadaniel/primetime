@@ -69,7 +69,7 @@ export function makeState(input: MakeStateInput): PublicGameState {
     totalQuestions,
     players,
     playerCount: players.length,
-    cap: input.cap ?? { hard: 150, soft: 10, upsell: false },
+    cap: input.cap ?? { max: 10 },
   };
 
   if (baseQ) {
@@ -159,7 +159,7 @@ const lobby150 = makeState({
   phase: 'lobby',
   question: null,
   players: makePlayers(150, { score: 0 }),
-  cap: { hard: 150, soft: 150, upsell: false },
+  cap: { max: 150 },
 });
 
 const fourPlayers = makePlayers(4);
@@ -316,7 +316,7 @@ export const fixtures: Fixture[] = [
     label: 'Lobby — 150 players (cap)',
     category: 'shared',
     state: lobby150,
-    notes: 'Hard cap exhausted.',
+    notes: 'Player cap reached (PLAYER_CAP=150).',
   },
 
   {

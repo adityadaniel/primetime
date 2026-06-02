@@ -1,3 +1,4 @@
+import { config as appConfig } from './config';
 import { registerActivePinsProvider, tryAllocateAgainstActiveSet } from './pin-allocator';
 import { isClean } from './profanity';
 import {
@@ -17,11 +18,9 @@ import type {
   Quiz,
 } from './types';
 
-const HARD_CAP = 150;
-// TEMP M2.5 unused: MID-75 restores tier-aware cap
-const SOFT_CAP_FREE = 10;
-// TEMP M2.5 unused: MID-75 restores tier-aware cap
-const UPSELL_AT = 8;
+// OSS has a single, env-driven player cap (MID-216 · OSS-CAP-01). There are no
+// billing tiers, so there is no soft/hard split and no upgrade prompt: every
+// game is capped at `config.playerCap` (PLAYER_CAP env, default 10).
 let RECONNECT_GRACE_MS = 30_000;
 const HOST_GRACE_MS = 60_000;
 
@@ -37,6 +36,8 @@ export type Tier = 'free' | 'pro';
 export interface GameSession {
   pin: string;
   tier: Tier;
+  /** Max concurrent players for this game (OSS env cap, see config.playerCap). */
+  playerCap: number;
   hostSocketId?: string;
   displaySocketIds: Set<string>;
   quiz: Quiz;
@@ -76,7 +77,7 @@ function generatePin(): string {
 
 export function createGame(
   quiz: Quiz,
-  tierOrOpts: Tier | { tier?: Tier; hostUserId?: string | null } = 'free',
+  tierOrOpts: Tier | { tier?: Tier; hostUserId?: string | null; playerCap?: number } = 'free',
   legacyOpts?: { hostUserId?: string | null },
 ): GameSession {
   if (!quiz.questions.length) {
@@ -87,10 +88,17 @@ export function createGame(
     typeof tierOrOpts === 'string'
       ? (legacyOpts?.hostUserId ?? null)
       : (tierOrOpts.hostUserId ?? null);
+  // Cap comes from config by default; tests may inject an explicit value to
+  // exercise the boundary without touching process.env.
+  const playerCap =
+    typeof tierOrOpts === 'string'
+      ? appConfig.playerCap
+      : (tierOrOpts.playerCap ?? appConfig.playerCap);
   const pin = generatePin();
   const session: GameSession = {
     pin,
     tier,
+    playerCap,
     displaySocketIds: new Set(),
     quiz,
     phase: 'lobby',
@@ -247,24 +255,22 @@ export function reapStalePlayers(game: GameSession): string[] {
 }
 
 export interface CapStatus {
-  hard: number;
-  soft: number;
+  /** Configured maximum concurrent players for this game. */
+  max: number;
+  /** Players currently occupying a slot (connected or within reconnect grace). */
   current: number;
-  upsell: boolean;
+  /** True when the game is at capacity and new players must be rejected. */
   full: boolean;
 }
 
 export function capStatus(game: GameSession): CapStatus {
-  // TEMP M2.5: hardcoded 150 until MID-75 ships tier-aware cap
   const current = Array.from(game.players.values()).filter(
     (p) => p.connected || isWithinReconnectGrace(p),
   ).length;
   return {
-    hard: HARD_CAP,
-    soft: HARD_CAP,
+    max: game.playerCap,
     current,
-    upsell: false,
-    full: current >= HARD_CAP,
+    full: current >= game.playerCap,
   };
 }
 
@@ -627,7 +633,7 @@ export function publicState(game: GameSession): PublicGameState {
         : undefined,
     endedReason: game.endedReason,
     playerCount: cap.current,
-    cap: { hard: cap.hard, soft: cap.soft, upsell: cap.upsell },
+    cap: { max: cap.max },
     players: Array.from(game.players.values()).map((p) => ({
       id: p.id,
       nickname: p.nickname,
@@ -655,5 +661,3 @@ export function personalState(game: GameSession, playerId: string) {
     score: player.score,
   };
 }
-
-export const config = { HARD_CAP, SOFT_CAP_FREE, UPSELL_AT };

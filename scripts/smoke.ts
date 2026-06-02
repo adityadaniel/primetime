@@ -2,6 +2,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import { io } from 'socket.io-client';
+import { config } from '../lib/config';
 import { createGame, detachSocket, joinPlayer, setReconnectGraceForTesting } from '../lib/game';
 import type { Quiz } from '../lib/types';
 
@@ -159,7 +160,11 @@ async function main() {
 }
 
 async function assertCapEnforcement() {
-  console.log('\n--- cap enforcement: hardcoded 150-player limit ---');
+  // OSS: the cap is env-driven (PLAYER_CAP, default 10). Server and this smoke
+  // run share the same lib/config, so we fill exactly config.playerCap slots
+  // and expect the next join to be rejected with code "full".
+  const cap = config.playerCap;
+  console.log(`\n--- cap enforcement: env PLAYER_CAP = ${cap} ---`);
   const capHost = io(URL, { transports: ['websocket'] });
   await new Promise<void>((r) => capHost.on('connect', () => r()));
 
@@ -169,7 +174,7 @@ async function assertCapEnforcement() {
   console.log('cap-test pin:', pin);
 
   const players: ReturnType<typeof io>[] = [];
-  for (let i = 0; i < 150; i++) {
+  for (let i = 0; i < cap; i++) {
     const p = io(URL, { transports: ['websocket'] });
     await new Promise<void>((r) => p.on('connect', () => r()));
     const res = await new Promise<{ ok: boolean; error?: string; code?: string }>((r) =>
@@ -178,32 +183,30 @@ async function assertCapEnforcement() {
     if (!res.ok) throw new Error(`player ${i + 1} unexpectedly rejected: ${res.error}`);
     players.push(p);
   }
-  console.log('150 players joined OK');
+  console.log(`${cap} players joined OK`);
 
   const overflow = io(URL, { transports: ['websocket'] });
   await new Promise<void>((r) => overflow.on('connect', () => r()));
   const rej = await new Promise<{ ok: boolean; error?: string; code?: string }>((r) =>
-    overflow.emit('player:join', pin, 'OneFiftyFirst', r),
+    overflow.emit('player:join', pin, 'Overflow', r),
   );
 
-  if (rej.ok) throw new Error('151st join should have been rejected');
+  if (rej.ok) throw new Error(`player ${cap + 1} should have been rejected`);
   if (rej.code !== 'full') {
     throw new Error(`expected code "full", got "${rej.code}" (error: ${rej.error})`);
   }
-  console.log('151st rejected with code:', rej.code, '·', rej.error);
+  console.log(`player ${cap + 1} rejected with code:`, rej.code, '·', rej.error);
 
   await sleep(50);
   const capState = await new Promise<{
     playerCount?: number;
-    cap?: { soft: number; hard: number; upsell: boolean };
+    cap?: { max: number };
   }>((r) => {
     capHost.once('state', (s) => r(s));
     capHost.emit('host:attach', pin);
   });
-  if (capState.cap?.hard !== 150 || capState.cap?.soft !== 150 || capState.cap?.upsell !== false) {
-    throw new Error(
-      `expected cap {hard:150, soft:150, upsell:false}, got ${JSON.stringify(capState.cap)}`,
-    );
+  if (capState.cap?.max !== cap) {
+    throw new Error(`expected cap {max:${cap}}, got ${JSON.stringify(capState.cap)}`);
   }
   console.log('publicState cap:', capState.cap);
   console.log('cap enforcement: PASS');

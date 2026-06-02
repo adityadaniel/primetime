@@ -88,7 +88,7 @@ The timer auto-locks when it hits zero, and locks early once every connected pla
 - Distinct **INPUT/OUTPUT** visual identity executed across all five surfaces
 - **Player reconnect grace window** — disconnected players have 30 s to rejoin and reclaim their score, nickname, and socket binding
 - **Host disconnect grace pause** — game pauses for 60 s on host drop; resumes seamlessly if the host returns, otherwise ends with `host-left`
-- **Player cap enforcement** — 10-player soft cap on free tier (upsell banner from 8), 150-player hard cap on pro tier
+- **Player cap enforcement** — a single, env-driven cap (`PLAYER_CAP`, default 10). The host lobby shows current/max; a join past the cap is rejected with the `full` code and the player sees a "room is full" message. No tiers, no upgrade prompts.
 - **CSV export of session results** — `GET /host/[pin]/results.csv` once the game is in `final`; includes rank, nickname, score, correct count, total questions, average response time
 - **Light profanity filter** for nicknames — rejects with `nickname-rejected` code so the join page can show a friendly retry
 - Smoke test extended to cover reconnect, host pause, cap enforcement, CSV export, and profanity rejection: `npm run smoke`
