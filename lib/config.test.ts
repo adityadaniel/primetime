@@ -121,6 +121,12 @@ describe('loadConfig — email provider vars', () => {
   it('does not require email vars on the default (none) provider', () => {
     expect(() => loadConfig({})).not.toThrow();
   });
+
+  it('accepts token-print without any SMTP vars', () => {
+    const c = loadConfig({ EMAIL_PROVIDER: 'token-print' });
+    expect(c.emailProvider).toBe('token-print');
+    expect(c.emailEnabled).toBe(true);
+  });
 });
 
 describe('loadConfig — upload provider vars', () => {
