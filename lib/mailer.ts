@@ -1,6 +1,3 @@
-import type { Transporter } from 'nodemailer';
-import * as nodemailer from 'nodemailer';
-import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import type { EmailProvider } from './config';
 
 export interface SendResetEmailParams {
@@ -25,6 +22,20 @@ function formatDevWarning(url: string): string {
 }
 
 async function sendWithSmtp(params: SendResetEmailParams): Promise<SendResetEmailResult> {
+  // Dynamic import: nodemailer is optional. Only resolve it at runtime when
+  // EMAIL_PROVIDER=smtp is configured. If the package is not installed, return
+  // a clear error instead of crashing at module-load time.
+  let nodemailer: typeof import('nodemailer');
+  try {
+    nodemailer = await import('nodemailer');
+  } catch {
+    return {
+      ok: false,
+      error:
+        'nodemailer is not installed. Run `npm install nodemailer` to enable SMTP email.',
+    };
+  }
+
   const host = process.env.SMTP_HOST ?? '';
   const portRaw = process.env.SMTP_PORT ?? '';
   const user = process.env.SMTP_USER ?? '';
@@ -35,7 +46,7 @@ async function sendWithSmtp(params: SendResetEmailParams): Promise<SendResetEmai
     return { ok: false, error: `Invalid SMTP_PORT: ${portRaw}` };
   }
 
-  const transporter: Transporter<SMTPTransport.SentMessageInfo> = nodemailer.createTransport({
+  const transporter = nodemailer.createTransport({
     host,
     port,
     secure: port === 465,
