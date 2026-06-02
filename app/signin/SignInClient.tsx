@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/components/Broadcast';
+import { config } from '@/lib/config';
 
 export default function SignInClient({ enableApple }: { enableApple: boolean }) {
   const router = useRouter();
@@ -122,11 +123,13 @@ export default function SignInClient({ enableApple }: { enableApple: boolean }) 
               />
             </label>
 
-            <div className="flex justify-end">
-              <Link href="/reset" className="ticker text-[11px] tracking-widest underline">
-                FORGOT PASSWORD?
-              </Link>
-            </div>
+            {config.emailEnabled ? (
+              <div className="flex justify-end">
+                <Link href="/reset" className="ticker text-[11px] tracking-widest underline">
+                  FORGOT PASSWORD?
+                </Link>
+              </div>
+            ) : null}
 
             <div role="alert" aria-live="polite">
               {error && (

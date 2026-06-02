@@ -20,9 +20,10 @@ import { z } from 'zod';
  * `password+oauth` (adds third-party providers like Apple on top). */
 export type AuthMode = 'password' | 'password+oauth';
 
-/** EMAIL_PROVIDER — `none` (OSS default, no transactional email),
+/** EMAIL_PROVIDER — `none` (OSS default, reset UI hidden),
+ * `token-print` (log reset URL to server logs; warns in production),
  * `smtp`, or `resend`. */
-export type EmailProvider = 'none' | 'smtp' | 'resend';
+export type EmailProvider = 'none' | 'token-print' | 'smtp' | 'resend';
 
 /** UPLOAD_PROVIDER — `local` (OSS default, on-disk),
  * `s3` (S3-compatible incl. R2), or `uploadthing`. */
@@ -51,7 +52,7 @@ export interface AppConfig {
 }
 
 const AUTH_MODES = ['password', 'password+oauth'] as const;
-const EMAIL_PROVIDERS = ['none', 'smtp', 'resend'] as const;
+const EMAIL_PROVIDERS = ['none', 'token-print', 'smtp', 'resend'] as const;
 const UPLOAD_PROVIDERS = ['local', 's3', 'uploadthing'] as const;
 
 /** Coerce common truthy/falsy spellings; treat unset as the given default. */

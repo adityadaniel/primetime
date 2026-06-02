@@ -2,10 +2,11 @@ import { createHash, randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
+import { sendResetEmail } from '@/lib/reset';
 
 const Body = z.object({ email: z.string().email().max(254) });
 
-const TOKEN_TTL_MS = 30 * 60 * 1000;
+const TOKEN_TTL_MS = 1800000;
 
 function hashToken(raw: string): string {
   return createHash('sha256').update(raw).digest('hex');
@@ -50,8 +51,21 @@ export async function POST(req: Request) {
       expires: new Date(Date.now() + TOKEN_TTL_MS),
     },
   });
-  const url = buildResetUrl(req, raw);
-  console.log('[reset]', url);
 
-  return NextResponse.json(dev ? { ok: true, devUrl: url } : { ok: true });
+  const url = buildResetUrl(req, raw);
+  const sent = await sendResetEmail({ to: email, url });
+
+  if (!sent.ok) {
+    console.error('[reset] failed to send reset email:', sent.error);
+    return NextResponse.json(
+      { ok: false, error: 'Failed to send reset link. Try again later.' },
+      { status: 502 },
+    );
+  }
+
+  if (dev) {
+    return NextResponse.json({ ok: true, devUrl: sent.devUrl ?? url });
+  }
+
+  return NextResponse.json({ ok: true });
 }
