@@ -141,7 +141,7 @@ export function LobbyDisplay({ state, pin }: { state: PublicGameState; pin: stri
             <span className="chyron">CHECK-IN</span>
             <span className="ticker text-[12px] tracking-widest">
               {String(state.players.length).padStart(2, '0')} /{' '}
-              {String(state.cap?.soft ?? 150).padStart(2, '0')}
+              {String(state.cap?.max ?? 10).padStart(2, '0')}
             </span>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">

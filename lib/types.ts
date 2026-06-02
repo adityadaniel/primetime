@@ -63,9 +63,8 @@ export interface PublicGameState {
   endedReason?: 'host-left';
   playerCount?: number;
   cap?: {
-    hard: number;
-    soft: number;
-    upsell: boolean;
+    /** Configured max players for this game (OSS PLAYER_CAP). */
+    max: number;
   };
   players: Array<{ id: string; nickname: string; score: number; connected: boolean }>;
   podium?: Array<{ id: string; nickname: string; score: number; rank: number }>;

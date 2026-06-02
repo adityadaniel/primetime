@@ -260,9 +260,9 @@ describe('joinPlayer lifecycle', () => {
     expect(r.player.score).toBe(0);
   });
 
-  it("rejects with code: 'full' when room is at HARD_CAP (150)", () => {
-    const game = setupGame();
-    for (let i = 0; i < 150; i++) {
+  it("rejects with code: 'full' when room is at the configured cap", () => {
+    const game = createGame(makeQuiz(), { playerCap: 3 });
+    for (let i = 0; i < 3; i++) {
       const r = joinPlayer(game.pin, `s${i}`, `P${i}`);
       if (!r.ok) throw new Error(`unexpected reject at ${i}: ${r.error}`);
     }
@@ -273,18 +273,57 @@ describe('joinPlayer lifecycle', () => {
     expect(overflow.error).toBe('Room is full');
   });
 
-  it('admits 150th but rejects 151st (boundary)', () => {
-    const game = setupGame();
-    for (let i = 0; i < 149; i++) {
+  it('admits the Nth player but rejects the (N+1)th at the cap boundary', () => {
+    const game = createGame(makeQuiz(), { playerCap: 5 });
+    for (let i = 0; i < 4; i++) {
       joinPlayer(game.pin, `s${i}`, `P${i}`);
     }
-    expect(game.players.size).toBe(149);
-    const r150 = joinPlayer(game.pin, 's149', 'P149');
-    expect(r150.ok).toBe(true);
-    const r151 = joinPlayer(game.pin, 's150', 'P150');
-    expect(r151.ok).toBe(false);
-    if (r151.ok) return;
-    expect(r151.code).toBe('full');
+    expect(game.players.size).toBe(4);
+    const r5 = joinPlayer(game.pin, 's4', 'P4');
+    expect(r5.ok).toBe(true);
+    const r6 = joinPlayer(game.pin, 's5', 'P5');
+    expect(r6.ok).toBe(false);
+    if (r6.ok) return;
+    expect(r6.code).toBe('full');
+  });
+
+  it('a custom cap of 50 admits 50 players and rejects the 51st (acceptance)', () => {
+    const game = createGame(makeQuiz(), { playerCap: 50 });
+    for (let i = 0; i < 50; i++) {
+      const r = joinPlayer(game.pin, `s${i}`, `P${i}`);
+      if (!r.ok) throw new Error(`unexpected reject at ${i}: ${r.error}`);
+    }
+    expect(game.players.size).toBe(50);
+    const r51 = joinPlayer(game.pin, 's50', 'P50');
+    expect(r51.ok).toBe(false);
+    if (r51.ok) return;
+    expect(r51.code).toBe('full');
+  });
+
+  it('defaults to the OSS config cap (10) when none is injected', () => {
+    const game = setupGame();
+    for (let i = 0; i < 10; i++) {
+      const r = joinPlayer(game.pin, `s${i}`, `P${i}`);
+      expect(r.ok).toBe(true);
+    }
+    const overflow = joinPlayer(game.pin, 's10', 'P10');
+    expect(overflow.ok).toBe(false);
+    if (overflow.ok) return;
+    expect(overflow.code).toBe('full');
+  });
+
+  it('a reconnecting player is NOT blocked even when the game is at capacity', () => {
+    const game = createGame(makeQuiz(), { playerCap: 2 });
+    const a = mustJoin(game.pin, 's1', 'Alice');
+    mustJoin(game.pin, 's2', 'Bob'); // full at 2
+    detachSocket('s1'); // Alice within grace still holds her slot
+    const stranger = joinPlayer(game.pin, 's3', 'Carol');
+    expect(stranger.ok).toBe(false); // a new player can't take a slot
+    const back = joinPlayer(game.pin, 's4', 'Alice'); // Alice reclaims hers
+    expect(back.ok).toBe(true);
+    if (!back.ok) return;
+    expect(back.reconnected).toBe(true);
+    expect(back.player.id).toBe(a.player.id);
   });
 
   it('rejects whitespace-only nickname (no code, baseline behavior)', () => {
@@ -512,7 +551,7 @@ describe('phase transitions', () => {
   });
 });
 
-describe('capStatus (M2.5 hardcoded behavior)', () => {
+describe('capStatus (OSS env cap)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 0, 1, 12, 0, 0));
@@ -522,40 +561,30 @@ describe('capStatus (M2.5 hardcoded behavior)', () => {
     vi.useRealTimers();
   });
 
-  it('0 connected → not full, hard=soft=150, upsell=false', () => {
-    const game = setupGame();
-    expect(capStatus(game)).toEqual({
-      hard: 150,
-      soft: 150,
-      current: 0,
-      full: false,
-      upsell: false,
-    });
+  it('0 connected → not full, max = configured cap, no tier fields', () => {
+    const game = createGame(makeQuiz(), { playerCap: 10 });
+    expect(capStatus(game)).toEqual({ max: 10, current: 0, full: false });
   });
 
-  it('149 connected → not full', () => {
-    const game = setupGame();
-    for (let i = 0; i < 149; i++) joinPlayer(game.pin, `s${i}`, `P${i}`);
+  it('max reflects the per-game configured cap', () => {
+    const game = createGame(makeQuiz(), { playerCap: 50 });
+    expect(capStatus(game).max).toBe(50);
+  });
+
+  it('one short of the cap → not full', () => {
+    const game = createGame(makeQuiz(), { playerCap: 5 });
+    for (let i = 0; i < 4; i++) joinPlayer(game.pin, `s${i}`, `P${i}`);
     const s = capStatus(game);
     expect(s.full).toBe(false);
-    expect(s.current).toBe(149);
+    expect(s.current).toBe(4);
   });
 
-  it('150 connected → full', () => {
-    const game = setupGame();
-    for (let i = 0; i < 150; i++) joinPlayer(game.pin, `s${i}`, `P${i}`);
+  it('at the cap → full', () => {
+    const game = createGame(makeQuiz(), { playerCap: 5 });
+    for (let i = 0; i < 5; i++) joinPlayer(game.pin, `s${i}`, `P${i}`);
     const s = capStatus(game);
     expect(s.full).toBe(true);
-    expect(s.current).toBe(150);
-  });
-
-  it('upsell is ALWAYS false (M2.5 hardcode)', () => {
-    const game = setupGame();
-    expect(capStatus(game).upsell).toBe(false);
-    for (let i = 0; i < 9; i++) joinPlayer(game.pin, `s${i}`, `P${i}`);
-    expect(capStatus(game).upsell).toBe(false);
-    for (let i = 9; i < 50; i++) joinPlayer(game.pin, `s${i}`, `P${i}`);
-    expect(capStatus(game).upsell).toBe(false);
+    expect(s.current).toBe(5);
   });
 
   it('disconnected players within grace ARE counted (codex F6 baseline)', () => {
@@ -742,7 +771,7 @@ describe('misc surfaces (coverage)', () => {
     expect(s.pin).toBe(game.pin);
     expect(s.phase).toBe('lobby');
     expect(s.players).toHaveLength(1);
-    expect(s.cap).toEqual({ hard: 150, soft: 150, upsell: false });
+    expect(s.cap).toEqual({ max: 10 });
     expect(s.totalQuestions).toBe(2);
   });
 

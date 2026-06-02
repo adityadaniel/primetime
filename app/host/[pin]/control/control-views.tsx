@@ -36,9 +36,7 @@ export function ControlView({
     phase === 'question' || phase === 'reveal' ? (state?.players?.length ?? 0) : 0;
 
   const playerCount = state?.playerCount ?? state?.players.length ?? 0;
-  const softCap = state?.cap?.soft ?? 10;
-  const hardCap = state?.cap?.hard ?? 150;
-  const upsell = state?.cap?.upsell ?? false;
+  const maxPlayers = state?.cap?.max ?? 10;
 
   const board = state ? [...state.players].sort((a, b) => b.score - a.score) : [];
 
@@ -75,31 +73,6 @@ export function ControlView({
         </div>
       </header>
       <SmpteBars className="h-1.5 mt-3" />
-
-      {/* TODO M3-MID-75: restore upsell banner once tier-aware cap is back */}
-      {false && upsell && (
-        <div className="px-6 mt-3" role="status" aria-live="polite">
-          <div
-            className="ink-border halftone px-4 py-3 flex items-center gap-4 max-w-[1500px] mx-auto"
-            style={{ background: 'var(--marigold)', color: 'var(--ink)' }}
-          >
-            <span
-              className="ticker text-[11px] tracking-widest px-2 py-[2px] ink-border shrink-0"
-              style={{ background: 'var(--ink)', color: 'var(--bone)' }}
-            >
-              UPSELL · ADVISORY
-            </span>
-            <p className="font-editorial text-[15px] md:text-base leading-tight flex-1">
-              Approaching <span className="ticker">{softCap}</span>-player limit. Upgrade to{' '}
-              <span className="ticker">PRO</span> for <span className="ticker">{hardCap}</span>{' '}
-              players.
-            </p>
-            <span className="ticker text-[11px] tracking-widest opacity-70 hidden md:inline">
-              {String(playerCount).padStart(2, '0')} / {String(softCap).padStart(2, '0')}
-            </span>
-          </div>
-        </div>
-      )}
 
       <section className="px-6 pt-6 max-w-[1500px] mx-auto grid grid-cols-12 gap-5">
         <div
@@ -138,7 +111,7 @@ export function ControlView({
             <PanelStat
               cols="col-span-12 md:col-span-3"
               label="PLAYERS"
-              value={`${String(playerCount).padStart(2, '0')} / ${String(softCap).padStart(2, '0')}`}
+              value={`${String(playerCount).padStart(2, '0')} / ${String(maxPlayers).padStart(2, '0')}`}
             />
             <PanelStat
               cols="col-span-12 md:col-span-3"
@@ -182,7 +155,7 @@ export function ControlView({
           <div className="flex items-center justify-between">
             <span className="chyron">STANDINGS</span>
             <span className="ticker text-[11px] tracking-widest opacity-60">
-              {String(playerCount).padStart(2, '0')} / {String(softCap).padStart(2, '0')} PLAYERS
+              {String(playerCount).padStart(2, '0')} / {String(maxPlayers).padStart(2, '0')} PLAYERS
             </span>
           </div>
           <ol className="mt-3 divide-y" style={{ borderColor: 'rgba(15,15,15,.18)' }}>
