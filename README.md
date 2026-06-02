@@ -23,6 +23,30 @@ Single command boots Next.js + the WebSocket server on the **same port**: <http:
 > PORT=4000 npm run dev
 > ```
 
+## Configuration — OSS vs SaaS (MID-214)
+
+The same codebase ships two ways. **OSS self-host is the default for every
+flag** — a fresh clone boots with an empty `.env` (beyond `DATABASE_URL` /
+`AUTH_SECRET`) and never needs a Stripe, Resend, OAuth, or cloud-storage
+account. Flags are parsed once in [`lib/config.ts`](lib/config.ts); an invalid
+value, or a provider you explicitly selected without its required vars, **fails
+fast at startup** with a clear error.
+
+| Env var | Values | OSS default | Notes |
+|---|---|---|---|
+| `AUTH_MODE` | `password` · `password+oauth` | `password` | `password` = local email/password only. `password+oauth` additionally enables third-party providers (Apple, gated separately). |
+| `EMAIL_PROVIDER` | `none` · `smtp` · `resend` | `none` | `smtp` requires `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`. `resend` requires `RESEND_API_KEY`. |
+| `UPLOAD_PROVIDER` | `local` · `s3` · `uploadthing` | `local` | `local` = on-disk. `s3` (incl. Cloudflare R2) requires `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`. `uploadthing` requires `UPLOADTHING_TOKEN`. |
+| `BILLING_ENABLED` | `true` · `false` | `false` | OSS ships with no billing/upgrade flow. |
+| `PLAYER_CAP` | integer ≥ 1 | `10` | Max players per game. |
+| `ENABLE_APPLE_SIGNIN` | `true` · `false` | `false` | Only takes effect when `AUTH_MODE=password+oauth`. When `true`, all four `APPLE_*` vars are required. |
+
+> **Self-hosting OSS?** Leave all of the above unset (or at their defaults).
+> Password auth, no email, local uploads, billing off, and a 10-player cap are
+> the out-of-the-box behaviour — no SaaS provider accounts required.
+
+See [`.env.example`](.env.example) for the full annotated list.
+
 ## Live demo flow
 
 Open three browser windows on the same machine (or use Chrome profiles):

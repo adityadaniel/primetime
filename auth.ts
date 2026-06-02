@@ -5,9 +5,12 @@ import Apple from 'next-auth/providers/apple';
 import Credentials from 'next-auth/providers/credentials';
 import authConfig from '@/auth.config';
 import { getAppleClientSecret } from '@/lib/apple-secret';
+import { config } from '@/lib/config';
 import { prisma } from '@/lib/db';
 
-const enableApple = process.env.ENABLE_APPLE_SIGNIN === 'true';
+// Apple is enabled only when AUTH_MODE=password+oauth AND ENABLE_APPLE_SIGNIN=true
+// (see lib/config.ts). OSS default is password-only, so Apple stays off.
+const enableApple = config.appleEnabled;
 
 export const { handlers, signIn, signOut, auth } = NextAuth(async () => {
   const providers: NextAuthConfig['providers'] = [
