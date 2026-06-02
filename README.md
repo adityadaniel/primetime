@@ -1,51 +1,159 @@
 [![PR](https://github.com/adityadaniel/inputoutput/actions/workflows/pr.yml/badge.svg)](https://github.com/adityadaniel/inputoutput/actions/workflows/pr.yml)
 [![Main](https://github.com/adityadaniel/inputoutput/actions/workflows/main.yml/badge.svg)](https://github.com/adityadaniel/inputoutput/actions/workflows/main.yml)
 
-# INPUT/OUTPUT — Kahoot-style live quiz (M1 + M2)
+# INPUT/OUTPUT — Live quiz game (open-source)
+
+> **OSS build uses sane defaults — no SaaS keys required.** Clone, install, and run with zero configuration beyond a database URL. See [Quickstart (local)](#quickstart-local) and [Environment reference](#environment-reference) below.
 
 A real-time quiz game with a vintage broadcast-graphics aesthetic. Built end-to-end as the **M1 — Core Loop** and **M2 — Resilience & Scale** milestones described in `PRD.md` and `CLAUDE.md`.
 
 > See **`DESIGN.md`** for the visual identity, palette, type stack, and motion principles.
 >
-> M3 issues tracked in Linear: <https://linear.app/midnight-labs/project/kahoot-clone-broadcast-4a50abefef00>
+> M3 issues tracked in <https://linear.app/midnight-labs/project/kahoot-clone-broadcast-4a50abefef00>.
 
-## Quick start
+---
+
+## Quickstart (local)
+
+**No SaaS accounts needed.** The defaults are password auth, no email, local uploads, and no billing.
+
+### 1. Prerequisites
+
+- Node.js 24+
+- Postgres 16 (Docker, Postgres.app, or Homebrew — see [Database setup](#database-setup))
+
+### 2. Clone and install
 
 ```bash
+git clone https://github.com/adityadaniel/inputoutput.git
+cd inputoutput
 npm install
+```
+
+### 3. Database
+
+The fastest path (Docker):
+
+```bash
+npm run db:up          # starts Postgres 16 via Docker Compose
+```
+
+Or with Postgres.app / Homebrew — see [Database setup](#database-setup).
+
+### 4. Environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and set at minimum:
+
+```
+DATABASE_URL=postgresql://inputoutput:inputoutput@localhost:5432/inputoutput_dev
+AUTH_SECRET=your-random-secret-here
+```
+
+Generate a secret: `openssl rand -hex 32`
+
+### 5. Run migrations
+
+```bash
+npm run db:migrate
+```
+
+### 6. Boot
+
+```bash
 npm run dev
 ```
 
 Single command boots Next.js + the WebSocket server on the **same port**: <http://localhost:4321>.
 
-> Port 3000 is intentionally avoided because another local dev app on this machine occupies it. To override:
-> ```bash
-> PORT=4000 npm run dev
-> ```
+> Port 3000 is intentionally avoided. To override: `PORT=4000 npm run dev`
 
-## Configuration — OSS vs SaaS (MID-214)
+### 7. Play
 
-The same codebase ships two ways. **OSS self-host is the default for every
-flag** — a fresh clone boots with an empty `.env` (beyond `DATABASE_URL` /
-`AUTH_SECRET`) and never needs a Stripe, Resend, OAuth, or cloud-storage
-account. Flags are parsed once in [`lib/config.ts`](lib/config.ts); an invalid
-value, or a provider you explicitly selected without its required vars, **fails
-fast at startup** with a clear error.
+1. Open <http://localhost:4321> → click **Host**
+2. Build a quiz → click **GO LIVE** → note the 6-digit PIN
+3. Open <http://localhost:4321/join> → enter PIN + nickname
+4. Play!
 
-| Env var | Values | OSS default | Notes |
-|---|---|---|---|
-| `AUTH_MODE` | `password` · `password+oauth` | `password` | `password` = local email/password only. `password+oauth` additionally enables third-party providers (Apple, gated separately). |
-| `EMAIL_PROVIDER` | `none` · `smtp` · `resend` | `none` | `smtp` requires `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`. `resend` requires `RESEND_API_KEY`. |
-| `UPLOAD_PROVIDER` | `local` · `s3` · `uploadthing` | `local` | `local` = on-disk. `s3` (incl. Cloudflare R2) requires `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`. `uploadthing` requires `UPLOADTHING_TOKEN`. |
-| `BILLING_ENABLED` | `true` · `false` | `false` | OSS ships with no billing/upgrade flow. |
-| `PLAYER_CAP` | integer ≥ 1 | `10` | Max players per game. |
-| `ENABLE_APPLE_SIGNIN` | `true` · `false` | `false` | Only takes effect when `AUTH_MODE=password+oauth`. When `true`, all four `APPLE_*` vars are required. |
+---
 
-> **Self-hosting OSS?** Leave all of the above unset (or at their defaults).
-> Password auth, no email, local uploads, billing off, and a 10-player cap are
-> the out-of-the-box behaviour — no SaaS provider accounts required.
+## Quickstart (Docker — self-host)
 
-See [`.env.example`](.env.example) for the full annotated list.
+For production self-hosting, run the app + database in Docker:
+
+```bash
+# Build the app image
+docker build -t inputoutput .
+
+# Run with docker-compose (app + Postgres)
+docker compose up -d
+```
+
+The app is available at `http://localhost:4321`. Expose via [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) or your reverse proxy of choice.
+
+---
+
+## Environment reference
+
+All flags default to the OSS path. **Unset = OSS default.** You only need to set these when you want SaaS behavior.
+
+| Env var | Values | Default | Owning ticket | Notes |
+|---|---|---|---|---|
+| `AUTH_MODE` | `password` · `password+oauth` | `password` | MID-213 | `password` = local email/password only. `password+oauth` enables Apple (gated by `ENABLE_APPLE_SIGNIN`). |
+| `EMAIL_PROVIDER` | `none` · `token-print` · `smtp` · `resend` | `none` | MID-215 | `token-print` logs reset URLs to server console (dev). `smtp` requires `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`. `resend` requires `RESEND_API_KEY`. |
+| `UPLOAD_PROVIDER` | `local` · `s3` · `uploadthing` | `local` | MID-217 | `local` = on-disk at `public/uploads/`. `s3` (incl. R2/MinIO) requires `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`. `uploadthing` requires `UPLOADTHING_TOKEN`. |
+| `BILLING_ENABLED` | `true` · `false` | `false` | MID-214 | OSS ships with no billing/upgrade flow. |
+| `PLAYER_CAP` | integer ≥ 1 | `10` | MID-216 | Max players per game. |
+| `UPLOAD_MAX_BYTES` | bytes (integer) | `5242880` (5 MB) | MID-217 | Max file upload size in bytes. |
+| `UPLOAD_DIR` | absolute path | `<cwd>/public/uploads` | MID-217 | Upload directory on disk. |
+| `AUTH_SECRET` | any non-empty string | — | MID-213 | **Required.** JWT session secret. Generate: `openssl rand -hex 32`. |
+| `DATABASE_URL` | postgres connection URI | — | — | **Required.** |
+| `ENABLE_APPLE_SIGNIN` | `true` · `false` | `false` | MID-213 | Only effective when `AUTH_MODE=password+oauth`. Requires `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`. |
+| `NEXTAUTH_URL` | URL | `http://localhost:4321` | MID-213 | Your app's public URL. |
+| `NEXT_PUBLIC_SITE_URL` | URL | — | — | Your app's public URL (client-side). |
+
+> **Self-hosting OSS?** Only `DATABASE_URL` and `AUTH_SECRET` are required. Leave everything else at defaults — password auth, no email, local uploads, no billing.
+
+---
+
+## Auth modes
+
+| Mode | What it does | Config |
+|---|---|---|
+| **Password-only** (default) | Email/password signup and login. No third-party OAuth. | `AUTH_MODE=password` |
+| **Password + OAuth** | Password auth plus third-party providers (Apple). | `AUTH_MODE=password+oauth` + `ENABLE_APPLE_SIGNIN=true` + Apple credential vars |
+
+See [MID-213](https://linear.app/midnight-labs/issue/MID-213) for implementation details.
+
+---
+
+## Email modes
+
+| Mode | What it does | Config |
+|---|---|---|
+| **None** (default) | No email. Forgot-password link is hidden. | `EMAIL_PROVIDER=none` |
+| **Token print** | Logs reset URL to server console instead of sending. Dev-only — shows a warning in production. | `EMAIL_PROVIDER=token-print` |
+| **SMTP** | Sends real emails via an SMTP server (e.g. Mailpit, SES, Postmark). | `EMAIL_PROVIDER=smtp` + `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` |
+| **Resend** | Sends via the Resend API. | `EMAIL_PROVIDER=resend` + `RESEND_API_KEY` |
+
+See [MID-215](https://linear.app/midnight-labs/issue/MID-215) for implementation details.
+
+---
+
+## Upload modes
+
+| Mode | What it does | Config |
+|---|---|---|
+| **Local** (default) | Writes files to `public/uploads/` on disk. Served by Next.js static file serving. | `UPLOAD_PROVIDER=local` |
+| **S3-compatible** | Uploads to any S3-compatible bucket (AWS S3, Cloudflare R2, MinIO, etc.). | `UPLOAD_PROVIDER=s3` + S3 credential vars |
+| **UploadThing** | Uploads via the UploadThing SaaS. | `UPLOAD_PROVIDER=uploadthing` + `UPLOADTHING_TOKEN` |
+
+See [MID-217](https://linear.app/midnight-labs/issue/MID-217) for implementation details.
+
+---
 
 ## Live demo flow
 
@@ -61,6 +169,8 @@ In the **control panel** (`/host/[PIN]/control`) the host clicks the right-rail 
 
 The timer auto-locks when it hits zero, and locks early once every connected player has answered.
 
+---
+
 ## Surfaces
 
 | Route | Who | Purpose |
@@ -71,6 +181,8 @@ The timer auto-locks when it hits zero, and locks early once every connected pla
 | `/host/[pin]/display` | Audience | On-air feed (fullscreen on projector) — PIN, question, shapes-only, podium |
 | `/join` | Player | PIN + nickname |
 | `/play/[pin]` | Player | Lobby → answer → reveal → final |
+
+---
 
 ## What's done (M1 + M2)
 
@@ -93,6 +205,11 @@ The timer auto-locks when it hits zero, and locks early once every connected pla
 - **Light profanity filter** for nicknames — rejects with `nickname-rejected` code so the join page can show a friendly retry
 - Smoke test extended to cover reconnect, host pause, cap enforcement, CSV export, and profanity rejection: `npm run smoke`
 - Word Cloud activity (alternative to quiz): host posts a prompt, players submit words, real-time projection cloud with CSV export
+- **OSS configuration surface** — password auth, email, uploads, billing, player cap all configurable via env vars. Defaults require zero SaaS accounts.
+- **Local file upload** — `POST /api/upload` for on-disk file uploads (quiz covers, etc.) with size and MIME validation
+- **Password reset** — optional SMTP or token-print reset flow for OSS self-hosters
+
+---
 
 ## What's stubbed / deferred (M3)
 
@@ -102,9 +219,11 @@ The timer auto-locks when it hits zero, and locks early once every connected pla
 - **Stripe billing + Pro tier upgrade** — tier flag exists in `createGame`, billing flow does not
 - **Session history & analytics** — results vanish at process exit
 - **Redis pub/sub for multi-node** — single-node only; would need the Socket.IO Redis adapter to scale horizontally
-- **Image uploads in questions** — text-only questions for now
+- **Image uploads in questions** — text-only questions for now (upload endpoint exists but isn't wired into the question builder yet)
 - **Playwright E2E** — coverage today is the headless smoke test
 - **Browser tested:** Chrome on macOS. Should work in modern Safari/Firefox but not exhaustively verified.
+
+---
 
 ## Project layout
 
@@ -116,17 +235,24 @@ app/
   host/[pin]/display/page.tsx    on-air feed
   join/page.tsx                  player entry
   play/[pin]/page.tsx            player live view
+  api/upload/route.ts            local file upload endpoint
 components/
   Broadcast.tsx                  chyron, frame counter, on-air, smpte bars, clock
   Countdown.tsx                  ring countdown
   Shape.tsx                      4 answer shapes (triangle / diamond / circle / square)
 lib/
+  config.ts                      OSS ⇄ SaaS config surface (env flags)
   game.ts                        in-memory game state + scoring
   socket.ts                      browser socket singleton hook
   types.ts                       shared types
+  upload.ts                      local file upload module
+  mailer.ts                      email transport (SMTP / token-print)
+  reset.ts                       password reset email wrapper
 server.ts                        Next.js + Socket.IO on one port
 DESIGN.md                        visual identity rationale
 ```
+
+---
 
 ## Scripts
 
@@ -134,10 +260,17 @@ DESIGN.md                        visual identity rationale
 npm run dev      # start everything on http://localhost:4321
 npm run qa       # vanilla Next dev on :4322 for /dev/fixtures (no socket, no DB)
 npm run build    # next build
-npm start        # production-ish start (still tsx-driven)
+npm run start    # production-ish start (still tsx-driven)
 npm run smoke    # end-to-end ws smoke test (server must be running)
 npm test         # vitest (lib/* unit tests + fixture × surface snapshots)
+npm run db:up    # start Postgres via Docker Compose
+npm run db:down  # stop Postgres
+npm run db:reset # nuke and rebuild DB
+npm run db:migrate  # apply Prisma migrations
+npm run db:studio   # browse data at localhost:5555
 ```
+
+---
 
 ## Dev fixtures
 
@@ -168,7 +301,7 @@ http://localhost:4322/dev/fixtures?id=question-long-stem&surface=display&bare=1
 
 This is the mode QA agents should use when checking layout, font clamps,
 or anything `vw`-based — the regular harness wraps the surface in chrome
-that eats viewport width and height and skews `clamp()` math.
+that eats viewport height and skews `clamp()` math.
 
 A small `← exit bare` pill in the bottom-right returns you to the regular
 harness with the same fixture and surface preselected.
@@ -179,35 +312,26 @@ The same fixture catalog drives Vitest snapshot tests
 (`app/dev/fixtures/fixtures.test.tsx`) — run `npm test` and any unintended
 visual change shows up as a snapshot diff.
 
+---
 
 ## Database setup
 
 Local Postgres 16 required.
 
-### Recommended: Postgres.app (one-click on macOS)
+### Docker Compose (recommended)
+
+```bash
+npm run db:up
+```
+
+Uses the same image, credentials, and database name as CI. See `docker-compose.yml`.
+
+### Postgres.app (one-click on macOS)
+
 1. Download from <https://postgresapp.com> (already installed if `/Applications/Postgres.app` exists).
 2. Open the app, click "Initialize" on first run.
 3. Add to your shell: `export PATH="/Applications/Postgres.app/Contents/Versions/latest/bin:$PATH"`
 4. Create role + dev database: `createuser inputoutput && createdb -O inputoutput inputoutput_dev`
-
-### Docker Compose
-
-```yaml
-# docker-compose.yml
-services:
-  db:
-    image: postgres:16
-    ports: ["5432:5432"]
-    environment:
-      POSTGRES_USER: inputoutput
-      POSTGRES_PASSWORD: inputoutput
-      POSTGRES_DB: inputoutput_dev
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-volumes: { pgdata: {} }
-```
-
-Then `docker compose up -d`.
 
 ### Homebrew
 
@@ -227,38 +351,38 @@ npm run db:reset      # nuke and rebuild (no seed yet)
 npm run db:studio     # browse data at localhost:5555
 ```
 
-## For other academies
+---
+
+## Self-hosting (for other academies)
 
 This is the internal tool we use to run live in-room workshop activities at our academy. It's not a SaaS and there's no hosted version — but the install path is open, and the repo is set up so any other academy can clone it, point it at their own domain, and run their own instance.
 
 ### What you need
 
-- A Mac (mini, Studio, or any modern MacBook) with at least 8 GB RAM — this is the machine that hosts the app during workshops
+- A machine (Mac mini, MacBook, or Linux server) with Node.js 24+
 - A domain you control, with DNS managed by Cloudflare (free tier is fine)
 - About 30 minutes for first-time setup
 
 ### Steps
 
-1. Clone the repo on the Mac you want as the server.
-2. Run `bash scripts/setup.sh`. The script installs prerequisites (Node, Postgres), sets up the database, walks you through provisioning a Cloudflare Tunnel for your domain, and optionally seeds a sample quiz.
-3. Start the app: `npm run start`.
+1. Clone the repo on your server.
+2. Run `bash scripts/setup.sh`. The script installs prerequisites, sets up the database, walks you through provisioning a Cloudflare Tunnel for your domain, and optionally seeds a sample quiz.
+3. Start the app: `npm run dev` (or `npm run start` for production).
 4. In a separate terminal, start the tunnel: `cloudflared tunnel run <your-tunnel-name>`.
-5. Workshops happen at `https://live.<your-domain>` — players scan a QR code on the host's screen to join. The host machine stays in the room; players hit it through the tunnel from their phones.
+5. Workshops happen at `https://live.<your-domain>` — players scan a QR code on the host's screen to join.
 
 ### Customize
 
 This fork is branded **INPUT/OUTPUT**. You'll want to swap that out for your own academy's identity. The things to change:
 
-- **Wordmark, colors, design tokens** — `landing/` and `app/globals.css`. Pick your own name, palette, and type stack.
+- **Wordmark, colors, design tokens** — `app/globals.css`. Pick your own name, palette, and type stack.
 - **Page metadata** — `app/layout.tsx` (title, description, OG tags).
-- **Sample quiz content** — `prisma/seed.ts` (lands with MID-140; safe to edit once it exists).
+- **Sample quiz content** — `prisma/seed.ts`.
 
 Everything else (game logic, scoring, real-time wiring, host/display/player surfaces) is generic and shouldn't need touching.
 
-### License
-
-MIT — fork it, modify it, ship it at your academy. See [LICENSE](./LICENSE).
+---
 
 ## License
 
-MIT. See [LICENSE](./LICENSE).
+MIT — fork it, modify it, ship it at your academy. See [LICENSE](./LICENSE).
