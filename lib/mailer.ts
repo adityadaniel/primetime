@@ -22,19 +22,6 @@ function formatDevWarning(url: string): string {
 }
 
 async function sendWithSmtp(params: SendResetEmailParams): Promise<SendResetEmailResult> {
-  // Dynamic import: nodemailer is optional. Only resolve it at runtime when
-  // EMAIL_PROVIDER=smtp is configured. If the package is not installed, return
-  // a clear error instead of crashing at module-load time.
-  let nodemailer: typeof import('nodemailer');
-  try {
-    nodemailer = await import('nodemailer');
-  } catch {
-    return {
-      ok: false,
-      error: 'nodemailer is not installed. Run `npm install nodemailer` to enable SMTP email.',
-    };
-  }
-
   const host = process.env.SMTP_HOST ?? '';
   const portRaw = process.env.SMTP_PORT ?? '';
   const user = process.env.SMTP_USER ?? '';
@@ -45,21 +32,36 @@ async function sendWithSmtp(params: SendResetEmailParams): Promise<SendResetEmai
     return { ok: false, error: `Invalid SMTP_PORT: ${portRaw}` };
   }
 
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass },
-  });
+  // Dynamic import: nodemailer is optional. Only resolve at runtime when
+  // EMAIL_PROVIDER=smtp is configured and env validation already passed.
+  // If the package is not installed, return a clear actionable error.
+  try {
+    const nodemailer = await import('nodemailer');
 
-  await transporter.sendMail({
-    from,
-    to: params.to,
-    subject: 'Reset your INPUT/OUTPUT password',
-    text: `Open this link to reset your password: ${params.url}\n\nIf you did not request this, ignore this email.`,
-    html: `<p>Open this link to reset your password: <a href="${params.url}">${params.url}</a></p><p>If you did not request this, ignore this email.</p>`,
-  });
-  return { ok: true };
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
+    });
+
+    await transporter.sendMail({
+      from,
+      to: params.to,
+      subject: 'Reset your INPUT/OUTPUT password',
+      text: `Open this link to reset your password: ${params.url}\n\nIf you did not request this, ignore this email.`,
+      html: `<p>Open this link to reset your password: <a href="${params.url}">${params.url}</a></p><p>If you did not request this, ignore this email.</p>`,
+    });
+    return { ok: true };
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message?.includes('Cannot find module')) {
+      return {
+        ok: false,
+        error: 'nodemailer is not installed. Run `npm install nodemailer` to enable SMTP email.',
+      };
+    }
+    throw err;
+  }
 }
 
 export function buildResetMailer(provider: EmailProvider): ResetMailer {
