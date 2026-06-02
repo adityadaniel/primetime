@@ -114,8 +114,8 @@
     },
     "tick-urgent": {
       "slug": "tick-urgent",
-      "label": "Countdown tick (last 5 seconds)",
-      "surface": "host display + player — last 5 ticks of countdown",
+      "label": "Countdown tick (last 3 seconds)",
+      "surface": "host display + player — last 3 seconds of countdown (looped)",
       "file": "/sounds/tick-urgent.mp3",
       "loop": true,
       "durationSec": 11.96,

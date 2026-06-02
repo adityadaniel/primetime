@@ -13,7 +13,7 @@ export default function SignInClient({ enableApple }: { enableApple: boolean }) 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
-  const [oauthPending, setOauthPending] = useState<'google' | 'apple' | null>(null);
+  const [oauthPending, setOauthPending] = useState<'apple' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
@@ -39,7 +39,7 @@ export default function SignInClient({ enableApple }: { enableApple: boolean }) 
     router.refresh();
   }
 
-  function oauth(provider: 'google' | 'apple') {
+  function oauth(provider: 'apple') {
     setOauthPending(provider);
     signIn(provider, { callbackUrl });
   }
@@ -68,36 +68,33 @@ export default function SignInClient({ enableApple }: { enableApple: boolean }) 
           </h1>
           <p className="font-editorial italic text-base mt-1 opacity-80">Step into the studio.</p>
 
-          <div className="mt-6 space-y-3">
-            <button
-              type="button"
-              onClick={() => oauth('google')}
-              disabled={!!oauthPending}
-              className="w-full ink-border ticker tracking-widest text-[12px] py-4"
-              style={{ background: 'var(--bone)', color: 'var(--ink)', minHeight: 56 }}
-            >
-              {oauthPending === 'google' ? 'REDIRECTING…' : 'CONTINUE WITH GOOGLE'}
-            </button>
-            {enableApple && (
-              <button
-                type="button"
-                onClick={() => oauth('apple')}
-                disabled={!!oauthPending}
-                className="w-full ink-border ticker tracking-widest text-[12px] py-4"
-                style={{ background: 'var(--ink)', color: 'var(--bone)', minHeight: 56 }}
-              >
-                {oauthPending === 'apple' ? 'REDIRECTING…' : 'CONTINUE WITH APPLE'}
-              </button>
-            )}
-          </div>
+          {enableApple && (
+            <>
+              <div className="mt-6 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => oauth('apple')}
+                  disabled={!!oauthPending}
+                  className="w-full ink-border ticker tracking-widest text-[12px] py-4"
+                  style={{ background: 'var(--ink)', color: 'var(--bone)', minHeight: 56 }}
+                >
+                  {oauthPending === 'apple' ? 'REDIRECTING…' : 'CONTINUE WITH APPLE'}
+                </button>
+              </div>
 
-          <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 border-t-2" style={{ borderColor: 'var(--ink)' }} />
-            <span className="ticker text-[11px] tracking-widest opacity-70">OR</span>
-            <div className="flex-1 border-t-2" style={{ borderColor: 'var(--ink)' }} />
-          </div>
+              <div className="flex items-center gap-3 my-6">
+                <div className="flex-1 border-t-2" style={{ borderColor: 'var(--ink)' }} />
+                <span className="ticker text-[11px] tracking-widest opacity-70">OR</span>
+                <div className="flex-1 border-t-2" style={{ borderColor: 'var(--ink)' }} />
+              </div>
+            </>
+          )}
 
-          <form onSubmit={submit} className="space-y-3" noValidate>
+          <form
+            onSubmit={submit}
+            className={enableApple ? 'space-y-3' : 'mt-6 space-y-3'}
+            noValidate
+          >
             <label className="block">
               <span className="chyron">EMAIL</span>
               <input

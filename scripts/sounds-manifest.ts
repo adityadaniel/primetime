@@ -5,6 +5,12 @@
 // `public/sounds/<slug>.mp3`, with metadata captured in
 // `public/sounds/manifest.json`.
 //
+// IMPORTANT — keep this file in sync with `public/sounds/manifest.json`.
+// `lib/sfx-assets.test.ts` enforces that the slug set, loop flags, and
+// label/surface metadata match between source and committed manifest. See
+// `scripts/generate-sounds.ts` for the regeneration path; manual edits to
+// individual entries are fine as long as the test passes.
+//
 // Aesthetic anchor: late-60s/early-70s broadcast control room.
 // See `DESIGN.md`.
 
@@ -29,10 +35,9 @@ export const SOUNDS: SoundSpec[] = [
   // ───────────────────────── LOOPS ─────────────────────────
   {
     slug: 'lobby-ambience',
-    label: 'Lobby ambience',
+    label: 'Lobby jazz',
     surface: 'host display + player lobby',
-    prompt:
-      'Warm vintage 1970s broadcast control room ambience. Distant teletype machine ticking, faint reel-to-reel tape hiss, soft analog hum at 60Hz, subtle sub-bass swell, no melody, no vocals. Loops cleanly. Calm but expectant — pre-show studio before a live broadcast.',
+    prompt: 'Manual lobby jazz replacement for the host display + player lobby ambience.',
     soundLoop: true,
     soundTempo: 70,
     soundKey: 'Am',
@@ -40,6 +45,16 @@ export const SOUNDS: SoundSpec[] = [
   {
     slug: 'question-tension',
     label: 'Question tension bed',
+    surface: 'host display + player + control during question phase',
+    prompt:
+      'Tense pulsing broadcast sub-bass loop. Slow heartbeat-like analog synth pulse on every beat, faint metallic ride cymbal accent, distant ticking metronome. Urgent but restrained — like a 1970s game show countdown bed. No melody, no vocals, no drums. Loops cleanly.',
+    soundLoop: true,
+    soundTempo: 120,
+    soundKey: 'Cm',
+  },
+  {
+    slug: 'question-tension-long',
+    label: 'Question tension bed (long)',
     surface: 'host display + player + control during question phase',
     prompt:
       'Tense pulsing broadcast sub-bass loop. Slow heartbeat-like analog synth pulse on every beat, faint metallic ride cymbal accent, distant ticking metronome. Urgent but restrained — like a 1970s game show countdown bed. No melody, no vocals, no drums. Loops cleanly.',
@@ -92,12 +107,15 @@ export const SOUNDS: SoundSpec[] = [
     soundLoop: false,
   },
   {
+    // Despite the slug, this is generated/used as a continuous ~12s ticking
+    // loop — `lib/sfx.ts` arms it via `crossfadeToUrgent` during the final 3
+    // seconds of the countdown rather than firing per-second one-shots.
     slug: 'tick-urgent',
-    label: 'Countdown tick (last 5 seconds)',
-    surface: 'host display + player — last 5 ticks of countdown',
+    label: 'Countdown tick (last 3 seconds)',
+    surface: 'host display + player — last 3 seconds of countdown (looped)',
     prompt:
-      'A sharper, harder analog studio clock tick. Mechanical, slightly metallic, close-mic, no reverb. About 80 milliseconds. Tense, last-five-seconds-of-countdown energy. 1970s broadcast control-room style.',
-    soundLoop: false,
+      'A sharper, harder analog studio clock tick. Mechanical, slightly metallic, close-mic, no reverb. About 80 milliseconds. Tense, last-three-seconds-of-countdown energy. 1970s broadcast control-room style.',
+    soundLoop: true,
   },
   {
     slug: 'time-up',

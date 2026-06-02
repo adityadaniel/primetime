@@ -56,15 +56,40 @@ export default function QuizClient({ pin }: { pin: string }) {
 
   useEffect(() => {
     if (state?.phase !== 'question' || !state?.endsAt) return;
+    // While paused, hold all timing audio: the server clock (endsAt) is
+    // frozen-in-time but Date.now() keeps moving, so without this guard the
+    // urgent crossfade fires the moment we cross the threshold relative to
+    // wall-clock and the urgent loop runs through a paused game.
+    if (state.paused) {
+      sfx.stopUrgentTickLoop();
+      sfx.stopQuestionTension();
+      return;
+    }
     urgentArmedRef.current = false;
     lastTickSecRef.current = -1;
+    let cancelled = false;
+    // Re-start the question bed on resume if we still have headroom — it was
+    // stopped by the paused branch above. If remaining time already sits in
+    // the urgent window, skip the bed and arm urgent immediately.
+    const msLeftAtMount = Math.max(0, (state.endsAt ?? 0) - Date.now());
+    if (msLeftAtMount > 3000) {
+      sfx.startQuestionTension();
+    } else if (msLeftAtMount > 0) {
+      urgentArmedRef.current = true;
+      sfx.crossfadeToUrgent();
+    }
     const id = window.setInterval(() => {
+      if (cancelled) return;
       const msLeft = Math.max(0, (state.endsAt ?? 0) - Date.now());
       const sec = Math.ceil(msLeft / 1000);
       if (sec !== lastTickSecRef.current && sec > 0 && sec <= 3) {
         if (!urgentArmedRef.current) {
           urgentArmedRef.current = true;
-          sfx.crossfadeToUrgent();
+          sfx.crossfadeToUrgent().then(() => {
+            // Late unmute / late resume can leave us already past the trigger
+            // when the loop finally starts; the Promise resolution is the only
+            // place we know the urgent buffer is actually playing.
+          });
         }
       }
       if (sec === 0 && lastTickSecRef.current !== 0) {
@@ -72,8 +97,11 @@ export default function QuizClient({ pin }: { pin: string }) {
       }
       lastTickSecRef.current = sec;
     }, 100);
-    return () => clearInterval(id);
-  }, [state?.phase, state?.endsAt, sfx]);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [state?.phase, state?.endsAt, state?.paused, sfx]);
 
   useEffect(() => {
     if (personal?.hasAnswered && !prevAnsweredRef.current) {

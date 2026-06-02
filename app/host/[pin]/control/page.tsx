@@ -76,9 +76,23 @@ export default function ControlPanel({ params }: { params: Promise<{ pin: string
 
   useEffect(() => {
     if (state?.phase !== 'question' || !state?.endsAt) return;
+    if (state.paused) {
+      sfx.stopUrgentTickLoop();
+      sfx.stopQuestionTension();
+      return;
+    }
     urgentArmedRef.current = false;
     lastTickSecRef.current = -1;
+    let cancelled = false;
+    const msLeftAtMount = Math.max(0, (state.endsAt ?? 0) - Date.now());
+    if (msLeftAtMount > 3000) {
+      sfx.startQuestionTension();
+    } else if (msLeftAtMount > 0) {
+      urgentArmedRef.current = true;
+      sfx.crossfadeToUrgent();
+    }
     const id = window.setInterval(() => {
+      if (cancelled) return;
       const msLeft = Math.max(0, (state.endsAt ?? 0) - Date.now());
       const sec = Math.ceil(msLeft / 1000);
       if (sec !== lastTickSecRef.current && sec > 0 && sec <= 3) {
@@ -92,8 +106,11 @@ export default function ControlPanel({ params }: { params: Promise<{ pin: string
       }
       lastTickSecRef.current = sec;
     }, 100);
-    return () => clearInterval(id);
-  }, [state?.phase, state?.endsAt, sfx]);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [state?.phase, state?.endsAt, state?.paused, sfx]);
 
   useEffect(() => {
     return () => {

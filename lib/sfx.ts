@@ -206,10 +206,18 @@ function playBufferOnce(c: AudioContext, master: GainNode, buf: AudioBuffer): vo
 /**
  * Start a looped MP3 sample. Returns a stop handle, or null if the sample is
  * unavailable so the caller can fall back to the oscillator loop.
+ *
+ * The fade-in is scheduled inside the buffer-ready callback (after async
+ * decode), not at the moment this function returns. Otherwise the linear ramp
+ * would run from 0 → peak across an empty source and the audio would play at
+ * full volume after decode finished.
+ *
+ * `opts.onStart` fires once the buffer source has actually started — surfaces
+ * use this to arm urgent state only after audio is confirmed playing.
  */
 function tryStartLoop(
   slug: string,
-  opts: { peak?: number; fadeInMs?: number } = {},
+  opts: { peak?: number; fadeInMs?: number; onStart?: () => void } = {},
 ): LoopHandle | null {
   const asset = getAsset(slug);
   if (!asset?.loop) return null;
@@ -222,15 +230,10 @@ function tryStartLoop(
   const fadeInMs = Math.max(0, opts.fadeInMs ?? 0);
 
   // Per-loop gain so we can fade out without touching masterGain (which carries
-  // mute/volume).
+  // mute/volume). Start at 0 — the real fade-in is scheduled in startWithBuffer
+  // once the audio source actually exists.
   const loopGain = c.createGain();
-  const startT = c.currentTime;
-  if (fadeInMs > 0) {
-    loopGain.gain.setValueAtTime(0, startT);
-    loopGain.gain.linearRampToValueAtTime(peak, startT + fadeInMs / 1000);
-  } else {
-    loopGain.gain.value = peak;
-  }
+  loopGain.gain.value = 0;
   loopGain.connect(master);
 
   let src: AudioBufferSourceNode | null = null;
@@ -247,7 +250,22 @@ function tryStartLoop(
     src.buffer = buf;
     src.loop = true;
     src.connect(loopGain);
+
+    // Schedule fade-in from the audio context's current time NOW, after decode
+    // is complete and right before the source starts. Scheduling earlier (when
+    // tryStartLoop returns) would race against the async decode and can leave
+    // the loop silent or jump to peak instantly depending on timing.
+    const t = c.currentTime;
+    loopGain.gain.cancelScheduledValues(t);
+    if (fadeInMs > 0) {
+      loopGain.gain.setValueAtTime(0, t);
+      loopGain.gain.linearRampToValueAtTime(peak, t + fadeInMs / 1000);
+    } else {
+      loopGain.gain.setValueAtTime(peak, t);
+    }
+
     src.start();
+    opts.onStart?.();
   };
 
   loadBuffer(slug, asset).then(startWithBuffer);
@@ -259,8 +277,13 @@ function tryStartLoop(
       const t = c.currentTime;
       const fade = Math.max(0, fadeMs) / 1000;
       try {
+        // Snapshot the current gain BEFORE canceling automation. Reading
+        // `loopGain.gain.value` after `cancelScheduledValues(t)` can return a
+        // stale endpoint of an automation that just got nuked, which produces
+        // an audible swell or cut.
+        const currentGain = loopGain.gain.value;
         loopGain.gain.cancelScheduledValues(t);
-        loopGain.gain.setValueAtTime(loopGain.gain.value, t);
+        loopGain.gain.setValueAtTime(currentGain, t);
         loopGain.gain.linearRampToValueAtTime(0, t + fade);
       } catch {}
       const cleanup = () => {
@@ -762,12 +785,16 @@ function startUrgentFallbackInterval(): LoopHandle {
   };
 }
 
-export function startUrgentTickLoop(durMs = 400): void {
+export function startUrgentTickLoop(durMs = 400, onStart?: () => void): void {
   if (muted) return;
   if (loops.urgent) return;
   loops.urgent =
-    tryStartLoop('tick-urgent', { peak: URGENT_PEAK, fadeInMs: durMs }) ??
-    startUrgentFallbackInterval();
+    tryStartLoop('tick-urgent', { peak: URGENT_PEAK, fadeInMs: durMs, onStart }) ??
+    (() => {
+      const handle = startUrgentFallbackInterval();
+      onStart?.();
+      return handle;
+    })();
 }
 
 export function stopUrgentTickLoop(fadeMs?: number): void {
@@ -779,11 +806,19 @@ export function stopUrgentTickLoop(fadeMs?: number): void {
  * Crossfade the question-tension bed into the tick-urgent loop over the given
  * duration. Idempotent — callers should arm a per-question flag and only fire
  * this once when the countdown first crosses the urgency threshold.
+ *
+ * Returns a Promise that resolves once the urgent loop has actually started
+ * playing (or when the fallback oscillator path engages). Surfaces should arm
+ * their `urgentArmedRef` only after this resolves so a late unmute or a
+ * resume-during-urgent window plays the urgent loop, not stale question
+ * tension.
  */
-export function crossfadeToUrgent(durMs = 400): void {
-  if (muted) return;
+export function crossfadeToUrgent(durMs = 400): Promise<void> {
+  if (muted) return Promise.resolve();
   stopQuestionTension(durMs);
-  startUrgentTickLoop(durMs);
+  return new Promise<void>((resolve) => {
+    startUrgentTickLoop(durMs, () => resolve());
+  });
 }
 
 export function stopAllLoops(): void {

@@ -15,8 +15,9 @@ const Body = z.object({
 const SIGNUP_RATE_LIMIT = { limit: 5, windowMs: 15 * 60_000 };
 
 function inviteRequired(): boolean {
-  // Default ON. Only the literal string "false" disables the gate.
-  return (process.env.REQUIRE_INVITE_CODE ?? 'true').toLowerCase() !== 'false';
+  // Default OFF for OSS self-host: open signup. Operators can flip
+  // REQUIRE_INVITE_CODE=true to gate signups behind a beta access code.
+  return (process.env.REQUIRE_INVITE_CODE ?? 'false').toLowerCase() === 'true';
 }
 
 function configuredInviteCodes(): string[] {
