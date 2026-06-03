@@ -10,10 +10,7 @@ describe('health check logic', () => {
   it('defaults buildSha to dev when no env vars are set', () => {
     cleanEnv();
     const buildSha =
-      process.env.VERCEL_GIT_COMMIT_SHA ??
-      process.env.GITHUB_SHA ??
-      process.env.BUILD_SHA ??
-      'dev';
+      process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA ?? process.env.BUILD_SHA ?? 'dev';
     expect(buildSha).toBe('dev');
   });
 
@@ -21,10 +18,7 @@ describe('health check logic', () => {
     cleanEnv();
     process.env.VERCEL_GIT_COMMIT_SHA = 'abc123';
     const buildSha =
-      process.env.VERCEL_GIT_COMMIT_SHA ??
-      process.env.GITHUB_SHA ??
-      process.env.BUILD_SHA ??
-      'dev';
+      process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA ?? process.env.BUILD_SHA ?? 'dev';
     expect(buildSha).toBe('abc123');
   });
 
@@ -32,10 +26,7 @@ describe('health check logic', () => {
     cleanEnv();
     process.env.GITHUB_SHA = 'def456';
     const buildSha =
-      process.env.VERCEL_GIT_COMMIT_SHA ??
-      process.env.GITHUB_SHA ??
-      process.env.BUILD_SHA ??
-      'dev';
+      process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA ?? process.env.BUILD_SHA ?? 'dev';
     expect(buildSha).toBe('def456');
   });
 

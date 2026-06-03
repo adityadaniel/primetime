@@ -10,3 +10,6 @@ tsconfig.tsbuildinfo
 coverage/
 public/sounds/.tasks/
 public/uploads/
+test-results/
+playwright-report/
+playwright/.cache/

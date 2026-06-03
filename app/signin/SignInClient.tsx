@@ -5,9 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/components/Broadcast';
-import { config } from '@/lib/config';
 
-export default function SignInClient({ enableApple }: { enableApple: boolean }) {
+export default function SignInClient({
+  enableApple,
+  emailEnabled,
+}: {
+  enableApple: boolean;
+  emailEnabled: boolean;
+}) {
   const router = useRouter();
   const search = useSearchParams();
   const callbackUrl = search.get('callbackUrl') || '/host';
@@ -123,7 +128,7 @@ export default function SignInClient({ enableApple }: { enableApple: boolean }) 
               />
             </label>
 
-            {config.emailEnabled ? (
+            {emailEnabled ? (
               <div className="flex justify-end">
                 <Link href="/reset" className="ticker text-[11px] tracking-widest underline">
                   FORGOT PASSWORD?
