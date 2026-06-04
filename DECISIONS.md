@@ -1,11 +1,96 @@
 # Decisions Log
 
-This file is the durable record of architectural and product decisions for INPUT/OUTPUT
-(formerly BROADCAST — see 2026-05-24 rebrand entry below).
+This file is the durable record of architectural and product decisions for PRIMETIME
+(formerly INPUT/OUTPUT, formerly BROADCAST — see the 2026-06-04 and 2026-05-24 rebrand
+entries below).
 Each entry is dated. Latest first.
 
 When a decision is reversed, do not delete the original — append a "Superseded by" line
 and add a new entry below.
+
+---
+
+## 2026-06-04 · Rebrand INPUT/OUTPUT → PRIMETIME (theprimetime.id)
+
+**Status:** Accepted
+
+**Context:** User acquired the domain `theprimetime.id` and wants to retire the
+working title INPUT/OUTPUT. This is the *second* rebrand of this codebase; the
+2026-05-24 BROADCAST → INPUT/OUTPUT entry below is the template, and its
+"what does NOT change" discipline is reused verbatim. The vintage broadcast-graphics
+visual identity stays — the rebrand is naming and metaphor copy, not visual.
+A real-time quiz already has the bones of a TV game show, and *prime time* is the
+flagship broadcast slot, so PRIMETIME reframes the existing surfaces at least as
+well as the I/O signal-flow metaphor did.
+
+**The one real subtlety:** the old name's slash was load-bearing — `INPUT/OUTPUT`
+*reinforced* the design language (control surface = input port, projection = output,
+players = signal flowing through). PRIMETIME has no slash and no I/O metaphor, so the
+metaphor copy is rewritten to the prime-time broadcast-slot framing (the show going out
+live in the marquee slot, the control room cutting the prime-time broadcast, the audience
+tuning in). One new bridging paragraph in `DESIGN.md` does this; everything else is a
+token flip. Generic input/output (`lib/config.ts` "Pure; no I/O." comment, the
+`lib/quiz-io.ts` serialization module filename) is preserved — only brand uses of `I/O`
+retire.
+
+**Decision (locked names):**
+
+| Token | Old | New |
+|---|---|---|
+| Product wordmark | `INPUT/OUTPUT` | `PRIMETIME` |
+| Landing wordmark | `INPUT/OUTPUT` | two-line `PRIME` / `TIME` (never `THE PRIMETIME`) |
+| Short form | `I/O` | none; use `PRIMETIME` |
+| Code identifier | `inputoutput` | `primetime` |
+| Local host-style id | `inputoutput.local` | `primetime.local` |
+| Domain | `inputoutput.id` | `theprimetime.id` |
+| Uppercase domain display | `INPUTOUTPUT.ID` | `THEPRIMETIME.ID` |
+| GitHub repo | `adityadaniel/inputoutput` | `adityadaniel/primetime` |
+| Working tree | `~/Developer/inputoutput` | `~/Developer/primetime` |
+| Postgres user/db/password | `inputoutput` / `inputoutput_dev` / `inputoutput_e2e` / pw `inputoutput` | `primetime` / `primetime_dev` / `primetime_e2e` / pw `primetime` |
+| Quiz schema URL | `https://inputoutput.id/quiz-v1.json` | `https://theprimetime.id/quiz-v1.json` |
+| Subdomains | `live`/`techcanteen`/`www`.`inputoutput.id` | same on `theprimetime.id` |
+| Support email | `support@inputoutput.id` | `support@theprimetime.id` |
+| Cloudflared tunnel | `inputoutput-live` | `primetime-live` |
+| Linear project | "INPUT/OUTPUT (inputoutput.id)" | "PRIMETIME (theprimetime.id)" |
+
+> ⚠️ Domain is `theprimetime.id`, **not** `primetime.id`. The code identifier and
+> product wordmark stay the short `primetime` / `PRIMETIME` (repo, package, db, dirs,
+> UI). Only URLs, hosts, emails, schema URLs, and domain-display strings take the full
+> `theprimetime.id`. The `*.local` hostname stays short (`primetime.local`).
+
+**Landing wordmark treatment (locked):** the main landing hero (`landing/index.html`,
+mirrored in the in-app `/` hero and `landing/og.html`) renders a two-line stacked mark —
+`PRIME` on line 1 in `--vermilion` (#E5341F), `TIME` on line 2 in `--ink` — using the
+existing Big Shoulders Display condensed face with tight leading. No slash. In-app
+chyrons/footers stay single-line uppercase `PRIMETIME`.
+
+**What deliberately does NOT change:** Visual identity / design language (vintage
+broadcast graphics, CRT, scanlines, SMPTE/ON-AIR, palette, type stack); DB schema,
+Prisma migrations, route shapes, in-app URL paths, WebSocket protocol, scoring, tier
+limits; frozen `playtest/*` branches (stay on INPUT/OUTPUT forever); historical review
+docs; the `quiz-v1.json` schema shape (only the `$schema` URL host flips); the Tech
+Canteen separate product identity (only its old INPUT/OUTPUT attribution / old-domain
+references change); the AASA file content (`landing-techcanteen/.well-known/
+apple-app-site-association` — bundle IDs and bytes unchanged; only its serving host moves
+in Phase 4).
+
+**Sequencing (4 phases):** Phase 1 — this DECISIONS entry. Phase 2 — code & infra
+rename in three passes (2a code-id, 2b tests + CI, 2c infra/config/lockfile). Phase 3 —
+brand & copy (3a DESIGN.md bridging paragraph + landing wordmark, 3b user-facing copy +
+landings). Phase 4 (orchestrator, post-merge, off-hours, OUT OF SCOPE for the coding
+agent) — GitHub repo rename + working-tree move + `.env.local`; DNS / Pages / cloudflared
+tunnel + AASA host move; Linear project + Hermes routing/memory. Phases 1–3 land on
+branch `rebrand/primetime` off `main`.
+
+**Risks accepted:** Dev DB rename wipes local volumes (throwaway). GH repo rename creates
+a redirect Pages/tunnel integrations may transiently mishandle (run 4a off-hours). Two
+domains in flight — keep `inputoutput.id` 301 → `theprimetime.id` until links age out
+(retirement timeline deferred to its own ticket). Generic `I/O`/`io` occurrences must be
+preserved, not flipped.
+
+**Authoritative plan:** `docs/rebrand-primetime-plan.md` (with code-aware review
+`docs/rebrand-primetime-claude-review.md`) is the single source of truth this entry
+promotes.
 
 ---
 
