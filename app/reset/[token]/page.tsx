@@ -31,7 +31,7 @@ export default async function ResetTokenPage({ params }: { params: Promise<{ tok
         <SmpteBars className="h-1.5 mt-2" />
         <section className="px-6 pt-8 pb-8 flex-1">
           <div className="max-w-[420px] mx-auto w-full">
-            <p className="ticker text-[11px] tracking-widest opacity-70 mb-2">▶ INPUT/OUTPUT ◀</p>
+            <p className="ticker text-[11px] tracking-widest opacity-70 mb-2">▶ PRIMETIME ◀</p>
             <h1
               className="display-num"
               style={{ fontSize: 'clamp(48px, 11vw, 96px)', lineHeight: 0.9 }}

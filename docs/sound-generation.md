@@ -1,6 +1,6 @@
 # Sound generation
 
-INPUT/OUTPUT ships with a small kit of broadcast-graphics sound effects and
+PRIMETIME ships with a small kit of broadcast-graphics sound effects and
 ambient beds — countdown ticks, lock-in stamps, lobby ambience, podium pad,
 and so on. The fallback is a fully synthesized Web Audio kit in `lib/sfx.ts`
 (oscillators only — no assets). The richer flavour comes from real audio

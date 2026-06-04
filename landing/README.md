@@ -1,15 +1,15 @@
-# INPUT/OUTPUT landing page
+# PRIMETIME landing page
 
-Static landing page for `inputoutput.id`. Pure HTML + CSS, no build step. Cloudflare Pages serves these files directly.
+Static landing page for `theprimetime.id`. Pure HTML + CSS, no build step. Cloudflare Pages serves these files directly.
 
 ## Cloudflare Pages config
 
 - Build command: *(none — leave empty)*
 - Build output directory: `landing`
 - Production branch: `main`
-- Custom domain: `inputoutput.id` (apex)
+- Custom domain: `theprimetime.id` (apex)
 
-`www.inputoutput.id` redirects to apex automatically (Cloudflare Pages handles).
+`www.theprimetime.id` redirects to apex automatically (Cloudflare Pages handles).
 
 ## Local preview
 
@@ -32,7 +32,7 @@ cd landing && python3 -m http.server 8000
 `og.png` is a screenshot of `og.html` rendered at exactly 1200×630 in headless Chrome. To regenerate after editing `og.html`:
 
 ```bash
-cd ~/Developer/broadcast/landing
+cd ~/Developer/primetime/landing
 python3 -m http.server 8765 &
 SERVER_PID=$!
 sleep 1

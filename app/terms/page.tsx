@@ -4,7 +4,7 @@ import { Chyron, Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/compo
 
 export const metadata: Metadata = {
   title: 'Terms',
-  description: 'Terms of service for INPUT/OUTPUT.',
+  description: 'Terms of service for PRIMETIME.',
   robots: { index: false, follow: false },
 };
 
@@ -13,7 +13,7 @@ export default function TermsPage() {
     <main className="relative flex flex-col min-h-[100dvh] overflow-hidden grain">
       <CornerMarks fixed />
       <header className="px-6 pt-4 flex items-center justify-between">
-        <Chyron label="INPUT/OUTPUT / DOC.TERMS" number="T" />
+        <Chyron label="PRIMETIME / DOC.TERMS" number="T" />
         <div className="flex items-center gap-3">
           <DateStamp />
           <span className="ticker text-[11px] opacity-40">·</span>
@@ -37,11 +37,11 @@ export default function TermsPage() {
 
           <div className="mt-10 ink-border p-6 md:p-8" style={{ background: 'var(--bone)' }}>
             <p className="font-editorial text-xl md:text-2xl leading-[1.4]">
-              Terms of service coming soon. While we&apos;re in beta, INPUT/OUTPUT is provided as-is
+              Terms of service coming soon. While we&apos;re in beta, PRIMETIME is provided as-is
               for classroom and small-room use. Don&apos;t use it to run anything you wouldn&apos;t
               want a server outage to interrupt. Contact{' '}
-              <a className="underline" href="mailto:support@inputoutput.id">
-                support@inputoutput.id
+              <a className="underline" href="mailto:support@theprimetime.id">
+                support@theprimetime.id
               </a>{' '}
               with questions.
             </p>
@@ -53,7 +53,7 @@ export default function TermsPage() {
               className="underline inline-flex items-center min-h-11 px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
               style={{ outlineColor: 'var(--ink)' }}
             >
-              ← BACK TO INPUT/OUTPUT
+              ← BACK TO PRIMETIME
             </Link>
           </p>
         </div>

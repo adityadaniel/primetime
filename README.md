@@ -1,7 +1,7 @@
-[![PR](https://github.com/adityadaniel/inputoutput/actions/workflows/pr.yml/badge.svg)](https://github.com/adityadaniel/inputoutput/actions/workflows/pr.yml)
-[![Main](https://github.com/adityadaniel/inputoutput/actions/workflows/main.yml/badge.svg)](https://github.com/adityadaniel/inputoutput/actions/workflows/main.yml)
+[![PR](https://github.com/adityadaniel/primetime/actions/workflows/pr.yml/badge.svg)](https://github.com/adityadaniel/primetime/actions/workflows/pr.yml)
+[![Main](https://github.com/adityadaniel/primetime/actions/workflows/main.yml/badge.svg)](https://github.com/adityadaniel/primetime/actions/workflows/main.yml)
 
-# INPUT/OUTPUT — Live quiz game (open-source)
+# PRIMETIME — Live quiz game (open-source)
 
 > **OSS build uses sane defaults — no SaaS keys required.** Clone, install, and run with zero configuration beyond a database URL. See [Quickstart (local)](#quickstart-local) and [Environment reference](#environment-reference) below.
 
@@ -25,8 +25,8 @@ A real-time quiz game with a vintage broadcast-graphics aesthetic. Built end-to-
 ### 2. Clone and install
 
 ```bash
-git clone https://github.com/adityadaniel/inputoutput.git
-cd inputoutput
+git clone https://github.com/adityadaniel/primetime.git
+cd primetime
 npm install
 ```
 
@@ -49,7 +49,7 @@ cp .env.example .env
 Edit `.env` and set at minimum:
 
 ```
-DATABASE_URL=postgresql://inputoutput:inputoutput@localhost:5432/inputoutput_dev
+DATABASE_URL=postgresql://primetime:primetime@localhost:5432/primetime_dev
 AUTH_SECRET=your-random-secret-here
 ```
 
@@ -86,7 +86,7 @@ For production self-hosting, run the app + database in Docker:
 
 ```bash
 # Build the app image
-docker build -t inputoutput .
+docker build -t primetime .
 
 # Run with docker-compose (app + Postgres)
 docker compose up -d
@@ -197,7 +197,7 @@ The timer auto-locks when it hits zero, and locks early once every connected pla
 - Live answer distribution + correct-answer reveal
 - Top-3 podium between questions, full leaderboard at the end
 - Player feedback: locked-in confirmation, correct/incorrect, points awarded, current rank
-- Distinct **INPUT/OUTPUT** visual identity executed across all five surfaces
+- Distinct **PRIMETIME** visual identity executed across all five surfaces
 - **Player reconnect grace window** — disconnected players have 30 s to rejoin and reclaim their score, nickname, and socket binding
 - **Host disconnect grace pause** — game pauses for 60 s on host drop; resumes seamlessly if the host returns, otherwise ends with `host-left`
 - **Player cap enforcement** — a single, env-driven cap (`PLAYER_CAP`, default 10). The host lobby shows current/max; a join past the cap is rejected with the `full` code and the player sees a "room is full" message. No tiers, no upgrade prompts.
@@ -250,7 +250,7 @@ lib/
 server.ts                        Next.js + Socket.IO on one port
 scripts/
   smoke.ts                       Socket.IO realtime smoke test
-  e2e-db-reset.ts                create + migrate the inputoutput_e2e database
+  e2e-db-reset.ts                create + migrate the primetime_e2e database
 tests/e2e/
   auth.spec.ts                   signup / signin / reset / first-run / duplicate
   quiz-lifecycle.spec.ts         quiz CRUD, socket game, upload, word-cloud CSV
@@ -277,7 +277,7 @@ npm run db:up    # start Postgres via Docker Compose
 npm run db:down  # stop Postgres
 npm run db:reset # nuke and rebuild DB
 npm run db:migrate  # apply Prisma migrations
-npm run db:e2e:reset # create + migrate the dedicated inputoutput_e2e database
+npm run db:e2e:reset # create + migrate the dedicated primetime_e2e database
 npm run db:studio   # browse data at localhost:5555
 ```
 
@@ -306,7 +306,7 @@ npm run test:e2e     # installs nothing; boots the app itself
 
 What it does for you:
 
-- **Dedicated database.** Tests run against `inputoutput_e2e` (derived from your
+- **Dedicated database.** Tests run against `primetime_e2e` (derived from your
   `DATABASE_URL`, same Postgres server), created + migrated by
   `npm run db:e2e:reset`. Your dev DB is never touched. Tables are truncated
   between tests, so order never matters.
@@ -396,14 +396,14 @@ Uses the same image, credentials, and database name as CI. See `docker-compose.y
 1. Download from <https://postgresapp.com> (already installed if `/Applications/Postgres.app` exists).
 2. Open the app, click "Initialize" on first run.
 3. Add to your shell: `export PATH="/Applications/Postgres.app/Contents/Versions/latest/bin:$PATH"`
-4. Create role + dev database: `createuser inputoutput && createdb -O inputoutput inputoutput_dev`
+4. Create role + dev database: `createuser primetime && createdb -O primetime primetime_dev`
 
 ### Homebrew
 
 ```bash
 brew install postgresql@16
 brew services start postgresql@16
-createuser inputoutput && createdb -O inputoutput inputoutput_dev
+createuser primetime && createdb -O primetime primetime_dev
 ```
 
 ### After install
@@ -438,7 +438,7 @@ This is the internal tool we use to run live in-room workshop activities at our 
 
 ### Customize
 
-This fork is branded **INPUT/OUTPUT**. You'll want to swap that out for your own academy's identity. The things to change:
+This fork is branded **PRIMETIME**. You'll want to swap that out for your own academy's identity. The things to change:
 
 - **Wordmark, colors, design tokens** — `app/globals.css`. Pick your own name, palette, and type stack.
 - **Page metadata** — `app/layout.tsx` (title, description, OG tags).

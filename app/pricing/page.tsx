@@ -4,7 +4,7 @@ import { Chyron, Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/compo
 
 export const metadata: Metadata = {
   title: 'Pricing',
-  description: 'Pricing for INPUT/OUTPUT.',
+  description: 'Pricing for PRIMETIME.',
 };
 
 export default function PricingPage() {
@@ -12,7 +12,7 @@ export default function PricingPage() {
     <main className="relative flex flex-col min-h-[100dvh] overflow-hidden grain">
       <CornerMarks fixed />
       <header className="px-6 pt-4 flex items-center justify-between">
-        <Chyron label="INPUT/OUTPUT / DOC.PRICING" number="$" />
+        <Chyron label="PRIMETIME / DOC.PRICING" number="$" />
         <div className="flex items-center gap-3">
           <DateStamp />
           <span className="ticker text-[11px] opacity-40">·</span>
@@ -46,7 +46,7 @@ export default function PricingPage() {
               className="underline inline-flex items-center min-h-11 px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
               style={{ outlineColor: 'var(--ink)' }}
             >
-              ← BACK TO INPUT/OUTPUT
+              ← BACK TO PRIMETIME
             </Link>
           </p>
         </div>

@@ -1,8 +1,8 @@
-# DESIGN — "INPUT/OUTPUT"
+# DESIGN — "PRIMETIME"
 
 A real-time quiz game has the bones of a TV game show. So the visual identity for this build is exactly that: a **vintage broadcast graphics package** — late-60s through mid-70s control-room aesthetics, Swiss editorial rigor, and the deliberate feel of a network on-air kit. Cream paper instead of glass white, hot vermilion instead of millennial purple, oversized condensed display numerals as the dominant element, monospace tickers for scores, and SMPTE-flavored frame counters and "ON AIR" indicators as decorative anchors. Every screen is staged like a broadcast frame: question number reads like a chyron, the projection display is the main camera feed, the host control panel is the director's console, and the player phone is the talent's confidence monitor. This is unmistakably a game show, not a SaaS dashboard.
 
-The name is the schematic. The host control panel is the **input** port — every cue, advance, and override originates there. The projection display is the **output** — the on-air feed routed to the room's screen. Players are the signal flowing through the system, locked in and read out as packets of color and shape. Vintage broadcast graphics already speaks this language fluently: test cards calibrate inputs, scanlines render output, frame counters timestamp the signal, station IDs identify the channel. *INPUT/OUTPUT* is a sharper name for the kit that's already being assembled below.
+The name is the slot. *PRIMETIME* is the flagship broadcast window — the marquee hour a network reserves for the show the whole room is tuned in for, and a live quiz is exactly that show. The host control panel is the director's console **cutting the prime-time broadcast** — every cue, advance, and override originates there. The projection display is the **on-air feed going out live in the marquee slot**, routed to the room's screen. Players are the audience tuning in, their answers locked in and tabulated on air as packets of color and shape. Vintage broadcast graphics already speaks this language fluently: test cards warm up the slot, scanlines carry the live feed, frame counters timestamp the transmission, station IDs identify the channel. *PRIMETIME* is a sharper name for the kit that's already being assembled below.
 
 ## Palette
 
@@ -65,7 +65,7 @@ Animations are present and intentional but never twee.
 
 | Surface | Treatment |
 |---------|-----------|
-| `/` landing | Bone background, oversized "INPUT/OUTPUT" wordmark, two CTAs (host / join) |
+| `/` landing | Bone background, oversized two-line "PRIME / TIME" wordmark (PRIME in vermilion, TIME in ink), two CTAs (host / join) |
 | `/host` builder | Director's worksheet — question rows feel like cue cards on a clipboard |
 | `/host/[pin]/control` | Control room — split panes, dense, monospace-heavy, response meters |
 | `/host/[pin]/display` | The on-air feed. Inverts to ink during question state. Huge type. |

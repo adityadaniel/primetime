@@ -198,10 +198,10 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
  * the database name (the URL pathname) to `dbName`. Keeps host, credentials,
  * port, and any query params (e.g. `?schema=public`, `?sslmode=require`) intact
  * so the test DB lives on the same Postgres server as the dev DB. Portable
- * across local (`broadcast_dev`) and CI (`inputoutput_dev`) — both resolve from
- * whatever `DATABASE_URL` is in scope. Pure; no I/O.
+ * across whatever dev DB name is in scope (`primetime_dev` locally and in CI) —
+ * both resolve from whatever `DATABASE_URL` is set. Pure; no I/O.
  */
-export function deriveE2eDatabaseUrl(base: string, dbName = 'inputoutput_e2e'): string {
+export function deriveE2eDatabaseUrl(base: string, dbName = 'primetime_e2e'): string {
   const u = new URL(base);
   u.pathname = `/${dbName}`;
   return u.toString();

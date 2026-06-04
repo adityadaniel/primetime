@@ -4,7 +4,7 @@ import { Chyron, Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/compo
 
 export const metadata: Metadata = {
   title: 'Privacy',
-  description: 'Privacy policy for INPUT/OUTPUT.',
+  description: 'Privacy policy for PRIMETIME.',
   robots: { index: false, follow: false },
 };
 
@@ -13,7 +13,7 @@ export default function PrivacyPage() {
     <main className="relative flex flex-col min-h-[100dvh] overflow-hidden grain">
       <CornerMarks fixed />
       <header className="px-6 pt-4 flex items-center justify-between">
-        <Chyron label="INPUT/OUTPUT / DOC.PRIVACY" number="P" />
+        <Chyron label="PRIMETIME / DOC.PRIVACY" number="P" />
         <div className="flex items-center gap-3">
           <DateStamp />
           <span className="ticker text-[11px] opacity-40">·</span>
@@ -40,8 +40,8 @@ export default function PrivacyPage() {
               Privacy policy coming soon. We collect the minimum needed to run a live quiz: your
               email and display name when you sign up, the nicknames and answers your players submit
               during a session, and the usual server logs. Contact{' '}
-              <a className="underline" href="mailto:support@inputoutput.id">
-                support@inputoutput.id
+              <a className="underline" href="mailto:support@theprimetime.id">
+                support@theprimetime.id
               </a>{' '}
               with questions.
             </p>
@@ -53,7 +53,7 @@ export default function PrivacyPage() {
               className="underline inline-flex items-center min-h-11 px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
               style={{ outlineColor: 'var(--ink)' }}
             >
-              ← BACK TO INPUT/OUTPUT
+              ← BACK TO PRIMETIME
             </Link>
           </p>
         </div>
