@@ -4,9 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const RUN_INTEGRATION = process.env.INTEGRATION_DB === 'true';
 
-const dbName = `inputoutput_test_${randomBytes(4).toString('hex')}`;
+const dbName = `primetime_test_${randomBytes(4).toString('hex')}`;
 const baseUrl =
-  process.env.DATABASE_URL ?? 'postgresql://broadcast:broadcast@localhost:5432/broadcast_dev';
+  process.env.DATABASE_URL ?? 'postgresql://primetime:primetime@localhost:5432/primetime_dev';
 const maintenanceUrl = baseUrl.replace(/\/[^/?]+(\?|$)/, '/postgres$1');
 const testUrl = baseUrl.replace(/\/[^/?]+(\?|$)/, `/${dbName}$1`);
 

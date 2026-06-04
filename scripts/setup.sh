@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# scripts/setup.sh — INPUT/OUTPUT internal-tool installer
+# scripts/setup.sh — PRIMETIME internal-tool installer
 #
 # Single-command bootstrap from a fresh `git clone` to a working install on a
 # Mac. Idempotent: re-runs preserve existing Postgres data, never overwrite
@@ -43,8 +43,8 @@ cd "${REPO_ROOT}"
 # ---- 0. banner ----
 
 cat <<'EOF'
-INPUT/OUTPUT setup — internal tool installer
---------------------------------------------
+PRIMETIME setup — internal tool installer
+-----------------------------------------
 Idempotent. Safe to re-run. Preserves your existing .env.local and
 Postgres volume. macOS only.
 
@@ -210,7 +210,7 @@ docker compose up -d postgres
 info "Waiting up to 30s for Postgres to become healthy..."
 ready=0
 for _ in $(seq 1 30); do
-  if docker compose exec -T postgres pg_isready -U inputoutput -d inputoutput_dev >/dev/null 2>&1; then
+  if docker compose exec -T postgres pg_isready -U primetime -d primetime_dev >/dev/null 2>&1; then
     ready=1
     break
   fi
@@ -247,10 +247,10 @@ case "${tunnel_reply}" in
 EOF
       info "Skipping tunnel setup for now."
     else
-      default_tunnel_name="$(hostname -s 2>/dev/null || echo 'inputoutput')-live"
+      default_tunnel_name="$(hostname -s 2>/dev/null || echo 'primetime')-live"
       read -r -p "    Tunnel name [${default_tunnel_name}]: " tunnel_name
       tunnel_name="${tunnel_name:-${default_tunnel_name}}"
-      read -r -p "    Public hostname (e.g. live.inputoutput.id): " tunnel_host
+      read -r -p "    Public hostname (e.g. live.theprimetime.id): " tunnel_host
       if [[ -z "${tunnel_host}" ]]; then
         warn "No hostname entered — skipping tunnel setup."
       else

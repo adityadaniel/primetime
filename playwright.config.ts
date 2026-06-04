@@ -5,7 +5,7 @@ import { E2E_BASE_URL, webServerEnv } from './tests/e2e/e2e-env';
 // Socket.IO realtime smoke (scripts/smoke.ts) with browser-level coverage of
 // signup → signin → reset and the authenticated quiz/game/upload flows.
 //
-// One Postgres DB (inputoutput_e2e) is shared by the whole run, so tests run
+// One Postgres DB (primetime_e2e) is shared by the whole run, so tests run
 // serially (workers: 1) and reset their tables in beforeEach — no parallelism
 // to avoid cross-test interference.
 

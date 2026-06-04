@@ -11,8 +11,8 @@ const ORIGINAL_ENV = {
 };
 
 beforeEach(() => {
-  process.env.NEXT_PUBLIC_SITE_URL = 'https://inputoutput.example.com';
-  process.env.NEXTAUTH_URL = 'https://auth.inputoutput.example.com';
+  process.env.NEXT_PUBLIC_SITE_URL = 'https://primetime.example.com';
+  process.env.NEXTAUTH_URL = 'https://auth.primetime.example.com';
 });
 
 afterEach(() => {
@@ -42,14 +42,14 @@ describe('robots', () => {
 
   it('uses NEXT_PUBLIC_SITE_URL as the canonical host', () => {
     const out = robots();
-    expect(out.host).toBe('https://inputoutput.example.com');
-    expect(out.sitemap).toBe('https://inputoutput.example.com/sitemap.xml');
+    expect(out.host).toBe('https://primetime.example.com');
+    expect(out.sitemap).toBe('https://primetime.example.com/sitemap.xml');
   });
 
   it('falls back to NEXTAUTH_URL when NEXT_PUBLIC_SITE_URL is unset', () => {
     delete process.env.NEXT_PUBLIC_SITE_URL;
     const out = robots();
-    expect(out.host).toBe('https://auth.inputoutput.example.com');
+    expect(out.host).toBe('https://auth.primetime.example.com');
   });
 
   it('falls back to localhost:4321 when neither env var is set', () => {
@@ -65,7 +65,7 @@ describe('sitemap', () => {
     const entries = sitemap();
     const urls = entries.map((e) => e.url);
     for (const path of ALLOWED) {
-      expect(urls).toContain(`https://inputoutput.example.com${path}`);
+      expect(urls).toContain(`https://primetime.example.com${path}`);
     }
   });
 
