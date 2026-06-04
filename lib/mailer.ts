@@ -48,7 +48,7 @@ async function sendWithSmtp(params: SendResetEmailParams): Promise<SendResetEmai
     await transporter.sendMail({
       from,
       to: params.to,
-      subject: 'Reset your INPUT/OUTPUT password',
+      subject: 'Reset your PRIMETIME password',
       text: `Open this link to reset your password: ${params.url}\n\nIf you did not request this, ignore this email.`,
       html: `<p>Open this link to reset your password: <a href="${params.url}">${params.url}</a></p><p>If you did not request this, ignore this email.</p>`,
     });

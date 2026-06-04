@@ -1,4 +1,4 @@
-// Sound asset manifest for INPUT/OUTPUT.
+// Sound asset manifest for PRIMETIME.
 //
 // Each entry maps 1:1 to a function in `lib/sfx.ts` (loops or one-shots).
 // The Suno Sounds API ("kie.ai") generates each as an mp3 in

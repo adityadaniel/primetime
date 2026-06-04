@@ -9,31 +9,31 @@ function siteUrl(): string {
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
   title: {
-    default: 'INPUT/OUTPUT — Live quizzes done well',
-    template: '%s — INPUT/OUTPUT',
+    default: 'PRIMETIME — Live quizzes done well',
+    template: '%s — PRIMETIME',
   },
   description:
-    'INPUT/OUTPUT is a real-time quiz network for classrooms, conference rooms, and the back of any room with a projector. Editorial brutalist by design — no purple gradient.',
-  applicationName: 'INPUT/OUTPUT',
+    'PRIMETIME is a real-time quiz network for classrooms, conference rooms, and the back of any room with a projector. Editorial brutalist by design — no purple gradient.',
+  applicationName: 'PRIMETIME',
   keywords: [
     'live quiz',
     'classroom quiz',
     'real-time quiz',
     'kahoot alternative',
-    'input/output',
+    'primetime',
     'projector trivia',
   ],
   openGraph: {
     type: 'website',
-    siteName: 'INPUT/OUTPUT',
-    title: 'INPUT/OUTPUT — Live quizzes done well',
+    siteName: 'PRIMETIME',
+    title: 'PRIMETIME — Live quizzes done well',
     description:
       'A real-time quiz broadcast for classrooms and conference rooms. Editorial brutalist by design.',
     url: '/',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'INPUT/OUTPUT — Live quizzes done well',
+    title: 'PRIMETIME — Live quizzes done well',
     description: 'A real-time quiz broadcast. Editorial brutalist by design.',
   },
 };

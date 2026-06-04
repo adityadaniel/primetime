@@ -4,7 +4,7 @@ External accounts and config you need to provision before/while M3 ships. Check 
 
 ## Tier shape (locked)
 
-- **Free**: 50 players, 5 saved quizzes, full CSV export, INPUT/OUTPUT watermark, sessions auto-delete after 7d
+- **Free**: 50 players, 5 saved quizzes, full CSV export, PRIMETIME watermark, sessions auto-delete after 7d
 - **Pro $9/mo or $90/yr**: 200 players, unlimited quizzes, image upload, custom logo, no watermark, full history retention
 
 These tiers drive `MID-73` (mock billing), `MID-74` (pricing page), `MID-75` (cap enforcement). Don't drift.
@@ -31,7 +31,7 @@ Block budget: 30 min once domain is bought.
 ## 2. Vercel project (~10 min, do first)
 
 - [ ] Sign in to vercel.com (use GitHub account)
-- [ ] Import `adityadaniel/inputoutput` repo
+- [ ] Import `adityadaniel/primetime` repo
 - [ ] Framework preset: Next.js (auto-detected)
 - [ ] Build command: leave default
 - [ ] Root directory: leave default
@@ -50,19 +50,19 @@ Decision: see `DECISIONS.md` 2026-05-21 entry. R2 has zero egress fees and 10 GB
 
 - [ ] Sign in to https://dash.cloudflare.com
 - [ ] R2 Object Storage → enable (no card needed for free tier)
-- [ ] Create bucket: `inputoutput-uploads`
+- [ ] Create bucket: `primetime-uploads`
 - [ ] Settings → CORS policy → allow `GET, PUT, POST, HEAD` from your domains (localhost:4321 + production URL when known)
 - [ ] R2 → Manage R2 API Tokens → Create API token
-  - Token name: `INPUT/OUTPUT production`
+  - Token name: `PRIMETIME production`
   - Permissions: Object Read & Write
-  - Specify bucket: `inputoutput-uploads`
+  - Specify bucket: `primetime-uploads`
   - TTL: forever
 - [ ] Copy Access Key ID, Secret Access Key, and S3 endpoint URL (looks like `https://<account-id>.r2.cloudflarestorage.com`)
 - [ ] Add to Vercel env (and `.env.local`):
   - `R2_ACCESS_KEY_ID=<key>`
   - `R2_SECRET_ACCESS_KEY=<secret>`
   - `R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`
-  - `R2_BUCKET=inputoutput-uploads`
+  - `R2_BUCKET=primetime-uploads`
   - `R2_PUBLIC_URL=https://<bucket>.<account-id>.r2.dev` (turn on the dev URL toggle in R2 settings, or put a CDN URL here later)
 - [ ] Used by `MID-72` (image upload) and `MID-79` (R2 prod setup with presigned URLs)
 
@@ -70,7 +70,7 @@ Decision: see `DECISIONS.md` 2026-05-21 entry. R2 has zero egress fees and 10 GB
 
 - [ ] Sign in to https://upstash.com (Google sign-in is fine)
 - [ ] Create Database → Redis
-  - Name: `inputoutput-pubsub`
+  - Name: `primetime-pubsub`
   - Type: Regional
   - Region: closest to your Vercel deploy region (`us-east-1` is the Vercel default)
   - TLS: enabled
@@ -245,7 +245,7 @@ Free tier: 3000 emails/mo, 100/day.
   - Domains → Add Domain → enter `yourdomain.com`
   - Add the SPF/DKIM/DMARC TXT records to your domain registrar
   - Wait for verification (usually <10 min)
-  - Update `EMAIL_FROM=INPUT/OUTPUT <hello@yourdomain.com>`
+  - Update `EMAIL_FROM=PRIMETIME <hello@yourdomain.com>`
 
 ---
 

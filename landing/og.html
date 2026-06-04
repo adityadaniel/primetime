@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>INPUT/OUTPUT — OG image</title>
+    <title>PRIMETIME — OG image</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -110,14 +110,21 @@
         font-weight: 900;
         font-stretch: condensed;
         letter-spacing: -0.02em;
-        line-height: 0.85;
-        font-size: 200px;
+        line-height: 0.82;
+        font-size: 168px;
         text-transform: uppercase;
         margin: 0;
-        white-space: nowrap;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
       }
-      .wordmark .slash {
+      .wordmark .line-prime {
+        display: block;
         color: var(--vermilion);
+      }
+      .wordmark .line-time {
+        display: block;
+        color: var(--ink);
       }
 
       /* Lede */
@@ -171,7 +178,7 @@
       </header>
 
       <div>
-        <h1 class="wordmark">INPUT<span class="slash">/</span>OUTPUT</h1>
+        <h1 class="wordmark"><span class="line-prime">PRIME</span><span class="line-time">TIME</span></h1>
         <p class="lede">
           Interactive activity tool for in-room workshops.<br />
           <em>Word clouds, quizzes, live audience response.</em>
@@ -181,7 +188,7 @@
       <div class="footer-block">
         <div class="smpte"></div>
         <div class="footer-row">
-          <span class="chyron">INPUTOUTPUT.ID</span>
+          <span class="chyron">THEPRIMETIME.ID</span>
           <span class="chyron">MADE BY ADITYA DANIEL</span>
         </div>
       </div>

@@ -72,7 +72,7 @@ function parseArgs(argv: string[]): Args {
 }
 
 function printHelp() {
-  console.log(`generate-sounds — submit, poll, and download Suno Sounds for INPUT/OUTPUT.
+  console.log(`generate-sounds — submit, poll, and download Suno Sounds for PRIMETIME.
 
 Usage:
   tsx scripts/generate-sounds.ts [flags]
