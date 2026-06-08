@@ -157,11 +157,7 @@ if [[ ! -f package-lock.json ]]; then
   warn "package-lock.json missing — falling back to npm install."
   npm install
 else
-  # npm 10's peer resolver rejects the current lockfile because Vite's optional
-  # @types/node peer range is newer than our pinned Node 22 types. npm 11
-  # accepts it, but the setup script should also work with the npm 10 binary
-  # that may appear earlier in PATH on local Macs.
-  npm ci --legacy-peer-deps
+  npm ci
 fi
 
 # ---- 3. .env.local (generate only if missing) ----
