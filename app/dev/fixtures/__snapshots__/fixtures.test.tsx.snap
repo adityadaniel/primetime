@@ -28536,25 +28536,30 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0"
+          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
-          <svg
-            aria-hidden="true"
-            height="64"
-            viewBox="0 0 100 100"
-            width="64"
+          <div
+            class="shrink-0"
           >
-            <polygon
-              fill="var(--bone)"
-              points="50,10 92,86 8,86"
-              stroke="var(--ink)"
-              stroke-linejoin="miter"
-              stroke-width="3"
-            />
-          </svg>
+            <svg
+              aria-hidden="true"
+              height="64"
+              viewBox="0 0 100 100"
+              width="64"
+            >
+              <polygon
+                fill="var(--bone)"
+                points="50,10 92,86 8,86"
+                stroke="var(--ink)"
+                stroke-linejoin="miter"
+                stroke-width="3"
+              />
+            </svg>
+          </div>
           <p
-            class="font-editorial leading-[1.0]"
+            class="font-editorial min-w-0"
+            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
           >
             Mercury
           </p>
@@ -30243,25 +30248,30 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0"
+          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
-          <svg
-            aria-hidden="true"
-            height="64"
-            viewBox="0 0 100 100"
-            width="64"
+          <div
+            class="shrink-0"
           >
-            <polygon
-              fill="var(--bone)"
-              points="50,10 92,86 8,86"
-              stroke="var(--ink)"
-              stroke-linejoin="miter"
-              stroke-width="3"
-            />
-          </svg>
+            <svg
+              aria-hidden="true"
+              height="64"
+              viewBox="0 0 100 100"
+              width="64"
+            >
+              <polygon
+                fill="var(--bone)"
+                points="50,10 92,86 8,86"
+                stroke="var(--ink)"
+                stroke-linejoin="miter"
+                stroke-width="3"
+              />
+            </svg>
+          </div>
           <p
-            class="font-editorial leading-[1.0]"
+            class="font-editorial min-w-0"
+            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
           >
             Mercury
           </p>
@@ -30647,25 +30657,30 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0"
+          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
-          <svg
-            aria-hidden="true"
-            height="64"
-            viewBox="0 0 100 100"
-            width="64"
+          <div
+            class="shrink-0"
           >
-            <polygon
-              fill="var(--bone)"
-              points="50,10 92,86 8,86"
-              stroke="var(--ink)"
-              stroke-linejoin="miter"
-              stroke-width="3"
-            />
-          </svg>
+            <svg
+              aria-hidden="true"
+              height="64"
+              viewBox="0 0 100 100"
+              width="64"
+            >
+              <polygon
+                fill="var(--bone)"
+                points="50,10 92,86 8,86"
+                stroke="var(--ink)"
+                stroke-linejoin="miter"
+                stroke-width="3"
+              />
+            </svg>
+          </div>
           <p
-            class="font-editorial leading-[1.0]"
+            class="font-editorial min-w-0"
+            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
           >
             Mercury
           </p>
@@ -31051,25 +31066,30 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0"
+          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
-          <svg
-            aria-hidden="true"
-            height="64"
-            viewBox="0 0 100 100"
-            width="64"
+          <div
+            class="shrink-0"
           >
-            <polygon
-              fill="var(--bone)"
-              points="50,8 92,50 50,92 8,50"
-              stroke="var(--ink)"
-              stroke-linejoin="miter"
-              stroke-width="3"
-            />
-          </svg>
+            <svg
+              aria-hidden="true"
+              height="64"
+              viewBox="0 0 100 100"
+              width="64"
+            >
+              <polygon
+                fill="var(--bone)"
+                points="50,8 92,50 50,92 8,50"
+                stroke="var(--ink)"
+                stroke-linejoin="miter"
+                stroke-width="3"
+              />
+            </svg>
+          </div>
           <p
-            class="font-editorial leading-[1.0]"
+            class="font-editorial min-w-0"
+            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
           >
             Venus
           </p>
@@ -31455,26 +31475,31 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0"
+          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
-          <svg
-            aria-hidden="true"
-            height="64"
-            viewBox="0 0 100 100"
-            width="64"
+          <div
+            class="shrink-0"
           >
-            <circle
-              cx="50"
-              cy="50"
-              fill="var(--bone)"
-              r="42"
-              stroke="var(--ink)"
-              stroke-width="3"
-            />
-          </svg>
+            <svg
+              aria-hidden="true"
+              height="64"
+              viewBox="0 0 100 100"
+              width="64"
+            >
+              <circle
+                cx="50"
+                cy="50"
+                fill="var(--bone)"
+                r="42"
+                stroke="var(--ink)"
+                stroke-width="3"
+              />
+            </svg>
+          </div>
           <p
-            class="font-editorial leading-[1.0]"
+            class="font-editorial min-w-0"
+            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
           >
             Earth
           </p>
@@ -31860,27 +31885,32 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0"
+          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
-          <svg
-            aria-hidden="true"
-            height="64"
-            viewBox="0 0 100 100"
-            width="64"
+          <div
+            class="shrink-0"
           >
-            <rect
-              fill="var(--bone)"
-              height="80"
-              stroke="var(--ink)"
-              stroke-width="3"
-              width="80"
-              x="10"
-              y="10"
-            />
-          </svg>
+            <svg
+              aria-hidden="true"
+              height="64"
+              viewBox="0 0 100 100"
+              width="64"
+            >
+              <rect
+                fill="var(--bone)"
+                height="80"
+                stroke="var(--ink)"
+                stroke-width="3"
+                width="80"
+                x="10"
+                y="10"
+              />
+            </svg>
+          </div>
           <p
-            class="font-editorial leading-[1.0]"
+            class="font-editorial min-w-0"
+            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
           >
             Mars
           </p>
@@ -32266,25 +32296,30 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0"
+          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
-          <svg
-            aria-hidden="true"
-            height="64"
-            viewBox="0 0 100 100"
-            width="64"
+          <div
+            class="shrink-0"
           >
-            <polygon
-              fill="var(--bone)"
-              points="50,10 92,86 8,86"
-              stroke="var(--ink)"
-              stroke-linejoin="miter"
-              stroke-width="3"
-            />
-          </svg>
+            <svg
+              aria-hidden="true"
+              height="64"
+              viewBox="0 0 100 100"
+              width="64"
+            >
+              <polygon
+                fill="var(--bone)"
+                points="50,10 92,86 8,86"
+                stroke="var(--ink)"
+                stroke-linejoin="miter"
+                stroke-width="3"
+              />
+            </svg>
+          </div>
           <p
-            class="font-editorial leading-[1.0]"
+            class="font-editorial min-w-0"
+            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
           >
             Mercury
           </p>
@@ -32670,25 +32705,30 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0"
+          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
-          <svg
-            aria-hidden="true"
-            height="64"
-            viewBox="0 0 100 100"
-            width="64"
+          <div
+            class="shrink-0"
           >
-            <polygon
-              fill="var(--bone)"
-              points="50,8 92,50 50,92 8,50"
-              stroke="var(--ink)"
-              stroke-linejoin="miter"
-              stroke-width="3"
-            />
-          </svg>
+            <svg
+              aria-hidden="true"
+              height="64"
+              viewBox="0 0 100 100"
+              width="64"
+            >
+              <polygon
+                fill="var(--bone)"
+                points="50,8 92,50 50,92 8,50"
+                stroke="var(--ink)"
+                stroke-linejoin="miter"
+                stroke-width="3"
+              />
+            </svg>
+          </div>
           <p
-            class="font-editorial leading-[1.0]"
+            class="font-editorial min-w-0"
+            style="line-height: 1.1; max-height: 3.2em; overflow: hidden;"
           >
             A very long answer that probably needs to truncate cleanly inside the answer tile container
           </p>
@@ -33074,25 +33114,30 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0"
+          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
-          <svg
-            aria-hidden="true"
-            height="64"
-            viewBox="0 0 100 100"
-            width="64"
+          <div
+            class="shrink-0"
           >
-            <polygon
-              fill="var(--bone)"
-              points="50,10 92,86 8,86"
-              stroke="var(--ink)"
-              stroke-linejoin="miter"
-              stroke-width="3"
-            />
-          </svg>
+            <svg
+              aria-hidden="true"
+              height="64"
+              viewBox="0 0 100 100"
+              width="64"
+            >
+              <polygon
+                fill="var(--bone)"
+                points="50,10 92,86 8,86"
+                stroke="var(--ink)"
+                stroke-linejoin="miter"
+                stroke-width="3"
+              />
+            </svg>
+          </div>
           <p
-            class="font-editorial leading-[1.0]"
+            class="font-editorial min-w-0"
+            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
           >
             Mercury
           </p>
@@ -33478,25 +33523,30 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0"
+          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
-          <svg
-            aria-hidden="true"
-            height="64"
-            viewBox="0 0 100 100"
-            width="64"
+          <div
+            class="shrink-0"
           >
-            <polygon
-              fill="var(--bone)"
-              points="50,10 92,86 8,86"
-              stroke="var(--ink)"
-              stroke-linejoin="miter"
-              stroke-width="3"
-            />
-          </svg>
+            <svg
+              aria-hidden="true"
+              height="64"
+              viewBox="0 0 100 100"
+              width="64"
+            >
+              <polygon
+                fill="var(--bone)"
+                points="50,10 92,86 8,86"
+                stroke="var(--ink)"
+                stroke-linejoin="miter"
+                stroke-width="3"
+              />
+            </svg>
+          </div>
           <p
-            class="font-editorial leading-[1.0]"
+            class="font-editorial min-w-0"
+            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
           >
             Mercury
           </p>

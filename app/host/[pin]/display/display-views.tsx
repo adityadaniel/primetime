@@ -186,6 +186,8 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
     dist.reduce((a, b) => a + b, 0),
   );
   const correct = state.reveal?.correct;
+  const correctAnswer = correct !== undefined ? q.options[correct] : undefined;
+  const correctAnswerLen = correctAnswer?.length ?? 0;
 
   return (
     <div className="flex flex-col gap-6 flex-1 min-h-0">
@@ -225,19 +227,31 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
 
       {state.phase === 'reveal' && correct !== undefined && (
         <div
-          className="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0"
+          className="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
           style={{ background: 'var(--ivy)', color: 'var(--bone)' }}
         >
-          <Shape
-            kind={(CHANNELS[correct] ?? CHANNELS[0]).key}
-            fill="var(--bone)"
-            stroke="var(--ink)"
-            size={64}
-            strokeWidth={3}
-          />
+          <div className="shrink-0">
+            <Shape
+              kind={(CHANNELS[correct] ?? CHANNELS[0]).key}
+              fill="var(--bone)"
+              stroke="var(--ink)"
+              size={64}
+              strokeWidth={3}
+            />
+          </div>
           <p
-            className="font-editorial leading-[1.0]"
-            style={{ fontSize: 'clamp(36px, 5.5vw, 88px)' }}
+            className="font-editorial min-w-0"
+            style={{
+              fontSize:
+                correctAnswerLen >= 72
+                  ? 'clamp(24px, 3vw, 44px)'
+                  : correctAnswerLen >= 40
+                    ? 'clamp(30px, 4vw, 64px)'
+                    : 'clamp(36px, 5.5vw, 88px)',
+              lineHeight: correctAnswerLen >= 72 ? 1.1 : correctAnswerLen >= 40 ? 1.08 : 1.0,
+              maxHeight: '3.2em',
+              overflow: 'hidden',
+            }}
           >
             {q.options[correct]}
           </p>
