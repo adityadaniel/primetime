@@ -210,7 +210,7 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
       <div className="flex-1 min-h-0 overflow-hidden flex items-center gap-8">
         {q.imageUrl && (
           <div
-            className="ink-border relative shrink-0 h-full max-w-[42%] overflow-hidden"
+            className="ink-border relative shrink-0 h-full w-[42%] overflow-hidden"
             style={{ background: 'var(--bone)' }}
           >
             <Image src={q.imageUrl} alt="" fill unoptimized className="object-contain" />
