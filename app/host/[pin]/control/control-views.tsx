@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
 import { Countdown } from '@/components/Countdown';
 import { CHANNELS, Checkmark, Shape } from '@/components/Shape';
+import { publicUrl } from '@/lib/public-origin';
 import type { PublicGameState } from '@/lib/types';
 
 export interface ControlViewProps {
@@ -37,6 +38,7 @@ export function ControlView({
 
   const playerCount = state?.playerCount ?? state?.players.length ?? 0;
   const maxPlayers = state?.cap?.max ?? 10;
+  const displayUrl = pin ? publicUrl(`/host/${pin}/display`) : '#';
 
   const board = state ? [...state.players].sort((a, b) => b.score - a.score) : [];
 
@@ -97,7 +99,7 @@ export function ControlView({
             <div className="flex flex-col items-end gap-3">
               <PhaseBadge phase={phase} />
               <a
-                href={`/host/${pin}/display`}
+                href={displayUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="ink-border ticker text-[11px] tracking-widest px-3 py-2"

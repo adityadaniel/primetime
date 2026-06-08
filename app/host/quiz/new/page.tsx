@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import AccountMenu from '@/components/AccountMenu';
 import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
 import { CHANNELS, Shape } from '@/components/Shape';
+import { publicUrl } from '@/lib/public-origin';
 import { useSocket } from '@/lib/socket';
 import type { AnswerIndex, Question, Quiz } from '@/lib/types';
 
@@ -202,7 +203,11 @@ export default function QuizNew() {
     if (!socket) return;
     setLaunching(true);
     socket.emit('host:create', draft, (res: { pin: string }) => {
-      window.open(`/host/${res.pin}/display`, '_blank', 'noopener');
+      window.open(
+        publicUrl(`/host/${res.pin}/display`, window.location.origin),
+        '_blank',
+        'noopener',
+      );
       router.push(`/host/${res.pin}/control`);
     });
   }

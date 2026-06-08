@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AccountMenu from '@/components/AccountMenu';
 import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { publicUrl } from '@/lib/public-origin';
 import { useSocket } from '@/lib/socket';
 
 type CloudStatus = 'LOBBY' | 'LIVE' | 'PAUSED' | 'ENDED';
@@ -139,7 +140,11 @@ export default function WordCloudControl({ params }: { params: Promise<{ pin: st
 
   function openDisplay() {
     if (!pin) return;
-    window.open(`/host/wordcloud/${pin}/display`, '_blank', 'noopener,noreferrer');
+    window.open(
+      publicUrl(`/host/wordcloud/${pin}/display`, window.location.origin),
+      '_blank',
+      'noopener,noreferrer',
+    );
   }
 
   function startActivity() {
