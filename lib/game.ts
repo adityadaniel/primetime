@@ -622,6 +622,7 @@ export function publicState(game: GameSession): PublicGameState {
             options: q.options,
             timeLimit: q.timeLimit,
             doublePoints: q.doublePoints,
+            ...(q.imageUrl ? { imageUrl: q.imageUrl } : {}),
           }
         : undefined,
     startedAt: game.questionStartedAt,

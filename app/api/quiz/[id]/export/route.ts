@@ -24,6 +24,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       correct: q.correct,
       timeLimit: q.timeLimit,
       doublePoints: q.doublePoints,
+      imageUrl: q.imageUrl,
     })),
   });
   const filename = quizFilenameSlug(quiz.title);

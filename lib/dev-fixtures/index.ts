@@ -79,6 +79,7 @@ export function makeState(input: MakeStateInput): PublicGameState {
       options: baseQ.options,
       timeLimit: baseQ.timeLimit,
       doublePoints: baseQ.doublePoints,
+      ...(baseQ.imageUrl ? { imageUrl: baseQ.imageUrl } : {}),
     };
   }
   if (input.startedAt !== undefined) state.startedAt = input.startedAt;
@@ -167,6 +168,19 @@ const fourPlayers = makePlayers(4);
 const questionShort = makeState({
   phase: 'question',
   question: shortOptsQ,
+  players: fourPlayers,
+  startedAt: 1_700_000_000_000,
+  endsAt: 1_700_000_020_000,
+});
+
+const imageQ: Question = makeQuestion({
+  text: 'Identify the broadcast still shown on the monitor.',
+  imageUrl: '/uploads/quiz-images/sample.png',
+});
+
+const questionImage = makeState({
+  phase: 'question',
+  question: imageQ,
   players: fourPlayers,
   startedAt: 1_700_000_000_000,
   endsAt: 1_700_000_020_000,
@@ -324,6 +338,13 @@ export const fixtures: Fixture[] = [
     label: 'Question — short options',
     category: 'shared',
     state: questionShort,
+  },
+  {
+    id: 'question-image',
+    label: 'Question — with image',
+    category: 'shared',
+    state: questionImage,
+    notes: 'Per-question still alongside stem (MID-278).',
   },
   {
     id: 'question-long-options',

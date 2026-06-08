@@ -102,6 +102,7 @@ model Question {
   correct      Int
   timeLimit    Int
   doublePoints Boolean  @default(false)
+  imageUrl     String?
 
   @@unique([quizId, ordinal])
   @@index([quizId])

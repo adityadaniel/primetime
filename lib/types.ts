@@ -10,6 +10,8 @@ export interface Question {
   correct: AnswerIndex;
   timeLimit: number;
   doublePoints: boolean;
+  /** Optional public URL of an image shown with the question (MID-278). */
+  imageUrl?: string;
 }
 
 export interface Quiz {
@@ -48,6 +50,7 @@ export interface PublicGameState {
     options: string[];
     timeLimit: number;
     doublePoints: boolean;
+    imageUrl?: string;
   };
   startedAt?: number;
   endsAt?: number;
@@ -96,6 +99,7 @@ export interface QuestionInput {
   correct: AnswerIndex;
   timeLimit: number;
   doublePoints: boolean;
+  imageUrl?: string;
 }
 
 export interface QuizSummary {

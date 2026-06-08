@@ -206,9 +206,18 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
         <Countdown endsAt={state.endsAt} startedAt={state.startedAt} size={120} dark />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden flex items-center">
+      <div className="flex-1 min-h-0 overflow-hidden flex items-center gap-8">
+        {q.imageUrl && (
+          <div
+            className="ink-border shrink-0 h-full max-w-[42%] grid place-items-center overflow-hidden"
+            style={{ background: 'var(--bone)' }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={q.imageUrl} alt="" className="max-h-full max-w-full object-contain" />
+          </div>
+        )}
         <p
-          className="font-editorial teleprompter"
+          className="font-editorial teleprompter flex-1 min-w-0"
           style={{
             fontSize:
               q.text.length >= 200
