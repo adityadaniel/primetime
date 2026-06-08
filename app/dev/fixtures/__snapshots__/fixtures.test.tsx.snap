@@ -29188,7 +29188,7 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -29196,9 +29196,9 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <polygon
                 fill="var(--bone)"
@@ -29210,27 +29210,28 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Mercury
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -29252,9 +29253,9 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -29278,7 +29279,7 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 3
@@ -29294,16 +29295,16 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--cobalt); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -29332,7 +29333,7 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -29348,16 +29349,16 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -29387,7 +29388,7 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -29403,16 +29404,16 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -29443,7 +29444,7 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -31220,7 +31221,7 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -31228,9 +31229,9 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <polygon
                 fill="var(--bone)"
@@ -31242,27 +31243,28 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Mercury
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -31284,9 +31286,9 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -31310,7 +31312,7 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -31326,16 +31328,16 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--cobalt); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -31364,7 +31366,7 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 100
@@ -31380,16 +31382,16 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -31419,7 +31421,7 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -31435,16 +31437,16 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -31475,7 +31477,7 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -31629,7 +31631,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -31637,9 +31639,9 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <polygon
                 fill="var(--bone)"
@@ -31651,27 +31653,28 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Mercury
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -31693,9 +31696,9 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -31719,7 +31722,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 4
@@ -31735,16 +31738,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--cobalt); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -31773,7 +31776,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -31789,16 +31792,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -31828,7 +31831,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -31844,16 +31847,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -31884,7 +31887,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -32038,7 +32041,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -32046,9 +32049,9 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <polygon
                 fill="var(--bone)"
@@ -32060,27 +32063,28 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Venus
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--vermilion); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--vermilion); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -32109,7 +32113,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -32125,16 +32129,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -32156,9 +32160,9 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -32182,7 +32186,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 3
@@ -32198,16 +32202,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -32237,7 +32241,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -32253,16 +32257,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -32293,7 +32297,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -32447,7 +32451,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -32455,9 +32459,9 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <circle
                 cx="50"
@@ -32470,27 +32474,28 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Earth
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--vermilion); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--vermilion); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -32519,7 +32524,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -32535,16 +32540,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--cobalt); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -32573,7 +32578,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -32589,16 +32594,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -32621,9 +32626,9 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -32647,7 +32652,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 2
@@ -32663,16 +32668,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -32703,7 +32708,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -32857,7 +32862,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -32865,9 +32870,9 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <rect
                 fill="var(--bone)"
@@ -32881,27 +32886,28 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Mars
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--vermilion); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--vermilion); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -32930,7 +32936,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -32946,16 +32952,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--cobalt); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -32984,7 +32990,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -33000,16 +33006,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -33039,7 +33045,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -33055,16 +33061,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -33088,9 +33094,9 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -33114,7 +33120,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 2
@@ -33268,7 +33274,7 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -33276,9 +33282,9 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <polygon
                 fill="var(--bone)"
@@ -33290,27 +33296,28 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Mercury
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -33332,9 +33339,9 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -33358,7 +33365,7 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 25
@@ -33374,16 +33381,16 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--cobalt); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -33412,7 +33419,7 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 25
@@ -33428,16 +33435,16 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -33467,7 +33474,7 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 25
@@ -33483,16 +33490,16 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -33523,7 +33530,7 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 25
@@ -33677,7 +33684,7 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -33685,9 +33692,9 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <polygon
                 fill="var(--bone)"
@@ -33699,27 +33706,28 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1.1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1.1; max-height: 3.2em;"
           >
             A very long answer that probably needs to truncate cleanly inside the answer tile container
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--vermilion); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--vermilion); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -33748,7 +33756,7 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -33764,16 +33772,16 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -33795,9 +33803,9 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -33821,7 +33829,7 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 5
@@ -33837,16 +33845,16 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -33876,7 +33884,7 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -33892,16 +33900,16 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -33932,7 +33940,7 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -34086,7 +34094,7 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -34094,9 +34102,9 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <polygon
                 fill="var(--bone)"
@@ -34108,27 +34116,28 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Mercury
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -34150,9 +34159,9 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -34176,7 +34185,7 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 95
@@ -34192,16 +34201,16 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--cobalt); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -34230,7 +34239,7 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 2
@@ -34246,16 +34255,16 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -34285,7 +34294,7 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 2
@@ -34301,16 +34310,16 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -34341,7 +34350,7 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -34495,7 +34504,7 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -34503,9 +34512,9 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <polygon
                 fill="var(--bone)"
@@ -34517,27 +34526,28 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Mercury
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -34559,9 +34569,9 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -34585,7 +34595,7 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -34601,16 +34611,16 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--cobalt); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -34639,7 +34649,7 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -34655,16 +34665,16 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -34694,7 +34704,7 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -34710,16 +34720,16 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -34750,7 +34760,7 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
