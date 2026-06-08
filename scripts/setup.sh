@@ -205,12 +205,27 @@ fi
 # ---- 4. start Postgres ----
 
 step "Starting Postgres (docker compose up -d postgres)"
-docker compose up -d postgres
+postgres_container="primetime-postgres"
+postgres_healthcheck=(docker compose exec -T postgres pg_isready -U primetime -d primetime_dev)
+postgres_logs_hint="docker compose logs postgres"
+
+if ! docker compose up -d postgres; then
+  if docker inspect "${postgres_container}" >/dev/null 2>&1; then
+    warn "docker compose could not create ${postgres_container} because a container with that name already exists. Reusing the existing container."
+    if [[ "$(docker inspect -f '{{.State.Running}}' "${postgres_container}")" != "true" ]]; then
+      docker start "${postgres_container}" >/dev/null
+    fi
+    postgres_healthcheck=(docker exec "${postgres_container}" pg_isready -U primetime -d primetime_dev)
+    postgres_logs_hint="docker logs ${postgres_container}"
+  else
+    fail "docker compose could not start Postgres. Check: docker compose logs postgres"
+  fi
+fi
 
 info "Waiting up to 30s for Postgres to become healthy..."
 ready=0
 for _ in $(seq 1 30); do
-  if docker compose exec -T postgres pg_isready -U primetime -d primetime_dev >/dev/null 2>&1; then
+  if "${postgres_healthcheck[@]}" >/dev/null 2>&1; then
     ready=1
     break
   fi
@@ -218,7 +233,7 @@ for _ in $(seq 1 30); do
 done
 
 if (( ready == 0 )); then
-  fail "Postgres did not become healthy in 30s. Check: docker compose logs postgres"
+  fail "Postgres did not become healthy in 30s. Check: ${postgres_logs_hint}"
 fi
 info "Postgres healthy."
 
