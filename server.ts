@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { decode as decodeAuthJwt } from '@auth/core/jwt';
 import next from 'next';
 import { Server, type Socket } from 'socket.io';
+import { ensureAuthSecret } from './lib/auth-secret';
 import type { Tier } from './lib/game';
 import {
   advance,
@@ -48,6 +49,7 @@ import {
 const dev = process.env.NODE_ENV !== 'production';
 const port = Number(process.env.PORT ?? 4321);
 const hostname = 'localhost';
+const authSecret = ensureAuthSecret();
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -162,21 +164,22 @@ void app.prepare().then(() => {
   // Sets socket.data.userId for handlers to authorize against. Unauthenticated
   // connections are still allowed (anonymous players) — handlers that require
   // an owner enforce that explicitly.
-  const AUTH_SECRET = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? '';
   const COOKIE_NAMES = ['authjs.session-token', '__Secure-authjs.session-token'];
 
   io.use(async (socket, next) => {
     try {
-      if (!AUTH_SECRET) {
+      if (!authSecret) {
         socket.data.userId = null;
         return next();
       }
       const cookieHeader = socket.handshake.headers.cookie ?? '';
       const cookies = parseRawCookieHeader(cookieHeader);
-      let token: string | undefined;
-      for (const name of COOKIE_NAMES) {
-        if (cookies[name]) {
-          token = cookies[name];
+      let token: string | null = null;
+      let salt = 'authjs.session-token';
+      for (const cookieName of COOKIE_NAMES) {
+        token = readCookieValue(cookies, cookieName);
+        if (token) {
+          salt = cookieName;
           break;
         }
       }
@@ -186,10 +189,8 @@ void app.prepare().then(() => {
       }
       const decoded = await decodeAuthJwt({
         token,
-        secret: AUTH_SECRET,
-        salt: cookieHeader.includes('__Secure-')
-          ? '__Secure-authjs.session-token'
-          : 'authjs.session-token',
+        secret: authSecret,
+        salt,
       });
       const id = decoded && typeof decoded === 'object' ? (decoded as { id?: unknown }).id : null;
       socket.data.userId = typeof id === 'string' ? id : null;
@@ -249,6 +250,19 @@ void app.prepare().then(() => {
       if (k) out[k] = v;
     }
     return out;
+  }
+
+  function readCookieValue(cookies: Record<string, string>, name: string): string | null {
+    const value = cookies[name];
+    if (value) return value;
+
+    const chunks: string[] = [];
+    for (let i = 0; ; i++) {
+      const chunk = cookies[`${name}.${i}`];
+      if (!chunk) break;
+      chunks.push(chunk);
+    }
+    return chunks.length > 0 ? chunks.join('') : null;
   }
 
   function wcEmitState(state: WordCloudState) {

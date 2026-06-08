@@ -56,6 +56,8 @@ export default function WordCloudControl({ params }: { params: Promise<{ pin: st
   useEffect(() => {
     if (!socket || !pin) return;
 
+    let disposed = false;
+
     function register() {
       if (!socket || !pin) return;
       socket.emit(
@@ -68,16 +70,16 @@ export default function WordCloudControl({ params }: { params: Promise<{ pin: st
           profanityFilter: seedPf,
         },
         (res: { pin?: string; sessionId?: string; error?: string }) => {
+          if (disposed) return;
           if (res?.error) {
             showToast(`register failed: ${res.error}`);
+            setRegistered(false);
             return;
           }
           setRegistered(true);
         },
       );
     }
-
-    register();
 
     const onState = (s: CloudStatePayload) => {
       if (s.pin === pin) setState(s);
@@ -104,19 +106,26 @@ export default function WordCloudControl({ params }: { params: Promise<{ pin: st
       setState((prev) => (prev ? { ...prev, status: s.status } : prev));
     };
     const onConnect = () => register();
+    const onDisconnect = () => {
+      setRegistered(false);
+    };
 
     socket.on('wordcloud:state', onState);
     socket.on('wordcloud:word:added', onAdded);
     socket.on('wordcloud:word:removed', onRemoved);
     socket.on('wordcloud:status:changed', onStatus);
     socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+    if (socket.connected) register();
 
     return () => {
+      disposed = true;
       socket.off('wordcloud:state', onState);
       socket.off('wordcloud:word:added', onAdded);
       socket.off('wordcloud:word:removed', onRemoved);
       socket.off('wordcloud:status:changed', onStatus);
       socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
     };
   }, [socket, pin, seedPrompt, seedSessionId, seedWpp, seedPf, showToast]);
 
