@@ -29178,11 +29178,11 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center gap-8"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
             class="font-editorial teleprompter flex-1 min-w-0"
-            style="line-height: 1.05;"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
@@ -29587,7 +29587,7 @@ exports[`fixture × surface snapshots > display · question-double-points 1`] = 
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center gap-8"
+          class="flex items-center gap-8 flex-1 min-h-0 overflow-hidden"
         >
           <p
             class="font-editorial teleprompter flex-1 min-w-0"
@@ -29893,11 +29893,11 @@ exports[`fixture × surface snapshots > display · question-image 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center gap-6"
+          class="flex items-center gap-6 flex-1 min-h-0 overflow-hidden"
         >
           <div
-            class="ink-border relative shrink-0 h-full w-[36%] overflow-hidden"
-            style="background: var(--bone);"
+            class="ink-border relative shrink-0 overflow-hidden"
+            style="background: var(--bone); height: 100%; width: 36%;"
           >
             <img
               alt=""
@@ -30172,7 +30172,7 @@ exports[`fixture × surface snapshots > display · question-long-options 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center gap-8"
+          class="flex items-center gap-8 flex-1 min-h-0 overflow-hidden"
         >
           <p
             class="font-editorial teleprompter flex-1 min-w-0"
@@ -30437,7 +30437,7 @@ exports[`fixture × surface snapshots > display · question-long-stem 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center gap-8"
+          class="flex items-center gap-8 flex-1 min-h-0 overflow-hidden"
         >
           <p
             class="font-editorial teleprompter flex-1 min-w-0"
@@ -30743,7 +30743,7 @@ exports[`fixture × surface snapshots > display · question-short 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center gap-8"
+          class="flex items-center gap-8 flex-1 min-h-0 overflow-hidden"
         >
           <p
             class="font-editorial teleprompter flex-1 min-w-0"
@@ -31008,7 +31008,7 @@ exports[`fixture × surface snapshots > display · question-truefalse 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center gap-8"
+          class="flex items-center gap-8 flex-1 min-h-0 overflow-hidden"
         >
           <p
             class="font-editorial teleprompter flex-1 min-w-0"
@@ -31210,11 +31210,11 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center gap-8"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
             class="font-editorial teleprompter flex-1 min-w-0"
-            style="line-height: 1.05;"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
@@ -31619,11 +31619,11 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center gap-8"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
             class="font-editorial teleprompter flex-1 min-w-0"
-            style="line-height: 1.05;"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
@@ -32028,11 +32028,11 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center gap-8"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
             class="font-editorial teleprompter flex-1 min-w-0"
-            style="line-height: 1.05;"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
@@ -32437,11 +32437,11 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center gap-8"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
             class="font-editorial teleprompter flex-1 min-w-0"
-            style="line-height: 1.05;"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
@@ -32847,11 +32847,11 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center gap-8"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
             class="font-editorial teleprompter flex-1 min-w-0"
-            style="line-height: 1.05;"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
@@ -33258,11 +33258,11 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center gap-8"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
             class="font-editorial teleprompter flex-1 min-w-0"
-            style="line-height: 1.05;"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
@@ -33667,11 +33667,11 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center gap-8"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
             class="font-editorial teleprompter flex-1 min-w-0"
-            style="line-height: 1.05;"
+            style="line-height: 1.25;"
           >
             Pick the most accurate description.
           </p>
@@ -34076,11 +34076,11 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center gap-8"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
             class="font-editorial teleprompter flex-1 min-w-0"
-            style="line-height: 1.05;"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
@@ -34485,11 +34485,11 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center gap-8"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
             class="font-editorial teleprompter flex-1 min-w-0"
-            style="line-height: 1.05;"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
