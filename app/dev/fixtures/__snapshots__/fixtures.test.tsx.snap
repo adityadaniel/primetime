@@ -14972,6 +14972,658 @@ exports[`fixture × surface snapshots > control · question-double-points 1`] = 
 </div>
 `;
 
+exports[`fixture × surface snapshots > control · question-image 1`] = `
+<div>
+  <main
+    class="relative min-h-screen pb-20"
+  >
+    <span
+      aria-hidden="true"
+      class="absolute top-3 left-3 w-3 h-3 border-t-2 border-l-2"
+      style="border-color: var(--ink);"
+    />
+    <span
+      aria-hidden="true"
+      class="absolute top-3 right-3 w-3 h-3 border-t-2 border-r-2"
+      style="border-color: var(--ink);"
+    />
+    <span
+      aria-hidden="true"
+      class="absolute bottom-3 left-3 w-3 h-3 border-b-2 border-l-2"
+      style="border-color: var(--ink);"
+    />
+    <span
+      aria-hidden="true"
+      class="absolute bottom-3 right-3 w-3 h-3 border-b-2 border-r-2"
+      style="border-color: var(--ink);"
+    />
+    <header
+      class="px-6 pt-4 flex items-center justify-between"
+    >
+      <div
+        class="flex items-center gap-3"
+      >
+        <span
+          class="ticker tracking-widest text-[11px] px-2 py-[2px]"
+          style="background: var(--vermilion); color: var(--bone);"
+        >
+          C
+        </span>
+        <span
+          class="ticker tracking-widest text-[11px]"
+          style="color: var(--ink);"
+        >
+          DIRECTOR · CONTROL ROOM
+        </span>
+      </div>
+      <div
+        class="flex items-center gap-6"
+      >
+        <div
+          class="ticker flex items-center gap-2"
+          style="color: var(--ink);"
+        >
+          <span
+            class="opacity-60"
+          >
+            FRAME
+          </span>
+          <span
+            class="tracking-widest"
+          >
+            001
+          </span>
+        </div>
+        <span
+          class="ticker tracking-widest text-[11px]"
+          style="color: var(--ink);"
+        >
+          12
+          :
+          00
+          :
+          00
+        </span>
+        <div
+          class="flex items-center gap-2"
+        >
+          <span
+            class="live-dot"
+          />
+          <span
+            class="ticker tracking-widest text-[11px]"
+            style="color: var(--ink);"
+          >
+            ON AIR
+          </span>
+        </div>
+        <button
+          aria-label="Unmute audio"
+          aria-pressed="true"
+          class="ink-border ticker text-[11px] tracking-widest px-3 py-2"
+          style="background: var(--ash); color: var(--ink);"
+          type="button"
+        >
+          ● SND OFF
+        </button>
+      </div>
+    </header>
+    <div
+      aria-hidden="true"
+      class="smpte-bars h-1.5 mt-3"
+    />
+    <section
+      class="px-6 pt-6 max-w-[1500px] mx-auto grid grid-cols-12 gap-5"
+    >
+      <div
+        class="col-span-12 lg:col-span-8 ink-border p-6"
+        style="background: var(--bone);"
+      >
+        <div
+          class="flex items-start justify-between gap-4"
+        >
+          <div>
+            <span
+              class="chyron"
+              style="color: var(--vermilion);"
+            >
+              GAME PIN
+            </span>
+            <p
+              class="display-num ticker mt-1"
+              style="letter-spacing: 0.06em;"
+            >
+              123456
+            </p>
+            <p
+              class="font-editorial italic mt-1 opacity-70"
+            >
+              Players join at 
+              <span
+                class="ticker not-italic"
+              >
+                /join
+              </span>
+               with this code.
+            </p>
+          </div>
+          <div
+            class="flex flex-col items-end gap-3"
+          >
+            <span
+              class="ticker tracking-widest text-[12px] px-3 py-1 ink-border"
+              style="background: var(--vermilion); color: var(--bone);"
+            >
+              ON AIR · LIVE
+            </span>
+            <a
+              class="ink-border ticker text-[11px] tracking-widest px-3 py-2"
+              href="/host/123456/display"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              ⤴ OPEN PROJECTION
+            </a>
+          </div>
+        </div>
+        <div
+          class="mt-6 grid grid-cols-12 gap-4"
+        >
+          <div
+            class="col-span-12 md:col-span-3 ink-border p-4 flex flex-col"
+            style="background: var(--bone);"
+          >
+            <span
+              class="chyron opacity-70"
+            >
+              PLAYERS
+            </span>
+            <span
+              class="display-num text-3xl mt-1 ticker"
+            >
+              04 / 10
+            </span>
+          </div>
+          <div
+            class="col-span-12 md:col-span-3 ink-border p-4 flex flex-col"
+            style="background: var(--bone);"
+          >
+            <span
+              class="chyron opacity-70"
+            >
+              QUESTION
+            </span>
+            <span
+              class="display-num text-3xl mt-1 ticker"
+            >
+              01 / 05
+            </span>
+          </div>
+          <div
+            class="col-span-12 md:col-span-3 ink-border p-4 flex flex-col"
+            style="background: var(--bone);"
+          >
+            <span
+              class="chyron opacity-70"
+            >
+              ANSWERS
+            </span>
+            <span
+              class="display-num text-3xl mt-1 ticker"
+            >
+              0/4
+            </span>
+          </div>
+          <div
+            class="col-span-12 md:col-span-3 ink-border p-4 flex flex-col items-start"
+            style="background: var(--bone);"
+          >
+            <span
+              class="chyron opacity-70"
+            >
+              TIMER
+            </span>
+            <div
+              class="relative inline-flex"
+              style="width: 70px; height: 70px;"
+            >
+              <svg
+                height="70"
+                style="transform: rotate(-90deg);"
+                viewBox="0 0 70 70"
+                width="70"
+              >
+                <circle
+                  cx="35"
+                  cy="35"
+                  fill="none"
+                  r="27"
+                  stroke="rgba(15,15,15,0.18)"
+                  stroke-width="6"
+                />
+                <circle
+                  cx="35"
+                  cy="35"
+                  fill="none"
+                  r="27"
+                  stroke="var(--ink)"
+                  stroke-dasharray="169.64600329384882"
+                  stroke-dashoffset="169.64600329384882"
+                  stroke-linecap="butt"
+                  stroke-width="6"
+                />
+              </svg>
+              <div
+                class="absolute inset-0 grid place-items-center"
+              >
+                <span
+                  class="display-num ticker"
+                  style="color: var(--ink); font-size: 29.4px; font-weight: 700;"
+                >
+                  0
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          class="mt-8"
+        >
+          <div>
+            <p
+              class="font-editorial leading-tight teleprompter"
+            >
+              Identify the broadcast still shown on the monitor.
+            </p>
+            <div
+              class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6"
+            >
+              <div
+                class="ink-border relative overflow-hidden"
+                style="background: var(--bone); opacity: 1;"
+              >
+                <div
+                  class="absolute inset-y-0 left-0"
+                  style="width: 0%; background: var(--vermilion); opacity: 0.18; transition: width 380ms ease-out;"
+                />
+                <div
+                  class="relative flex items-center gap-3 p-3"
+                >
+                  <div
+                    class="relative grid place-items-center w-12 h-12 shrink-0 border-r-2"
+                    style="border-color: var(--ink); background: var(--vermilion);"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      height="28"
+                      viewBox="0 0 100 100"
+                      width="28"
+                    >
+                      <polygon
+                        fill="var(--bone)"
+                        points="50,10 92,86 8,86"
+                        stroke="var(--ink)"
+                        stroke-linejoin="miter"
+                        stroke-width="2"
+                      />
+                    </svg>
+                  </div>
+                  <div
+                    class="flex-1"
+                  >
+                    <span
+                      class="chyron opacity-70"
+                    >
+                      CH.
+                      01
+                    </span>
+                    <p
+                      class="font-editorial text-lg"
+                    >
+                      Mercury
+                    </p>
+                  </div>
+                  <div
+                    class="ticker tabular-nums text-right"
+                  >
+                    <div
+                      class="text-2xl"
+                    >
+                      0
+                    </div>
+                    <div
+                      class="text-[10px] tracking-widest opacity-60"
+                    >
+                      ·
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div
+                class="ink-border relative overflow-hidden"
+                style="background: var(--bone); opacity: 1;"
+              >
+                <div
+                  class="absolute inset-y-0 left-0"
+                  style="width: 0%; background: var(--cobalt); opacity: 0.18; transition: width 380ms ease-out;"
+                />
+                <div
+                  class="relative flex items-center gap-3 p-3"
+                >
+                  <div
+                    class="relative grid place-items-center w-12 h-12 shrink-0 border-r-2"
+                    style="border-color: var(--ink); background: var(--cobalt);"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      height="28"
+                      viewBox="0 0 100 100"
+                      width="28"
+                    >
+                      <polygon
+                        fill="var(--bone)"
+                        points="50,8 92,50 50,92 8,50"
+                        stroke="var(--ink)"
+                        stroke-linejoin="miter"
+                        stroke-width="2"
+                      />
+                    </svg>
+                  </div>
+                  <div
+                    class="flex-1"
+                  >
+                    <span
+                      class="chyron opacity-70"
+                    >
+                      CH.
+                      02
+                    </span>
+                    <p
+                      class="font-editorial text-lg"
+                    >
+                      Venus
+                    </p>
+                  </div>
+                  <div
+                    class="ticker tabular-nums text-right"
+                  >
+                    <div
+                      class="text-2xl"
+                    >
+                      0
+                    </div>
+                    <div
+                      class="text-[10px] tracking-widest opacity-60"
+                    >
+                      ·
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div
+                class="ink-border relative overflow-hidden"
+                style="background: var(--bone); opacity: 1;"
+              >
+                <div
+                  class="absolute inset-y-0 left-0"
+                  style="width: 0%; background: var(--marigold); opacity: 0.18; transition: width 380ms ease-out;"
+                />
+                <div
+                  class="relative flex items-center gap-3 p-3"
+                >
+                  <div
+                    class="relative grid place-items-center w-12 h-12 shrink-0 border-r-2"
+                    style="border-color: var(--ink); background: var(--marigold);"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      height="28"
+                      viewBox="0 0 100 100"
+                      width="28"
+                    >
+                      <circle
+                        cx="50"
+                        cy="50"
+                        fill="var(--bone)"
+                        r="42"
+                        stroke="var(--ink)"
+                        stroke-width="2"
+                      />
+                    </svg>
+                  </div>
+                  <div
+                    class="flex-1"
+                  >
+                    <span
+                      class="chyron opacity-70"
+                    >
+                      CH.
+                      03
+                    </span>
+                    <p
+                      class="font-editorial text-lg"
+                    >
+                      Earth
+                    </p>
+                  </div>
+                  <div
+                    class="ticker tabular-nums text-right"
+                  >
+                    <div
+                      class="text-2xl"
+                    >
+                      0
+                    </div>
+                    <div
+                      class="text-[10px] tracking-widest opacity-60"
+                    >
+                      ·
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div
+                class="ink-border relative overflow-hidden"
+                style="background: var(--bone); opacity: 1;"
+              >
+                <div
+                  class="absolute inset-y-0 left-0"
+                  style="width: 0%; background: var(--ivy); opacity: 0.18; transition: width 380ms ease-out;"
+                />
+                <div
+                  class="relative flex items-center gap-3 p-3"
+                >
+                  <div
+                    class="relative grid place-items-center w-12 h-12 shrink-0 border-r-2"
+                    style="border-color: var(--ink); background: var(--ivy);"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      height="28"
+                      viewBox="0 0 100 100"
+                      width="28"
+                    >
+                      <rect
+                        fill="var(--bone)"
+                        height="80"
+                        stroke="var(--ink)"
+                        stroke-width="2"
+                        width="80"
+                        x="10"
+                        y="10"
+                      />
+                    </svg>
+                  </div>
+                  <div
+                    class="flex-1"
+                  >
+                    <span
+                      class="chyron opacity-70"
+                    >
+                      CH.
+                      04
+                    </span>
+                    <p
+                      class="font-editorial text-lg"
+                    >
+                      Mars
+                    </p>
+                  </div>
+                  <div
+                    class="ticker tabular-nums text-right"
+                  >
+                    <div
+                      class="text-2xl"
+                    >
+                      0
+                    </div>
+                    <div
+                      class="text-[10px] tracking-widest opacity-60"
+                    >
+                      ·
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <aside
+        class="col-span-12 lg:col-span-4 ink-border p-5 flex flex-col"
+        style="background: var(--bone);"
+      >
+        <div
+          class="flex items-center justify-between"
+        >
+          <span
+            class="chyron"
+          >
+            STANDINGS
+          </span>
+          <span
+            class="ticker text-[11px] tracking-widest opacity-60"
+          >
+            04
+             / 
+            10
+             PLAYERS
+          </span>
+        </div>
+        <ol
+          class="mt-3 divide-y"
+          style="border-color: rgba(15, 15, 15, 0.18);"
+        >
+          <li
+            class="py-2 flex items-center gap-3 border-b last:border-b-0"
+            style="border-color: rgba(15, 15, 15, 0.18);"
+          >
+            <span
+              class="display-num text-2xl"
+              style="min-width: 36px;"
+            >
+              01
+            </span>
+            <span
+              class="font-editorial flex-1 truncate text-lg"
+            >
+              Player 1
+            </span>
+            <span
+              class="ticker text-sm"
+            >
+              950
+            </span>
+          </li>
+          <li
+            class="py-2 flex items-center gap-3 border-b last:border-b-0"
+            style="border-color: rgba(15, 15, 15, 0.18);"
+          >
+            <span
+              class="display-num text-2xl"
+              style="min-width: 36px;"
+            >
+              02
+            </span>
+            <span
+              class="font-editorial flex-1 truncate text-lg"
+            >
+              Player 2
+            </span>
+            <span
+              class="ticker text-sm"
+            >
+              900
+            </span>
+          </li>
+          <li
+            class="py-2 flex items-center gap-3 border-b last:border-b-0"
+            style="border-color: rgba(15, 15, 15, 0.18);"
+          >
+            <span
+              class="display-num text-2xl"
+              style="min-width: 36px;"
+            >
+              03
+            </span>
+            <span
+              class="font-editorial flex-1 truncate text-lg"
+            >
+              Player 3
+            </span>
+            <span
+              class="ticker text-sm"
+            >
+              850
+            </span>
+          </li>
+          <li
+            class="py-2 flex items-center gap-3 border-b last:border-b-0"
+            style="border-color: rgba(15, 15, 15, 0.18);"
+          >
+            <span
+              class="display-num text-2xl"
+              style="min-width: 36px;"
+            >
+              04
+            </span>
+            <span
+              class="font-editorial flex-1 truncate text-lg"
+            >
+              Player 4
+            </span>
+            <span
+              class="ticker text-sm"
+            >
+              800
+            </span>
+          </li>
+        </ol>
+        <div
+          class="mt-auto pt-4 border-t-2 flex flex-col gap-2"
+          style="border-color: var(--ink);"
+        >
+          <button
+            class="ink-border stamp px-4 py-3 ticker tracking-widest text-[12px]"
+            style="background: var(--vermilion); color: var(--bone);"
+            type="button"
+          >
+            ▶ 
+            LOCK ANSWERS
+          </button>
+          <a
+            class="ticker text-[11px] tracking-widest opacity-70"
+            href="/host"
+          >
+            ← back to builder
+          </a>
+        </div>
+      </aside>
+    </section>
+  </main>
+</div>
+`;
+
 exports[`fixture × surface snapshots > control · question-long-options 1`] = `
 <div>
   <main
@@ -28526,17 +29178,17 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
-            class="font-editorial teleprompter"
-            style="line-height: 1.05;"
+            class="font-editorial teleprompter flex-1 min-w-0"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -28544,9 +29196,9 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <polygon
                 fill="var(--bone)"
@@ -28558,27 +29210,28 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Mercury
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -28600,9 +29253,9 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -28626,7 +29279,7 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 3
@@ -28642,16 +29295,16 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--cobalt); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -28680,7 +29333,7 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -28696,16 +29349,16 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -28735,7 +29388,7 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -28751,16 +29404,16 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -28791,7 +29444,7 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -28935,13 +29588,333 @@ exports[`fixture × surface snapshots > display · question-double-points 1`] = 
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center"
+          class="flex items-center gap-8 flex-1 min-h-0 overflow-hidden"
         >
           <p
-            class="font-editorial teleprompter"
+            class="font-editorial teleprompter flex-1 min-w-0"
             style="line-height: 1.05;"
           >
             Which planet is closest to the sun?
+          </p>
+        </div>
+        <div
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+        >
+          <div
+            class="relative ink-border overflow-hidden"
+            style="background: var(--vermilion); opacity: 1; aspect-ratio: 1.05 / 1;"
+          >
+            <div
+              class="absolute inset-0 grid place-items-center"
+            >
+              <svg
+                aria-hidden="true"
+                height="150"
+                viewBox="0 0 100 100"
+                width="150"
+              >
+                <polygon
+                  fill="var(--bone)"
+                  points="50,10 92,86 8,86"
+                  stroke="var(--ink)"
+                  stroke-linejoin="miter"
+                  stroke-width="3"
+                />
+              </svg>
+            </div>
+            <div
+              class="absolute top-2 left-2 ticker text-[11px] tracking-widest"
+              style="color: var(--bone);"
+            >
+              CH.
+              01
+            </div>
+          </div>
+          <div
+            class="relative ink-border overflow-hidden"
+            style="background: var(--cobalt); opacity: 1; aspect-ratio: 1.05 / 1;"
+          >
+            <div
+              class="absolute inset-0 grid place-items-center"
+            >
+              <svg
+                aria-hidden="true"
+                height="150"
+                viewBox="0 0 100 100"
+                width="150"
+              >
+                <polygon
+                  fill="var(--bone)"
+                  points="50,8 92,50 50,92 8,50"
+                  stroke="var(--ink)"
+                  stroke-linejoin="miter"
+                  stroke-width="3"
+                />
+              </svg>
+            </div>
+            <div
+              class="absolute top-2 left-2 ticker text-[11px] tracking-widest"
+              style="color: var(--bone);"
+            >
+              CH.
+              02
+            </div>
+          </div>
+          <div
+            class="relative ink-border overflow-hidden"
+            style="background: var(--marigold); opacity: 1; aspect-ratio: 1.05 / 1;"
+          >
+            <div
+              class="absolute inset-0 grid place-items-center"
+            >
+              <svg
+                aria-hidden="true"
+                height="150"
+                viewBox="0 0 100 100"
+                width="150"
+              >
+                <circle
+                  cx="50"
+                  cy="50"
+                  fill="var(--bone)"
+                  r="42"
+                  stroke="var(--ink)"
+                  stroke-width="3"
+                />
+              </svg>
+            </div>
+            <div
+              class="absolute top-2 left-2 ticker text-[11px] tracking-widest"
+              style="color: var(--bone);"
+            >
+              CH.
+              03
+            </div>
+          </div>
+          <div
+            class="relative ink-border overflow-hidden"
+            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+          >
+            <div
+              class="absolute inset-0 grid place-items-center"
+            >
+              <svg
+                aria-hidden="true"
+                height="150"
+                viewBox="0 0 100 100"
+                width="150"
+              >
+                <rect
+                  fill="var(--bone)"
+                  height="80"
+                  stroke="var(--ink)"
+                  stroke-width="3"
+                  width="80"
+                  x="10"
+                  y="10"
+                />
+              </svg>
+            </div>
+            <div
+              class="absolute top-2 left-2 ticker text-[11px] tracking-widest"
+              style="color: var(--bone);"
+            >
+              CH.
+              04
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+`;
+
+exports[`fixture × surface snapshots > display · question-image 1`] = `
+<div>
+  <main
+    class="relative h-screen w-full overflow-hidden grain flex flex-col ink-bg"
+    style="background: var(--ink); color: var(--bone);"
+  >
+    <span
+      aria-hidden="true"
+      class="absolute top-3 left-3 w-4 h-4 border-t-2 border-l-2"
+      style="border-color: var(--bone);"
+    />
+    <span
+      aria-hidden="true"
+      class="absolute top-3 right-3 w-4 h-4 border-t-2 border-r-2"
+      style="border-color: var(--bone);"
+    />
+    <span
+      aria-hidden="true"
+      class="absolute bottom-3 left-3 w-4 h-4 border-b-2 border-l-2"
+      style="border-color: var(--bone);"
+    />
+    <span
+      aria-hidden="true"
+      class="absolute bottom-3 right-3 w-4 h-4 border-b-2 border-r-2"
+      style="border-color: var(--bone);"
+    />
+    <header
+      class="px-8 pt-5 flex items-center justify-between"
+    >
+      <div
+        class="flex items-center gap-3"
+      >
+        <span
+          class="ticker tracking-widest text-[11px] px-2 py-[2px]"
+          style="background: var(--vermilion); color: var(--bone);"
+        >
+          A
+        </span>
+        <span
+          class="ticker tracking-widest text-[11px]"
+          style="color: var(--bone);"
+        >
+          LIVE FEED · STUDIO 4
+        </span>
+      </div>
+      <div
+        class="flex items-center gap-7"
+      >
+        <div
+          class="ticker flex items-center gap-2"
+          style="color: var(--bone);"
+        >
+          <span
+            class="opacity-60"
+          >
+            FRAME
+          </span>
+          <span
+            class="tracking-widest"
+          >
+            001
+          </span>
+        </div>
+        <span
+          class="ticker tracking-widest text-[11px]"
+          style="color: var(--bone);"
+        >
+          12
+          :
+          00
+          :
+          00
+        </span>
+        <div
+          class="flex items-center gap-2"
+        >
+          <span
+            class="live-dot"
+          />
+          <span
+            class="ticker tracking-widest text-[11px]"
+            style="color: var(--bone);"
+          >
+            ON AIR
+          </span>
+        </div>
+      </div>
+    </header>
+    <div
+      aria-hidden="true"
+      class="smpte-bars h-2 mt-3"
+    />
+    <section
+      class="px-10 pt-8 pb-12 max-w-[1800px] w-full mx-auto flex-1 min-h-0 flex flex-col"
+    >
+      <div
+        class="flex flex-col gap-6 flex-1 min-h-0"
+      >
+        <div
+          class="flex items-center justify-between shrink-0"
+        >
+          <div
+            class="flex items-center gap-4"
+          >
+            <span
+              class="ticker text-[12px] tracking-widest px-2 py-[2px]"
+              style="background: var(--vermilion); color: var(--bone);"
+            >
+              CUE 
+              01
+               / 
+              05
+            </span>
+            <span
+              class="ticker text-[12px] tracking-widest opacity-80"
+            >
+              20
+              s · 
+              1× POINTS
+            </span>
+          </div>
+          <div
+            class="relative inline-flex"
+            style="width: 120px; height: 120px;"
+          >
+            <svg
+              height="120"
+              style="transform: rotate(-90deg);"
+              viewBox="0 0 120 120"
+              width="120"
+            >
+              <circle
+                cx="60"
+                cy="60"
+                fill="none"
+                r="52"
+                stroke="rgba(242,235,220,0.18)"
+                stroke-width="6"
+              />
+              <circle
+                cx="60"
+                cy="60"
+                fill="none"
+                r="52"
+                stroke="var(--bone)"
+                stroke-dasharray="326.7256359733385"
+                stroke-dashoffset="326.7256359733385"
+                stroke-linecap="butt"
+                stroke-width="6"
+              />
+            </svg>
+            <div
+              class="absolute inset-0 grid place-items-center"
+            >
+              <span
+                class="display-num ticker"
+                style="color: var(--bone); font-size: 50.4px; font-weight: 700;"
+              >
+                0
+              </span>
+            </div>
+          </div>
+        </div>
+        <div
+          class="flex items-center gap-6 flex-1 min-h-0 overflow-hidden"
+        >
+          <div
+            class="ink-border relative shrink-0 overflow-hidden"
+            style="background: var(--bone); height: 100%; width: 36%;"
+          >
+            <img
+              alt=""
+              class="object-contain"
+              data-nimg="fill"
+              decoding="async"
+              loading="lazy"
+              src="/uploads/quiz-images/sample.png"
+              style="position: absolute; height: 100%; width: 100%; left: 0px; top: 0px; right: 0px; bottom: 0px; color: transparent;"
+            />
+          </div>
+          <p
+            class="font-editorial teleprompter flex-1 min-w-0"
+            style="line-height: 1.3;"
+          >
+            Identify the broadcast still shown on the monitor.
           </p>
         </div>
         <div
@@ -29200,10 +30173,10 @@ exports[`fixture × surface snapshots > display · question-long-options 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center"
+          class="flex items-center gap-8 flex-1 min-h-0 overflow-hidden"
         >
           <p
-            class="font-editorial teleprompter"
+            class="font-editorial teleprompter flex-1 min-w-0"
             style="line-height: 1.05;"
           >
             Pick the most accurate description.
@@ -29465,10 +30438,10 @@ exports[`fixture × surface snapshots > display · question-long-stem 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center"
+          class="flex items-center gap-8 flex-1 min-h-0 overflow-hidden"
         >
           <p
-            class="font-editorial teleprompter"
+            class="font-editorial teleprompter flex-1 min-w-0"
             style="line-height: 1.2;"
           >
             In the early hours of an unremarkable Tuesday morning, when the broadcast tower above the studio was still humming with residual static from the overnight programming block, which historic event is generally credited with kicking off the modern era of live television quiz shows?
@@ -29771,10 +30744,10 @@ exports[`fixture × surface snapshots > display · question-short 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center"
+          class="flex items-center gap-8 flex-1 min-h-0 overflow-hidden"
         >
           <p
-            class="font-editorial teleprompter"
+            class="font-editorial teleprompter flex-1 min-w-0"
             style="line-height: 1.05;"
           >
             Best answer?
@@ -30036,10 +31009,10 @@ exports[`fixture × surface snapshots > display · question-truefalse 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center"
+          class="flex items-center gap-8 flex-1 min-h-0 overflow-hidden"
         >
           <p
-            class="font-editorial teleprompter"
+            class="font-editorial teleprompter flex-1 min-w-0"
             style="line-height: 1.05;"
           >
             The sun is a star.
@@ -30238,17 +31211,17 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
-            class="font-editorial teleprompter"
-            style="line-height: 1.05;"
+            class="font-editorial teleprompter flex-1 min-w-0"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -30256,9 +31229,9 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <polygon
                 fill="var(--bone)"
@@ -30270,27 +31243,28 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Mercury
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -30312,9 +31286,9 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -30338,7 +31312,7 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -30354,16 +31328,16 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--cobalt); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -30392,7 +31366,7 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 100
@@ -30408,16 +31382,16 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -30447,7 +31421,7 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -30463,16 +31437,16 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -30503,7 +31477,7 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -30647,17 +31621,17 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
-            class="font-editorial teleprompter"
-            style="line-height: 1.05;"
+            class="font-editorial teleprompter flex-1 min-w-0"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -30665,9 +31639,9 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <polygon
                 fill="var(--bone)"
@@ -30679,27 +31653,28 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Mercury
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -30721,9 +31696,9 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -30747,7 +31722,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 4
@@ -30763,16 +31738,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--cobalt); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -30801,7 +31776,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -30817,16 +31792,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -30856,7 +31831,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -30872,16 +31847,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -30912,7 +31887,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -31056,17 +32031,17 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
-            class="font-editorial teleprompter"
-            style="line-height: 1.05;"
+            class="font-editorial teleprompter flex-1 min-w-0"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -31074,9 +32049,9 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <polygon
                 fill="var(--bone)"
@@ -31088,27 +32063,28 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Venus
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--vermilion); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--vermilion); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -31137,7 +32113,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -31153,16 +32129,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -31184,9 +32160,9 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -31210,7 +32186,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 3
@@ -31226,16 +32202,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -31265,7 +32241,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -31281,16 +32257,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -31321,7 +32297,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -31465,17 +32441,17 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
-            class="font-editorial teleprompter"
-            style="line-height: 1.05;"
+            class="font-editorial teleprompter flex-1 min-w-0"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -31483,9 +32459,9 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <circle
                 cx="50"
@@ -31498,27 +32474,28 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Earth
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--vermilion); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--vermilion); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -31547,7 +32524,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -31563,16 +32540,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--cobalt); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -31601,7 +32578,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -31617,16 +32594,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -31649,9 +32626,9 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -31675,7 +32652,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 2
@@ -31691,16 +32668,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -31731,7 +32708,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -31875,17 +32852,17 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
-            class="font-editorial teleprompter"
-            style="line-height: 1.05;"
+            class="font-editorial teleprompter flex-1 min-w-0"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -31893,9 +32870,9 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <rect
                 fill="var(--bone)"
@@ -31909,27 +32886,28 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Mars
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--vermilion); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--vermilion); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -31958,7 +32936,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -31974,16 +32952,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--cobalt); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -32012,7 +32990,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -32028,16 +33006,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -32067,7 +33045,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -32083,16 +33061,16 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -32116,9 +33094,9 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -32142,7 +33120,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 2
@@ -32286,17 +33264,17 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
-            class="font-editorial teleprompter"
-            style="line-height: 1.05;"
+            class="font-editorial teleprompter flex-1 min-w-0"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -32304,9 +33282,9 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <polygon
                 fill="var(--bone)"
@@ -32318,27 +33296,28 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Mercury
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -32360,9 +33339,9 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -32386,7 +33365,7 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 25
@@ -32402,16 +33381,16 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--cobalt); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -32440,7 +33419,7 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 25
@@ -32456,16 +33435,16 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -32495,7 +33474,7 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 25
@@ -32511,16 +33490,16 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -32551,7 +33530,7 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 25
@@ -32695,17 +33674,17 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
-            class="font-editorial teleprompter"
-            style="line-height: 1.05;"
+            class="font-editorial teleprompter flex-1 min-w-0"
+            style="line-height: 1.25;"
           >
             Pick the most accurate description.
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -32713,9 +33692,9 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <polygon
                 fill="var(--bone)"
@@ -32727,27 +33706,28 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1.1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1.1; max-height: 3.2em;"
           >
             A very long answer that probably needs to truncate cleanly inside the answer tile container
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--vermilion); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--vermilion); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -32776,7 +33756,7 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -32792,16 +33772,16 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -32823,9 +33803,9 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -32849,7 +33829,7 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 5
@@ -32865,16 +33845,16 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -32904,7 +33884,7 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -32920,16 +33900,16 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -32960,7 +33940,7 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -33104,17 +34084,17 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
-            class="font-editorial teleprompter"
-            style="line-height: 1.05;"
+            class="font-editorial teleprompter flex-1 min-w-0"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -33122,9 +34102,9 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <polygon
                 fill="var(--bone)"
@@ -33136,27 +34116,28 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Mercury
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -33178,9 +34159,9 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -33204,7 +34185,7 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 95
@@ -33220,16 +34201,16 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--cobalt); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -33258,7 +34239,7 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 2
@@ -33274,16 +34255,16 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -33313,7 +34294,7 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 2
@@ -33329,16 +34310,16 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -33369,7 +34350,7 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 1
@@ -33513,17 +34494,17 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
           </div>
         </div>
         <div
-          class="flex-1 min-h-0 overflow-hidden flex items-center"
+          class="flex items-center gap-8 shrink-0"
         >
           <p
-            class="font-editorial teleprompter"
-            style="line-height: 1.05;"
+            class="font-editorial teleprompter flex-1 min-w-0"
+            style="line-height: 1.25;"
           >
             Which planet is closest to the sun?
           </p>
         </div>
         <div
-          class="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          class="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style="background: var(--ivy); color: var(--bone);"
         >
           <div
@@ -33531,9 +34512,9 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
           >
             <svg
               aria-hidden="true"
-              height="64"
+              height="48"
               viewBox="0 0 100 100"
-              width="64"
+              width="48"
             >
               <polygon
                 fill="var(--bone)"
@@ -33545,27 +34526,28 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
             </svg>
           </div>
           <p
-            class="font-editorial min-w-0"
-            style="line-height: 1; max-height: 3.2em; overflow: hidden;"
+            class="font-editorial min-w-0 flex-1 overflow-hidden"
+            style="line-height: 1; max-height: 3.2em;"
           >
             Mercury
           </p>
         </div>
         <div
-          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
+          class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 flex-1 min-h-0"
+          style="grid-auto-rows: 1fr;"
         >
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 1;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -33587,9 +34569,9 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
             >
               <svg
                 aria-hidden="true"
-                height="48"
+                height="40"
                 viewBox="0 0 100 100"
-                width="48"
+                width="40"
               >
                 <polyline
                   fill="none"
@@ -33613,7 +34595,7 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -33629,16 +34611,16 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--cobalt); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <polygon
                   fill="var(--bone)"
@@ -33667,7 +34649,7 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -33683,16 +34665,16 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--marigold); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--marigold); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <circle
                   cx="50"
@@ -33722,7 +34704,7 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -33738,16 +34720,16 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
           </div>
           <div
             class="relative ink-border overflow-hidden"
-            style="background: var(--ivy); opacity: 0.35; aspect-ratio: 1.05 / 1;"
+            style="background: var(--ivy); opacity: 0.35;"
           >
             <div
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10"
             >
               <svg
                 aria-hidden="true"
-                height="72"
+                height="60"
                 viewBox="0 0 100 100"
-                width="72"
+                width="60"
               >
                 <rect
                   fill="var(--bone)"
@@ -33778,7 +34760,7 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
               style="background: rgba(15, 15, 15, 0.78);"
             >
               <span
-                class="display-num text-5xl"
+                class="display-num text-4xl"
                 style="color: var(--bone);"
               >
                 0
@@ -37166,6 +38148,342 @@ exports[`fixture × surface snapshots > player · question-double-points 1`] = `
           class="font-editorial leading-tight mt-3 teleprompter"
         >
           Which planet is closest to the sun?
+        </p>
+        <div
+          class="grid grid-cols-2 gap-3 mt-6"
+        >
+          <button
+            aria-label="TRIANGLE: Mercury"
+            class="answer-tile relative ink-border p-4 flex flex-col items-start text-left"
+            style="background: var(--vermilion); color: var(--bone); opacity: 1; min-height: 132px;"
+            type="button"
+          >
+            <div
+              class="flex items-center justify-between w-full"
+            >
+              <span
+                class="ticker text-[11px] tracking-widest opacity-90"
+              >
+                CH.
+                01
+              </span>
+              <svg
+                aria-hidden="true"
+                height="36"
+                viewBox="0 0 100 100"
+                width="36"
+              >
+                <polygon
+                  fill="var(--bone)"
+                  points="50,10 92,86 8,86"
+                  stroke="var(--ink)"
+                  stroke-linejoin="miter"
+                  stroke-width="2"
+                />
+              </svg>
+            </div>
+            <span
+              class="font-editorial text-xl mt-3 leading-snug"
+            >
+              Mercury
+            </span>
+          </button>
+          <button
+            aria-label="DIAMOND: Venus"
+            class="answer-tile relative ink-border p-4 flex flex-col items-start text-left"
+            style="background: var(--cobalt); color: var(--bone); opacity: 1; min-height: 132px;"
+            type="button"
+          >
+            <div
+              class="flex items-center justify-between w-full"
+            >
+              <span
+                class="ticker text-[11px] tracking-widest opacity-90"
+              >
+                CH.
+                02
+              </span>
+              <svg
+                aria-hidden="true"
+                height="36"
+                viewBox="0 0 100 100"
+                width="36"
+              >
+                <polygon
+                  fill="var(--bone)"
+                  points="50,8 92,50 50,92 8,50"
+                  stroke="var(--ink)"
+                  stroke-linejoin="miter"
+                  stroke-width="2"
+                />
+              </svg>
+            </div>
+            <span
+              class="font-editorial text-xl mt-3 leading-snug"
+            >
+              Venus
+            </span>
+          </button>
+          <button
+            aria-label="CIRCLE: Earth"
+            class="answer-tile relative ink-border p-4 flex flex-col items-start text-left"
+            style="background: var(--marigold); color: var(--bone); opacity: 1; min-height: 132px;"
+            type="button"
+          >
+            <div
+              class="flex items-center justify-between w-full"
+            >
+              <span
+                class="ticker text-[11px] tracking-widest opacity-90"
+              >
+                CH.
+                03
+              </span>
+              <svg
+                aria-hidden="true"
+                height="36"
+                viewBox="0 0 100 100"
+                width="36"
+              >
+                <circle
+                  cx="50"
+                  cy="50"
+                  fill="var(--bone)"
+                  r="42"
+                  stroke="var(--ink)"
+                  stroke-width="2"
+                />
+              </svg>
+            </div>
+            <span
+              class="font-editorial text-xl mt-3 leading-snug"
+            >
+              Earth
+            </span>
+          </button>
+          <button
+            aria-label="SQUARE: Mars"
+            class="answer-tile relative ink-border p-4 flex flex-col items-start text-left"
+            style="background: var(--ivy); color: var(--bone); opacity: 1; min-height: 132px;"
+            type="button"
+          >
+            <div
+              class="flex items-center justify-between w-full"
+            >
+              <span
+                class="ticker text-[11px] tracking-widest opacity-90"
+              >
+                CH.
+                04
+              </span>
+              <svg
+                aria-hidden="true"
+                height="36"
+                viewBox="0 0 100 100"
+                width="36"
+              >
+                <rect
+                  fill="var(--bone)"
+                  height="80"
+                  stroke="var(--ink)"
+                  stroke-width="2"
+                  width="80"
+                  x="10"
+                  y="10"
+                />
+              </svg>
+            </div>
+            <span
+              class="font-editorial text-xl mt-3 leading-snug"
+            >
+              Mars
+            </span>
+          </button>
+        </div>
+        <div
+          class="mt-5 min-h-[28px]"
+        />
+      </div>
+    </div>
+  </main>
+</div>
+`;
+
+exports[`fixture × surface snapshots > player · question-image 1`] = `
+<div>
+  <main
+    class="relative min-h-screen pb-10 flex flex-col"
+  >
+    <span
+      aria-hidden="true"
+      class="absolute top-3 left-3 w-3 h-3 border-t-2 border-l-2"
+      style="border-color: var(--ink);"
+    />
+    <span
+      aria-hidden="true"
+      class="absolute top-3 right-3 w-3 h-3 border-t-2 border-r-2"
+      style="border-color: var(--ink);"
+    />
+    <span
+      aria-hidden="true"
+      class="absolute bottom-3 left-3 w-3 h-3 border-b-2 border-l-2"
+      style="border-color: var(--ink);"
+    />
+    <span
+      aria-hidden="true"
+      class="absolute bottom-3 right-3 w-3 h-3 border-b-2 border-r-2"
+      style="border-color: var(--ink);"
+    />
+    <button
+      aria-label="Mute"
+      aria-pressed="false"
+      class="fixed bottom-3 right-3 z-50 ink-border ticker text-[11px] tracking-widest grid place-items-center"
+      style="width: 44px; height: 44px; background: var(--bone); color: var(--ink);"
+      type="button"
+    >
+      SND
+    </button>
+    <header
+      class="px-5 pt-4 flex items-center justify-between gap-3"
+    >
+      <div
+        class="flex items-center gap-3"
+      >
+        <span
+          class="ticker tracking-widest text-[11px] px-2 py-[2px]"
+          style="background: var(--vermilion); color: var(--bone);"
+        >
+          B
+        </span>
+        <span
+          class="ticker tracking-widest text-[11px]"
+          style="color: var(--ink);"
+        >
+          TALENT
+        </span>
+      </div>
+      <div
+        class="flex items-center gap-4"
+      >
+        <span
+          class="ticker tracking-widest text-[11px]"
+          style="color: var(--ink);"
+        >
+          12
+          :
+          00
+          :
+          00
+        </span>
+        <div
+          class="flex items-center gap-2"
+        >
+          <span
+            class="live-dot"
+          />
+          <span
+            class="ticker tracking-widest text-[11px]"
+            style="color: var(--ink);"
+          >
+            ON AIR
+          </span>
+        </div>
+      </div>
+    </header>
+    <div
+      aria-hidden="true"
+      class="smpte-bars h-1.5 mt-3"
+    />
+    <div
+      class="px-5 pt-4 max-w-[680px] mx-auto w-full flex-1 flex flex-col"
+    >
+      <div
+        class="flex items-center justify-between border-b-2 pb-2"
+        style="border-color: var(--ink);"
+      >
+        <span
+          class="font-editorial text-lg"
+        >
+          <span
+            class="opacity-60"
+          >
+            ID·
+          </span>
+          <span
+            class="ml-1"
+          >
+            QA
+          </span>
+        </span>
+        <span
+          class="ticker text-[11px] tracking-widest opacity-70"
+        >
+          PIN 
+          123456
+        </span>
+      </div>
+      <div
+        class="pt-4 flex-1 flex flex-col"
+      >
+        <div
+          class="flex items-center justify-between"
+        >
+          <span
+            class="ticker text-[11px] tracking-widest px-2 py-[2px]"
+            style="background: var(--vermilion); color: var(--bone);"
+          >
+            CUE 
+            01
+             /
+             
+            05
+          </span>
+          <div
+            class="relative inline-flex"
+            style="width: 64px; height: 64px;"
+          >
+            <svg
+              height="64"
+              style="transform: rotate(-90deg);"
+              viewBox="0 0 64 64"
+              width="64"
+            >
+              <circle
+                cx="32"
+                cy="32"
+                fill="none"
+                r="24"
+                stroke="rgba(15,15,15,0.18)"
+                stroke-width="6"
+              />
+              <circle
+                cx="32"
+                cy="32"
+                fill="none"
+                r="24"
+                stroke="var(--ink)"
+                stroke-dasharray="150.79644737231007"
+                stroke-dashoffset="150.79644737231007"
+                stroke-linecap="butt"
+                stroke-width="6"
+              />
+            </svg>
+            <div
+              class="absolute inset-0 grid place-items-center"
+            >
+              <span
+                class="display-num ticker"
+                style="color: var(--ink); font-size: 26.88px; font-weight: 700;"
+              >
+                0
+              </span>
+            </div>
+          </div>
+        </div>
+        <p
+          class="font-editorial leading-tight mt-3 teleprompter"
+        >
+          Identify the broadcast still shown on the monitor.
         </p>
         <div
           class="grid grid-cols-2 gap-3 mt-6"

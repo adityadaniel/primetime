@@ -784,6 +784,35 @@ describe('misc surfaces (coverage)', () => {
     expect(publicState(game).reveal?.correct).toBe(0);
   });
 
+  it('publicState surfaces question imageUrl when present (MID-278)', () => {
+    const game = createGame(
+      makeQuiz({
+        questions: [
+          {
+            id: 'q1',
+            type: 'multiple',
+            text: 'Q1',
+            options: ['a', 'b', 'c', 'd'],
+            correct: 0,
+            timeLimit: 10,
+            doublePoints: false,
+            imageUrl: '/uploads/quiz-images/pic.png',
+          },
+        ],
+      }),
+    );
+    mustJoin(game.pin, 's1', 'Alice');
+    startGame(game);
+    expect(publicState(game).question?.imageUrl).toBe('/uploads/quiz-images/pic.png');
+  });
+
+  it('publicState omits imageUrl for text-only questions (MID-278)', () => {
+    const game = setupGame();
+    mustJoin(game.pin, 's1', 'Alice');
+    startGame(game);
+    expect(publicState(game).question?.imageUrl).toBeUndefined();
+  });
+
   it('publicState includes paused metadata while paused', () => {
     const game = setupGame();
     mustJoin(game.pin, 's1', 'Alice');

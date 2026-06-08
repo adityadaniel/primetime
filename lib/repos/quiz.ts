@@ -14,7 +14,14 @@ function validateQuestionInput(q: QuestionInput, idx: number): string | null {
   if (typeof q.timeLimit !== 'number' || q.timeLimit < 3 || q.timeLimit > 600)
     return `Q${idx}: bad timeLimit`;
   if (typeof q.doublePoints !== 'boolean') return `Q${idx}: bad doublePoints`;
+  if (q.imageUrl != null && typeof q.imageUrl !== 'string') return `Q${idx}: bad imageUrl`;
   return null;
+}
+
+/** Normalize an optional image URL to a stored value (trimmed string or null). */
+function normalizeImageUrl(imageUrl: string | undefined): string | null {
+  const trimmed = imageUrl?.trim();
+  return trimmed ? trimmed : null;
 }
 
 export async function createQuiz(
@@ -43,6 +50,7 @@ export async function createQuiz(
           correct: q.correct,
           timeLimit: q.timeLimit,
           doublePoints: q.doublePoints,
+          imageUrl: normalizeImageUrl(q.imageUrl),
         })),
       },
     },
@@ -104,6 +112,7 @@ export async function updateQuiz(
             correct: q.correct,
             timeLimit: q.timeLimit,
             doublePoints: q.doublePoints,
+            imageUrl: normalizeImageUrl(q.imageUrl),
           })),
         },
       },

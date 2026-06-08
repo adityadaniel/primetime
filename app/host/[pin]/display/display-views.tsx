@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useState } from 'react';
 import { Chyron, Clock, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
@@ -206,19 +207,53 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
         <Countdown endsAt={state.endsAt} startedAt={state.startedAt} size={120} dark />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden flex items-center">
+      <div
+        className={`flex items-center ${q.imageUrl ? 'gap-6' : 'gap-8'} ${
+          state.phase === 'reveal' ? 'shrink-0' : 'flex-1 min-h-0 overflow-hidden'
+        }`}
+      >
+        {q.imageUrl && (
+          <div
+            className="ink-border relative shrink-0 overflow-hidden"
+            style={{
+              background: 'var(--bone)',
+              ...(state.phase === 'reveal'
+                ? { width: '18%', aspectRatio: '4 / 3' }
+                : { height: '100%', width: '36%' }),
+            }}
+          >
+            <Image src={q.imageUrl} alt="" fill unoptimized className="object-contain" />
+          </div>
+        )}
         <p
-          className="font-editorial teleprompter"
+          className="font-editorial teleprompter flex-1 min-w-0"
           style={{
             fontSize:
-              q.text.length >= 200
-                ? 'clamp(22px, 2.4vw, 34px)'
-                : q.text.length >= 120
-                  ? 'clamp(30px, 3.6vw, 56px)'
-                  : q.text.length >= 60
-                    ? 'clamp(40px, 5.5vw, 92px)'
-                    : 'clamp(44px, 6.5vw, 108px)',
-            lineHeight: q.text.length >= 120 ? 1.2 : 1.05,
+              state.phase === 'reveal'
+                ? 'clamp(14px, 1.6vw, 22px)'
+                : q.imageUrl
+                  ? q.text.length >= 200
+                    ? 'clamp(15px, 1.6vw, 22px)'
+                    : q.text.length >= 120
+                      ? 'clamp(18px, 2vw, 28px)'
+                      : q.text.length >= 60
+                        ? 'clamp(22px, 2.6vw, 36px)'
+                        : 'clamp(28px, 3.2vw, 48px)'
+                  : q.text.length >= 200
+                    ? 'clamp(22px, 2.4vw, 34px)'
+                    : q.text.length >= 120
+                      ? 'clamp(30px, 3.6vw, 56px)'
+                      : q.text.length >= 60
+                        ? 'clamp(40px, 5.5vw, 92px)'
+                        : 'clamp(44px, 6.5vw, 108px)',
+            lineHeight:
+              state.phase === 'reveal'
+                ? 1.25
+                : q.imageUrl
+                  ? 1.3
+                  : q.text.length >= 120
+                    ? 1.2
+                    : 1.05,
           }}
         >
           {q.text}
@@ -227,7 +262,7 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
 
       {state.phase === 'reveal' && correct !== undefined && (
         <div
-          className="ink-border stamp px-6 py-5 flex items-center gap-5 shrink-0 overflow-hidden"
+          className="ink-border stamp px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
           style={{ background: 'var(--ivy)', color: 'var(--bone)' }}
         >
           <div className="shrink-0">
@@ -235,22 +270,21 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
               kind={(CHANNELS[correct] ?? CHANNELS[0]).key}
               fill="var(--bone)"
               stroke="var(--ink)"
-              size={64}
+              size={48}
               strokeWidth={3}
             />
           </div>
           <p
-            className="font-editorial min-w-0"
+            className="font-editorial min-w-0 flex-1 overflow-hidden"
             style={{
               fontSize:
                 correctAnswerLen >= 72
-                  ? 'clamp(24px, 3vw, 44px)'
+                  ? 'clamp(18px, 2.2vw, 34px)'
                   : correctAnswerLen >= 40
-                    ? 'clamp(30px, 4vw, 64px)'
-                    : 'clamp(36px, 5.5vw, 88px)',
+                    ? 'clamp(20px, 2.5vw, 40px)'
+                    : 'clamp(18px, 2.8vw, 48px)',
               lineHeight: correctAnswerLen >= 72 ? 1.1 : correctAnswerLen >= 40 ? 1.08 : 1.0,
               maxHeight: '3.2em',
-              overflow: 'hidden',
             }}
           >
             {q.options[correct]}
@@ -258,7 +292,10 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0">
+      <div
+        className={`grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 ${state.phase === 'reveal' ? 'flex-1 min-h-0' : 'shrink-0'}`}
+        style={state.phase === 'reveal' ? { gridAutoRows: '1fr' } : undefined}
+      >
         {q.options.map((opt, i) => {
           const ch = CHANNELS[i] ?? CHANNELS[0];
           const pct = Math.round((dist[i] / totalAns) * 100);
@@ -272,7 +309,7 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
               style={{
                 background: isCorrect ? 'var(--ivy)' : ch.color,
                 opacity: isWrong ? 0.35 : 1,
-                aspectRatio: '1.05 / 1',
+                ...(isReveal ? {} : { aspectRatio: '1.05 / 1' }),
               }}
             >
               {!isReveal && (
@@ -287,19 +324,19 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
                 </div>
               )}
               {isReveal && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-12">
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 pb-10">
                   <Shape
                     kind={ch.key}
                     fill="var(--bone)"
                     stroke="var(--ink)"
-                    size={72}
+                    size={60}
                     strokeWidth={3}
                   />
                   <p
                     className="font-editorial text-center leading-tight"
                     style={{
                       color: 'var(--bone)',
-                      fontSize: 'clamp(18px, 2vw, 32px)',
+                      fontSize: 'clamp(14px, 1.6vw, 26px)',
                       maxHeight: '3.6em',
                       overflow: 'hidden',
                     }}
@@ -310,7 +347,7 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
               )}
               {isCorrect && (
                 <div className="absolute top-3 right-3">
-                  <Checkmark size={48} stroke="var(--bone)" strokeWidth={6} />
+                  <Checkmark size={40} stroke="var(--bone)" strokeWidth={6} />
                 </div>
               )}
               <div
@@ -324,7 +361,7 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
                   className="absolute bottom-0 left-0 right-0 px-3 py-2 flex items-end justify-between"
                   style={{ background: 'rgba(15,15,15,0.78)' }}
                 >
-                  <span className="display-num text-5xl" style={{ color: 'var(--bone)' }}>
+                  <span className="display-num text-4xl" style={{ color: 'var(--bone)' }}>
                     {dist[i]}
                   </span>
                   <span
