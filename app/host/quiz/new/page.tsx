@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -573,12 +574,16 @@ export default function QuizNew() {
               </p>
             )}
             {active.imageUrl ? (
-              <div className="ink-border overflow-hidden" style={{ background: 'var(--ink)' }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+              <div
+                className="ink-border relative overflow-hidden"
+                style={{ background: 'var(--ink)', height: '18rem' }}
+              >
+                <Image
                   src={active.imageUrl}
                   alt="Question still"
-                  className="w-full max-h-72 object-contain mx-auto"
+                  fill
+                  unoptimized
+                  className="object-contain"
                 />
               </div>
             ) : (

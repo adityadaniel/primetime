@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useState } from 'react';
 import { Chyron, Clock, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
@@ -209,11 +210,10 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
       <div className="flex-1 min-h-0 overflow-hidden flex items-center gap-8">
         {q.imageUrl && (
           <div
-            className="ink-border shrink-0 h-full max-w-[42%] grid place-items-center overflow-hidden"
+            className="ink-border relative shrink-0 h-full max-w-[42%] overflow-hidden"
             style={{ background: 'var(--bone)' }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={q.imageUrl} alt="" className="max-h-full max-w-full object-contain" />
+            <Image src={q.imageUrl} alt="" fill unoptimized className="object-contain" />
           </div>
         )}
         <p
