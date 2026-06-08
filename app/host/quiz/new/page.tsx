@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -67,7 +68,10 @@ export default function QuizNew() {
   const [savedFlash, setSavedFlash] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -87,6 +91,7 @@ export default function QuizNew() {
               correct: AnswerIndex;
               timeLimit: number;
               doublePoints: boolean;
+              imageUrl?: string | null;
             }) => ({
               id: q(),
               type: qq.type,
@@ -95,12 +100,18 @@ export default function QuizNew() {
               correct: qq.correct,
               timeLimit: qq.timeLimit,
               doublePoints: qq.doublePoints,
+              imageUrl: qq.imageUrl ?? undefined,
             }),
           ),
         });
         setSavedId(quizId);
       });
   }, []);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run on active-question change to clear any stale upload error.
+  useEffect(() => {
+    setUploadError(null);
+  }, [activeIdx]);
 
   const active = draft.questions[activeIdx];
   const totalSeconds = useMemo(
@@ -213,6 +224,7 @@ export default function QuizNew() {
           correct: qq.correct,
           timeLimit: qq.timeLimit,
           doublePoints: qq.doublePoints,
+          imageUrl: qq.imageUrl,
         })),
       };
       const url = savedId ? `/api/quiz/${savedId}` : `/api/quiz`;
@@ -256,6 +268,36 @@ export default function QuizNew() {
     }
     const { id } = await res.json();
     window.location.href = `/host/quiz/new?quiz=${id}`;
+  }
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('subdir', 'quiz-images');
+      const res = await fetch('/api/upload', { method: 'POST', body: form });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setUploadError(err.error ?? res.statusText);
+        return;
+      }
+      const { url } = await res.json();
+      patch('imageUrl', url);
+    } catch {
+      setUploadError('Upload failed — check your connection and try again.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function removeImage() {
+    setUploadError(null);
+    patch('imageUrl', undefined);
   }
 
   return (
@@ -488,6 +530,70 @@ export default function QuizNew() {
           />
           <div className="ticker text-[11px] tracking-widest mt-1 opacity-60">
             {active.text.length}/120
+          </div>
+
+          <div className="mt-8">
+            <div className="flex items-center justify-between mb-3">
+              <span className="chyron">VISUAL · OPTIONAL STILL</span>
+              <div className="flex items-center gap-3">
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={uploading}
+                  className="ink-border ticker text-[11px] tracking-widest px-3 h-9"
+                  style={{ background: 'var(--bone)', color: 'var(--ink)' }}
+                >
+                  {uploading ? 'UPLOADING…' : active.imageUrl ? 'REPLACE' : '+ ADD STILL'}
+                </button>
+                {active.imageUrl && (
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    disabled={uploading}
+                    className="ticker text-[11px] tracking-widest"
+                    style={{ color: 'var(--vermilion)' }}
+                  >
+                    REMOVE ✕
+                  </button>
+                )}
+              </div>
+            </div>
+            {uploadError && (
+              <p
+                className="ticker text-[11px] tracking-widest mb-3"
+                style={{ color: 'var(--vermilion)' }}
+              >
+                {uploadError}
+              </p>
+            )}
+            {active.imageUrl ? (
+              <div
+                className="ink-border relative overflow-hidden"
+                style={{ background: 'var(--ink)', height: '18rem' }}
+              >
+                <Image
+                  src={active.imageUrl}
+                  alt="Question still"
+                  fill
+                  unoptimized
+                  className="object-contain"
+                />
+              </div>
+            ) : (
+              <div
+                className="ink-border grid place-items-center py-8 font-editorial italic opacity-50"
+                style={{ background: 'var(--bone)' }}
+              >
+                No still cued — text-only question.
+              </div>
+            )}
           </div>
 
           <div className="mt-8 grid grid-cols-12 gap-6">

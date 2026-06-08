@@ -130,6 +130,9 @@ function validateQuiz(input: unknown): Quiz {
     ) {
       throw new Error(`Q${i}: timeLimit must be int 3..120`);
     }
+    if (qq.imageUrl != null && typeof qq.imageUrl !== 'string') {
+      throw new Error(`Q${i}: imageUrl must be string`);
+    }
   }
   return input as Quiz;
 }

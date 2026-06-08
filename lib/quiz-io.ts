@@ -11,6 +11,7 @@ const QuestionExport = z
     correct: z.number().int().nonnegative(),
     timeLimit: z.number().int().min(3).max(600),
     doublePoints: z.boolean(),
+    imageUrl: z.string().min(1).optional(),
   })
   .refine((q) => q.correct < q.options.length, {
     message: 'correct index out of range',
@@ -39,6 +40,7 @@ export interface ExportableQuiz {
     correct: number;
     timeLimit: number;
     doublePoints: boolean;
+    imageUrl?: string | null;
   }>;
 }
 
@@ -55,6 +57,7 @@ export function serializeQuiz(quiz: ExportableQuiz): string {
       correct: q.correct,
       timeLimit: q.timeLimit,
       doublePoints: q.doublePoints,
+      ...(q.imageUrl ? { imageUrl: q.imageUrl } : {}),
     })),
   };
   return JSON.stringify(payload, null, 2);
@@ -92,6 +95,7 @@ export function parseQuiz(json: string): ParseResult {
         correct: q.correct as 0 | 1 | 2 | 3,
         timeLimit: q.timeLimit,
         doublePoints: q.doublePoints,
+        ...(q.imageUrl ? { imageUrl: q.imageUrl } : {}),
       })),
     },
   };
