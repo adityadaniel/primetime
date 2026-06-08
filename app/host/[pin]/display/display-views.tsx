@@ -207,10 +207,12 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
         <Countdown endsAt={state.endsAt} startedAt={state.startedAt} size={120} dark />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden flex items-center gap-8">
+      <div
+        className={`flex-1 min-h-0 overflow-hidden flex items-center ${q.imageUrl ? 'gap-6' : 'gap-8'}`}
+      >
         {q.imageUrl && (
           <div
-            className="ink-border relative shrink-0 h-full w-[42%] overflow-hidden"
+            className="ink-border relative shrink-0 h-full w-[36%] overflow-hidden"
             style={{ background: 'var(--bone)' }}
           >
             <Image src={q.imageUrl} alt="" fill unoptimized className="object-contain" />
@@ -219,15 +221,22 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
         <p
           className="font-editorial teleprompter flex-1 min-w-0"
           style={{
-            fontSize:
-              q.text.length >= 200
+            fontSize: q.imageUrl
+              ? q.text.length >= 200
+                ? 'clamp(15px, 1.6vw, 22px)'
+                : q.text.length >= 120
+                  ? 'clamp(18px, 2vw, 28px)'
+                  : q.text.length >= 60
+                    ? 'clamp(22px, 2.6vw, 36px)'
+                    : 'clamp(28px, 3.2vw, 48px)'
+              : q.text.length >= 200
                 ? 'clamp(22px, 2.4vw, 34px)'
                 : q.text.length >= 120
                   ? 'clamp(30px, 3.6vw, 56px)'
                   : q.text.length >= 60
                     ? 'clamp(40px, 5.5vw, 92px)'
                     : 'clamp(44px, 6.5vw, 108px)',
-            lineHeight: q.text.length >= 120 ? 1.2 : 1.05,
+            lineHeight: q.imageUrl ? 1.3 : q.text.length >= 120 ? 1.2 : 1.05,
           }}
         >
           {q.text}
