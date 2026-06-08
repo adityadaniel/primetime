@@ -29896,13 +29896,17 @@ exports[`fixture × surface snapshots > display · question-image 1`] = `
           class="flex-1 min-h-0 overflow-hidden flex items-center gap-8"
         >
           <div
-            class="ink-border shrink-0 h-full max-w-[42%] grid place-items-center overflow-hidden"
+            class="ink-border relative shrink-0 h-full max-w-[42%] overflow-hidden"
             style="background: var(--bone);"
           >
             <img
               alt=""
-              class="max-h-full max-w-full object-contain"
+              class="object-contain"
+              data-nimg="fill"
+              decoding="async"
+              loading="lazy"
               src="/uploads/quiz-images/sample.png"
+              style="position: absolute; height: 100%; width: 100%; left: 0px; top: 0px; right: 0px; bottom: 0px; color: transparent;"
             />
           </div>
           <p
