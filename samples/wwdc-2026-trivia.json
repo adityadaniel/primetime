@@ -1,0 +1,121 @@
+{
+  "$schema": "https://theprimetime.id/quiz-v1.json",
+  "version": 1,
+  "title": "#WWDC2026 - Watch Party",
+  "exportedAt": "2026-06-09T00:00:00.000Z",
+  "questions": [
+    {
+      "type": "multiple",
+      "text": "What is the name of the new macOS version announced at WWDC 2026?",
+      "options": ["macOS Sequoia", "macOS Golden Gate", "macOS Big Bear", "macOS Emerald"],
+      "correct": 1,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Which AI company's models power the new Apple Foundation Models on Cloud (AFM Cloud Pro)?",
+      "options": ["OpenAI", "Meta", "Google", "Microsoft"],
+      "correct": 2,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "What is the oldest iPhone model that will fully support iOS 27?",
+      "options": ["iPhone X", "iPhone 12", "iPhone 11", "iPhone SE (2nd gen)"],
+      "correct": 2,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "How much faster do photos appear in the new update?",
+      "options": ["30%", "50%", "60%", "70%"],
+      "correct": 3,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "What new feature was added to the Health app to help users stay healthy long-term?",
+      "options": [
+        "Hydration tracking for high-altitude environments",
+        "Circadian rhythm synchronization with Smart Lights",
+        "Blood Glucose monitoring via optical sensors",
+        "Support for perimenopause and menopause"
+      ],
+      "correct": 3,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "What capability does 'Spatial Reframing' provide when editing photos using Apple Intelligence?",
+      "options": [
+        "It moves all the people in a photo to the center.",
+        "It turns flat photos into 3D models for printing.",
+        "It changes the angle of the photo, as if the camera was in a different position when the picture was taken.",
+        "It automatically adjusts the photo's colors based on the time of day."
+      ],
+      "correct": 2,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "How does Safari's new 'Notify Me' feature help users keep track of information on websites?",
+      "options": [
+        "It watches a webpage and sends you a notification when something changes.",
+        "It tells you when a website's privacy policy has changed.",
+        "It tracks price drops on items in your open shopping tabs.",
+        "It gives you an alarm when you have been looking at the screen for too long."
+      ],
+      "correct": 0,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Which tool lets you create high-quality images in different styles, including realistic-looking photos, using AI?",
+      "options": ["Gen-Art Studio", "Pixel Painter", "Creative Canvas", "Image Playground"],
+      "correct": 3,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "What does 'Call Context' do in the new Phone app?",
+      "options": [
+        "It shows useful information from other apps, like a confirmation code, while you are on a call.",
+        "It finds out who is calling you by checking a database of spam numbers.",
+        "It records the call and shows you the conversation as text in real time.",
+        "It automatically removes background noise during a call using AI."
+      ],
+      "correct": 0,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "When a task is too difficult for your device to handle on its own, how does Apple Intelligence keep your data safe?",
+      "options": [
+        "It saves your data in a shared pool to help train its AI models.",
+        "It uses Private Cloud Compute to process the task on secure servers.",
+        "It sends your data to public third-party servers for faster processing.",
+        "It makes the task simpler so it can only run on your device's chip."
+      ],
+      "correct": 1,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "(Bonus Round) Who is our Head of Academy?",
+      "options": ["Nadya", "Farid", "Ryan", "Zozo"],
+      "correct": 2,
+      "timeLimit": 10,
+      "doublePoints": true
+    }
+  ]
+}
