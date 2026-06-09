@@ -587,7 +587,9 @@ export default function QuizNew() {
                   src={active.imageUrl}
                   alt="Question still"
                   fill
-                  unoptimized
+                  // Match the display: optimize raster stills, pass SVG through.
+                  unoptimized={/\.svg(\?|$)/i.test(active.imageUrl)}
+                  sizes="(max-width: 1024px) 100vw, 50vw"
                   className="object-contain"
                 />
               </div>

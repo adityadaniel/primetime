@@ -222,7 +222,17 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
                 : { height: '100%', width: '36%' }),
             }}
           >
-            <Image src={q.imageUrl} alt="" fill unoptimized className="object-contain" />
+            <Image
+              src={q.imageUrl}
+              alt=""
+              fill
+              // Optimize raster stills to AVIF/WebP sized for the box; pass SVG
+              // through untouched (Next won't optimize SVG without opening it up
+              // to inline rendering). The box is ~18–36vw, so cap the request.
+              unoptimized={/\.svg(\?|$)/i.test(q.imageUrl)}
+              sizes="40vw"
+              className="object-contain"
+            />
           </div>
         )}
         <p
