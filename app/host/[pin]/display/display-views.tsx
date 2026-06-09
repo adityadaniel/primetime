@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { Chyron, Clock, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
 import { Countdown } from '@/components/Countdown';
 import { CHANNELS, Checkmark, Shape } from '@/components/Shape';
+import { publicUrl } from '@/lib/public-origin';
 import type { PublicGameState } from '@/lib/types';
 
 export function DisplayView({ state, pin }: { state: PublicGameState | null; pin: string }) {
@@ -77,8 +78,7 @@ export function LobbyDisplay({ state, pin }: { state: PublicGameState; pin: stri
   const [joinUrl, setJoinUrl] = useState('');
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const base = window.location.origin;
-    setJoinUrl(pin ? `${base}/join?pin=${pin}` : `${base}/join`);
+    setJoinUrl(publicUrl(pin ? `/join?pin=${pin}` : '/join', window.location.origin));
   }, [pin]);
 
   const ordered = [...state.players].map((p, i) => ({ p, no: i + 1 })).reverse();

@@ -1,14 +1,19 @@
-# PRIMETIME Agent Guide
+# AGENTS.md — PRIMETIME development guide
 
-PRIMETIME is a real-time live quiz / word-cloud platform with a vintage broadcast-graphics identity. Keep this file short and actionable; use the docs below for detail.
+PRIMETIME is a real-time live quiz / word-cloud platform with a vintage broadcast-graphics identity. Use this as the quick operational guide before editing this repo; keep it short and actionable, and use the docs below for detail.
 
 ## Source of truth
 
-- Product scope: `PRD.md`, plus `docs/wordcloud-prd.md` for Word Cloud.
-- Visual system: `DESIGN.md` — preserve the PRIMETIME broadcast identity.
-- Architecture and naming decisions: `DECISIONS.md`.
-- End-user setup / feature status: `README.md`.
-- Claude-specific entrypoint: `CLAUDE.md` points back here.
+Read in this order:
+
+1. `PRD.md` — product requirements and route semantics.
+2. `docs/wordcloud-prd.md` — Word Cloud product scope.
+3. `DESIGN.md` — visual identity, palette, type, motion rules; preserve the PRIMETIME broadcast identity.
+4. `DECISIONS.md` — durable architecture/product decisions; append, do not rewrite history.
+5. `README.md` — setup, env vars, deployment, and current feature surface.
+6. `docs/` — focused notes, reviews, and postmortems.
+
+`CLAUDE.md` points back here. Treat older brief-style content as historical context when it conflicts with the files above.
 
 ## Stack
 
@@ -18,29 +23,77 @@ PRIMETIME is a real-time live quiz / word-cloud platform with a vintage broadcas
 - Auth.js v5, Biome, Vitest, Playwright.
 - Package manager: npm.
 
-## Commands
+## Dev commands
 
 ```bash
 npm install
 npm run db:up          # Docker Postgres
 cp .env.example .env   # set DATABASE_URL + AUTH_SECRET if needed
 npm run db:migrate
-npm run dev            # app + Socket.IO at http://localhost:4321
+npm run dev            # Next.js + Socket.IO at http://localhost:4321
 ```
 
-Useful checks:
+Quality gates before PR:
 
 ```bash
 npm run lint
 npm test
 npm run build
-npm run smoke
-npm run test:e2e
 ```
 
-For UI-visible work, use `npm run qa` or Playwright/Chrome DevTools to inspect the actual rendered pages.
+Use `npm run smoke` when touching Socket.IO/gameplay flows. Use `npm run test:e2e` when touching auth, signup/signin, saved quizzes, or browser lifecycle flows. For UI-visible work, use `npm run qa` or Playwright/Chrome DevTools to inspect the actual rendered pages.
 
-## Development rules
+## Architecture map
+
+- App Router pages live under `app/`.
+- Socket.IO server and room lifecycle live in `server.ts`.
+- Shared game/session types live in `lib/types.ts`.
+- Quiz game state lives in `lib/game.ts`; word cloud state/layout lives in `lib/wordcloud-*`.
+- Auth.js config is split:
+  - `auth.config.ts` is edge-safe and used by middleware.
+  - `auth.ts` imports providers/adapters and is server-only.
+- Prisma schema/migrations live under `prisma/`.
+
+## Route privacy model
+
+Protected host surfaces require a host session:
+
+- `/host`
+- `/host/quiz/new`
+- `/host/[pin]/control`
+- `/host/wordcloud/new`
+- `/host/wordcloud/[pin]/control`
+
+Public room surfaces are reachable by PIN and must not require a host cookie:
+
+- `/host/[pin]/display`
+- `/host/wordcloud/[pin]/display`
+- `/join`
+- `/play/[pin]`
+- `/play/[pin]/wordcloud`
+
+See `docs/live-origin-auth.md` before changing public URL generation, Auth.js middleware, projection windows, QR codes, or join links.
+
+## Public URL rule
+
+Anything that leaves the current browser context must use the reachable public origin when configured:
+
+- QR join links
+- projection links
+- `GO LIVE` windows
+- invite/share links
+
+Use `publicUrl(path, fallbackOrigin)` from `lib/public-origin.ts`; do not hand-roll `window.location.origin + path` for these flows.
+
+Tunnel mode uses:
+
+```bash
+NEXT_PUBLIC_SITE_URL=https://live.theprimetime.id
+```
+
+Restart `npm run dev` after changing client-exposed env vars.
+
+## Development and safety rules
 
 1. Protect the broadcast aesthetic: no generic SaaS UI, no Kahoot purple-gradient clone, no stock-illustration filler.
 2. Answer options must remain distinguishable by shape, not color alone.
@@ -49,6 +102,10 @@ For UI-visible work, use `npm run qa` or Playwright/Chrome DevTools to inspect t
 5. Socket.IO changes must cover reconnects, host disconnect grace, room membership, and HMR/dev-server edge cases.
 6. Prefer small, focused changes. Update the relevant doc when product behavior, env vars, routes, or run steps change.
 7. Preserve existing uncommitted work. Check `git status` before editing and do not reset/overwrite unrelated files.
+8. Never commit secrets, tokens, real `.env*`, database dumps, or local upload artifacts.
+9. Do not edit AASA bundle IDs/bytes under `landing-techcanteen/.well-known/` unless explicitly asked.
+10. Preserve the known-good state with a branch instead of destructive git resets.
+11. Keep PRs focused: one bug/feature/doc finding per branch unless the user asks otherwise.
 
 ## Verification expectation
 
@@ -58,7 +115,7 @@ Before handing off, run the narrowest meaningful checks for your change and repo
 npm run lint && npm test && npm run build
 ```
 
-Add `npm run smoke` / Playwright when realtime flows or visible UI changed. Docs-only edits can use a lighter check, but still inspect the diff.
+Docs-only edits can use a lighter check, but still inspect the diff.
 
 ## Quick route map
 

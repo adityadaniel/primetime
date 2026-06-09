@@ -10,6 +10,30 @@ and add a new entry below.
 
 ---
 
+## 2026-06-09 · Public projection routes behind live.theprimetime.id
+
+**Status:** Accepted
+
+**Context:** In tunnel mode the host signs in at `http://localhost:4321`, but QR,
+projection, and `GO LIVE` links intentionally open on `https://live.theprimetime.id`
+when `NEXT_PUBLIC_SITE_URL` is configured. The browser does not send the host's
+`localhost` session cookie to the public tunnel domain, so Auth.js middleware that
+protects every `/host/*` route redirected `/host/:pin/display` to sign-in.
+
+**Decision:** Treat display/projection routes as public-by-PIN room surfaces, not
+private host-control surfaces. Keep builders and control rooms authenticated, but allow
+unauthenticated access to `/host/:pin/display` and `/host/wordcloud/:pin/display`.
+Centralize public URL generation in `lib/public-origin.ts` and use it for QR links,
+projection windows, and future share/invite links.
+
+**Implication:** Any future route under `/host/*` must be classified by product role,
+not path prefix alone. If it controls or edits host-owned data, protect it. If it is an
+audience/player room surface addressed by PIN, it may be public and must not depend on
+the host's auth cookie. The operational note and verification checklist live in
+`docs/live-origin-auth.md`.
+
+---
+
 ## 2026-06-04 · Rebrand INPUT/OUTPUT → PRIMETIME (theprimetime.id)
 
 **Status:** Accepted

@@ -113,9 +113,11 @@ All flags default to the OSS path. **Unset = OSS default.** You only need to set
 | `DATABASE_URL` | postgres connection URI | — | — | **Required.** |
 | `ENABLE_APPLE_SIGNIN` | `true` · `false` | `false` | MID-213 | Only effective when `AUTH_MODE=password+oauth`. Requires `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`. |
 | `NEXTAUTH_URL` | URL | `http://localhost:4321` | MID-213 | Your app's public URL. |
-| `NEXT_PUBLIC_SITE_URL` | URL | — | — | Your app's public URL (client-side). |
+| `NEXT_PUBLIC_SITE_URL` | URL | — | — | Public origin used by client-side QR, projection, and share links. Set to `https://live.theprimetime.id` for Cloudflare Tunnel live mode. |
 
 > **Self-hosting OSS?** Only `DATABASE_URL` and `AUTH_SECRET` are required. Leave everything else at defaults — password auth, no email, local uploads, no billing.
+>
+> **Tunnel/live-origin note:** when hosting locally but projecting through a public tunnel, host auth cookies stay on `localhost`; public projection/display routes must stay public-by-PIN. See [`docs/live-origin-auth.md`](docs/live-origin-auth.md) before changing QR/projection URL generation or Auth.js middleware.
 
 ---
 

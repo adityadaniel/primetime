@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { publicHost } from '@/lib/public-origin';
 import { useSocket } from '@/lib/socket';
 import { type LayoutPlacement, layoutWords } from '@/lib/wordcloud-layout';
 
@@ -175,7 +176,7 @@ function useJoinHost() {
   const [host, setHost] = useState('primetime.local');
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setHost(window.location.host);
+      setHost(publicHost(window.location.origin));
     }
   }, []);
   return host;
