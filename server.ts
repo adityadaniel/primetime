@@ -1,8 +1,11 @@
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { decode as decodeAuthJwt } from '@auth/core/jwt';
 import next from 'next';
 import { Server, type Socket } from 'socket.io';
 import { ensureAuthSecret } from './lib/auth-secret';
+import { config as appConfig } from './lib/config';
 import type { Tier } from './lib/game';
 import {
   advance,
@@ -23,6 +26,7 @@ import {
   startGame,
   submitAnswer,
 } from './lib/game';
+import { matchUploadsPath, resolveUploadFilePath, uploadContentType } from './lib/serve-upload';
 import type { AnswerIndex, Quiz } from './lib/types';
 import {
   addPlayerToCloud,
@@ -149,6 +153,14 @@ void app.prepare().then(() => {
     const answersCsv = matchAnswersCsv(req.url);
     if (answersCsv) {
       handleAnswersCsv(answersCsv, res);
+      return;
+    }
+    // Serve uploaded media (question stills, etc.) straight from the configured
+    // upload dir. Next.js only serves files that exist in `public/` when the
+    // server boots, so runtime-written uploads 404 if we leave this to `handle`.
+    const uploadRel = matchUploadsPath(req.url);
+    if (uploadRel !== null && (req.method === 'GET' || req.method === 'HEAD')) {
+      handleUploadFile(uploadRel, req, res);
       return;
     }
     handle(req, res).catch((err) => {
@@ -832,6 +844,47 @@ void app.prepare().then(() => {
     console.log(`▶ PRIMETIME ready on http://${hostname}:${port}`);
   });
 });
+
+function handleUploadFile(
+  relPath: string,
+  req: import('node:http').IncomingMessage,
+  res: import('node:http').ServerResponse,
+) {
+  const resolved = resolveUploadFilePath(appConfig.uploadDir, relPath);
+  if (resolved === null) {
+    res.statusCode = 403;
+    res.end('forbidden');
+    return;
+  }
+  stat(resolved)
+    .then((st) => {
+      if (!st.isFile()) {
+        res.statusCode = 404;
+        res.end('not found');
+        return;
+      }
+      res.statusCode = 200;
+      res.setHeader('Content-Type', uploadContentType(resolved));
+      res.setHeader('Content-Length', st.size);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      // Filenames are random and content is immutable once written.
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      if (req.method === 'HEAD') {
+        res.end();
+        return;
+      }
+      const stream = createReadStream(resolved);
+      stream.on('error', () => {
+        if (!res.headersSent) res.statusCode = 500;
+        res.end();
+      });
+      stream.pipe(res);
+    })
+    .catch(() => {
+      res.statusCode = 404;
+      res.end('not found');
+    });
+}
 
 function matchResultsCsv(url: string | undefined): string | null {
   if (!url) return null;
