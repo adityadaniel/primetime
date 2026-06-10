@@ -30,6 +30,7 @@ model User {
   sessions           Session[]
   hostedSessions     GameSession[]
   wordCloudSessions  WordCloudSession[]
+  qaSessions         QASession[]
   quizzes            Quiz[]
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
@@ -219,6 +220,170 @@ model WordCloudModeration {
   word       String
   reason     String
   createdAt  DateTime         @default(now())
+
+  @@index([sessionId, createdAt])
+}
+
+enum QASessionStatus {
+  OPEN
+  CLOSED
+  ENDED
+  ARCHIVED
+}
+
+enum QAQuestionStatus {
+  IN_REVIEW
+  LIVE
+  ANSWERED
+  ARCHIVED
+  DISMISSED
+  WITHDRAWN
+}
+
+enum QAPrivacyMode {
+  ANONYMOUS_BY_DEFAULT
+  ALWAYS_ANONYMOUS
+  NAMED_BY_DEFAULT
+  NAME_REQUIRED
+}
+
+enum QAVoteType {
+  UP
+  DOWN
+}
+
+model QASession {
+  id                        String              @id @default(cuid())
+  pin                       String              @unique
+  title                     String              @db.VarChar(100)
+  description               String?             @db.VarChar(200)
+  privacyMode               QAPrivacyMode       @default(ANONYMOUS_BY_DEFAULT)
+  moderationEnabled         Boolean             @default(false)
+  participantRepliesEnabled Boolean             @default(false)
+  downvotesEnabled          Boolean             @default(false)
+  questionCharLimit         Int                 @default(280)
+  status                    QASessionStatus     @default(OPEN)
+  hostUserId                String?
+  hostUser                  User?               @relation(fields: [hostUserId], references: [id], onDelete: SetNull)
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+  endedAt                   DateTime?
+  participants              QAParticipant[]
+  questions                 QAQuestion[]
+  labels                    QALabel[]
+  moderationEvents          QAModerationEvent[]
+
+  @@index([hostUserId, createdAt])
+  @@index([status])
+}
+
+model QAParticipant {
+  id          String       @id @default(cuid())
+  sessionId   String
+  session     QASession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  displayName String?
+  joinedAt    DateTime     @default(now())
+  questions   QAQuestion[]
+  votes       QAVote[]
+  replies     QAReply[]
+
+  @@index([sessionId])
+}
+
+model QAQuestion {
+  id                String              @id @default(cuid())
+  sessionId         String
+  session           QASession           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  // Participant linkage exists for personal state (withdraw/edit/own-question
+  // views) only. Anonymous questions must never surface this linkage in
+  // host-visible or export DTOs — see lib/qa-repo.ts projections.
+  participantId     String?
+  participant       QAParticipant?      @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  text              String              @db.VarChar(500)
+  // Preserved verbatim the first time a host edits the question.
+  originalText      String?             @db.VarChar(500)
+  isAnonymous       Boolean             @default(true)
+  // Public author name snapshot for named questions; null when anonymous.
+  authorDisplayName String?
+  status            QAQuestionStatus    @default(LIVE)
+  submittedAt       DateTime            @default(now())
+  approvedAt        DateTime?
+  answeredAt        DateTime?
+  archivedAt        DateTime?
+  dismissedAt       DateTime?
+  withdrawnAt       DateTime?
+  updatedAt         DateTime            @updatedAt
+  votes             QAVote[]
+  replies           QAReply[]
+  labels            QAQuestionLabel[]
+  moderationEvents  QAModerationEvent[]
+
+  @@index([sessionId, status])
+  @@index([sessionId, submittedAt])
+}
+
+model QAVote {
+  id            String        @id @default(cuid())
+  questionId    String
+  question      QAQuestion    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  participantId String
+  participant   QAParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  type          QAVoteType    @default(UP)
+  createdAt     DateTime      @default(now())
+
+  @@unique([questionId, participantId])
+  @@index([questionId])
+}
+
+model QALabel {
+  id                    String            @id @default(cuid())
+  sessionId             String
+  session               QASession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  name                  String            @db.VarChar(50)
+  participantSelectable Boolean           @default(false)
+  createdAt             DateTime          @default(now())
+  questions             QAQuestionLabel[]
+
+  @@unique([sessionId, name])
+  @@index([sessionId])
+}
+
+model QAQuestionLabel {
+  questionId String
+  question   QAQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  labelId    String
+  label      QALabel    @relation(fields: [labelId], references: [id], onDelete: Cascade)
+  createdAt  DateTime   @default(now())
+
+  @@id([questionId, labelId])
+  @@index([labelId])
+}
+
+model QAReply {
+  id            String         @id @default(cuid())
+  questionId    String
+  question      QAQuestion     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  // Null participantId + isHostReply=true marks a host reply.
+  participantId String?
+  participant   QAParticipant? @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  isHostReply   Boolean        @default(false)
+  text          String         @db.VarChar(1000)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([questionId, createdAt])
+}
+
+model QAModerationEvent {
+  id         String      @id @default(cuid())
+  sessionId  String
+  session    QASession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  questionId String?
+  question   QAQuestion? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+  hostUserId String?
+  action     String
+  reason     String?
+  createdAt  DateTime    @default(now())
 
   @@index([sessionId, createdAt])
 }

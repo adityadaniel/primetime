@@ -1,6 +1,7 @@
-// Shared 6-digit PIN allocator. Checks both GameSession and WordCloudSession,
-// plus optional in-memory active-pin sets so a PIN can never collide across
-// the quiz and word-cloud routes (F7 from the codex review).
+// Shared 6-digit PIN allocator. Checks GameSession, WordCloudSession, and
+// QASession, plus optional in-memory active-pin sets so a PIN can never
+// collide across the quiz, word-cloud, and Q&A routes (F7 from the codex
+// review).
 
 import { prisma } from './db';
 
@@ -35,11 +36,12 @@ export async function allocatePin(): Promise<string> {
   for (let i = 0; i < RETRY_LIMIT; i++) {
     const pin = generatePin();
     if (inMemoryHas(pin)) continue;
-    const [quiz, wc] = await Promise.all([
+    const [quiz, wc, qa] = await Promise.all([
       prisma.gameSession.findUnique({ where: { pin }, select: { id: true } }),
       prisma.wordCloudSession.findUnique({ where: { pin }, select: { id: true } }),
+      prisma.qASession.findUnique({ where: { pin }, select: { id: true } }),
     ]);
-    if (!quiz && !wc) return pin;
+    if (!quiz && !wc && !qa) return pin;
   }
   throw new Error('Could not allocate PIN');
 }
