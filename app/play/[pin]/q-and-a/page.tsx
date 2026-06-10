@@ -1,56 +1,699 @@
-// Q&A player surface — FOLLOW-UP SURFACE STUB (MID-333).
-// /join and /play/[pin] route Q&A PINs here. The real participant flow
-// (submit, vote, personal state) ships with MID-335. This stub only confirms
-// the session exists so the redirect has a stable, public landing page.
+'use client';
 
-import { notFound } from 'next/navigation';
-import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/components/Broadcast';
-import { prisma } from '@/lib/db';
+// Q&A participant surface (MID-335). Mobile-first: submit a question with a
+// live character count, toggle anonymous/named when the privacy mode allows,
+// and manage your own questions (status badges, withdraw, edit). Public board
+// state arrives over `qa:state`; personal state only ever arrives in acks
+// targeted at this socket (never broadcast to the room).
 
-export default async function QAndAPlayerStub({ params }: { params: Promise<{ pin: string }> }) {
-  const { pin } = await params;
-  if (!/^\d{6}$/.test(pin)) notFound();
-  const session = await prisma.qASession.findUnique({
-    where: { pin },
-    select: { title: true, description: true, status: true },
-  });
-  if (!session) notFound();
+import Link from 'next/link';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { validateQuestionInput } from '@/lib/qa-input';
+import { useSocket } from '@/lib/socket';
+import type {
+  QAPersonalQuestion,
+  QAPersonalState,
+  QAPrivacyMode,
+  QAQuestionStatus,
+} from '@/lib/types';
+
+type PublicSnapshot = {
+  pin: string;
+  title: string;
+  description: string | null;
+  privacyMode: QAPrivacyMode;
+  status: 'OPEN' | 'CLOSED' | 'ENDED';
+  submissionsOpen: boolean;
+  questionCharLimit: number;
+  questionCount: number;
+  participantCount: number;
+};
+
+type JoinAck =
+  | {
+      participantId: string;
+      reconnected: boolean;
+      state: PublicSnapshot;
+      personal: QAPersonalState;
+    }
+  | { error: string };
+
+type ActionAck =
+  | { questionId: string; status: QAQuestionStatus; personal: QAPersonalState }
+  | { error: string };
+
+// Mirrors QA_SUBMIT_RATE_LIMIT_MS in server.ts so the button re-enables right
+// as the server window reopens.
+const COOLDOWN_MS = 1000;
+
+function ackErrorMessage(error: string | undefined, charLimit: number): string {
+  switch (error) {
+    case 'rate_limited':
+      return 'Easy — give it a second between questions.';
+    case 'submissions_closed':
+      return 'Questions are closed.';
+    case 'empty_text':
+      return 'Type a question first.';
+    case 'text_too_long':
+      return `Keep it under ${charLimit} characters.`;
+    case 'name_required':
+      return 'This room needs a name to post as yourself.';
+    case 'session_ended':
+      return 'This Q&A has ended.';
+    case 'not_owner':
+      return "That question isn't yours.";
+    case 'invalid_transition':
+    case 'invalid_status':
+      return 'That question can no longer be changed.';
+    default:
+      return "Couldn't send — try again.";
+  }
+}
+
+const STATUS_BADGES: Record<QAQuestionStatus, { label: string; bg: string; fg: string }> = {
+  IN_REVIEW: { label: 'WAITING FOR REVIEW', bg: 'var(--marigold)', fg: 'var(--ink)' },
+  LIVE: { label: 'LIVE', bg: 'var(--vermilion)', fg: 'var(--bone)' },
+  ANSWERED: { label: 'ANSWERED', bg: 'var(--ivy)', fg: 'var(--bone)' },
+  ARCHIVED: { label: 'ARCHIVED', bg: 'var(--ash)', fg: 'var(--ink)' },
+  DISMISSED: { label: 'DISMISSED', bg: 'var(--ink)', fg: 'var(--bone)' },
+  WITHDRAWN: { label: 'WITHDRAWN', bg: 'var(--ash)', fg: 'var(--ink)' },
+};
+
+export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: string }> }) {
+  const socket = useSocket();
+  const [pin, setPin] = useState('');
+  const [phase, setPhase] = useState<'connecting' | 'name' | 'in' | 'gone'>('connecting');
+  const [goneMessage, setGoneMessage] = useState('');
+  const [nameDraft, setNameDraft] = useState('');
+  const [pub, setPub] = useState<PublicSnapshot | null>(null);
+  const [personal, setPersonal] = useState<QAPersonalState | null>(null);
+  const [draft, setDraft] = useState('');
+  const [anonymous, setAnonymous] = useState(true);
+  const [inlineError, setInlineError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [now, setNow] = useState(Date.now());
+  const [editing, setEditing] = useState<{ id: string; draft: string } | null>(null);
+  const [confirmWithdrawId, setConfirmWithdrawId] = useState<string | null>(null);
+
+  const participantIdRef = useRef<string | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+  const confirmTimerRef = useRef<number | null>(null);
+  const anonymousInitRef = useRef(false);
+
+  useEffect(() => {
+    params.then((p) => setPin(p.pin));
+  }, [params]);
+
+  useEffect(() => {
+    if (!pin) return;
+    participantIdRef.current = sessionStorage.getItem(`bc:qa:participant:${pin}`);
+    setNameDraft(sessionStorage.getItem(`bc:nick:${pin}`) ?? '');
+  }, [pin]);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 2400);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+      if (confirmTimerRef.current) window.clearTimeout(confirmTimerRef.current);
+    },
+    [],
+  );
+
+  // Tick while a cooldown is active so the submit button re-enables on time.
+  useEffect(() => {
+    if (cooldownUntil <= Date.now()) return;
+    const t = window.setInterval(() => setNow(Date.now()), 100);
+    return () => window.clearInterval(t);
+  }, [cooldownUntil]);
+
+  // Default the anonymous toggle from the session's privacy mode, once.
+  useEffect(() => {
+    if (!pub || anonymousInitRef.current) return;
+    anonymousInitRef.current = true;
+    setAnonymous(pub.privacyMode !== 'NAMED_BY_DEFAULT' && pub.privacyMode !== 'NAME_REQUIRED');
+  }, [pub]);
+
+  const join = useCallback(
+    (displayName?: string) => {
+      if (!socket || !pin) return;
+      const storedNick =
+        displayName ?? sessionStorage.getItem(`bc:nick:${pin}`)?.trim() ?? undefined;
+      socket.emit(
+        'qa:participant:join',
+        {
+          pin,
+          displayName: storedNick || undefined,
+          participantId: participantIdRef.current ?? undefined,
+        },
+        (res: JoinAck) => {
+          if ('error' in res) {
+            if (res.error === 'name_required') {
+              setPhase('name');
+              return;
+            }
+            if (res.error === 'session_ended') {
+              setGoneMessage('This Q&A has ended. Thanks for tuning in.');
+            } else if (res.error === 'not_found') {
+              setGoneMessage("That session isn't on the air.");
+            } else {
+              setGoneMessage("Couldn't join — try again from /join.");
+            }
+            setPhase('gone');
+            return;
+          }
+          participantIdRef.current = res.participantId;
+          sessionStorage.setItem(`bc:qa:participant:${pin}`, res.participantId);
+          setPub(res.state);
+          setPersonal(res.personal);
+          setPhase('in');
+        },
+      );
+    },
+    [socket, pin],
+  );
+
+  useEffect(() => {
+    if (!socket || !pin) return;
+    const onState = (s: PublicSnapshot) => {
+      if (s.pin !== pin) return;
+      setPub(s);
+    };
+    const onConnect = () => join();
+    socket.on('qa:state', onState);
+    socket.on('connect', onConnect);
+    if (socket.connected) join();
+    return () => {
+      socket.off('qa:state', onState);
+      socket.off('connect', onConnect);
+    };
+  }, [socket, pin, join]);
+
+  const charLimit = pub?.questionCharLimit ?? 280;
+  const cooldownRemaining = Math.max(0, cooldownUntil - now);
+  const remaining = charLimit - draft.trim().length;
+  const canSubmit =
+    !!socket && !!pub && pub.submissionsOpen && cooldownRemaining === 0 && phase === 'in';
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setInlineError(null);
+    if (!socket || !pin || !canSubmit) return;
+    const result = validateQuestionInput(draft, charLimit);
+    if (!result.ok) {
+      setInlineError(
+        result.reason === 'text_too_long'
+          ? `Keep it under ${charLimit} characters.`
+          : 'Type a question first.',
+      );
+      return;
+    }
+    setCooldownUntil(Date.now() + COOLDOWN_MS);
+    setNow(Date.now());
+    // Send the effective identity: forced modes and missing names override
+    // the toggle (the server enforces the same rules; this avoids a
+    // guaranteed name_required rejection).
+    const forced = pub?.privacyMode === 'ALWAYS_ANONYMOUS' || !personal?.displayName;
+    const isAnonymous = pub?.privacyMode === 'NAME_REQUIRED' ? false : forced || anonymous;
+    socket.emit(
+      'qa:participant:submit',
+      { pin, text: result.value, isAnonymous },
+      (res: ActionAck) => {
+        if ('error' in res) {
+          showToast(ackErrorMessage(res.error, charLimit));
+          return;
+        }
+        setPersonal(res.personal);
+        setDraft('');
+        showToast(res.status === 'IN_REVIEW' ? 'Sent — waiting for review.' : "It's live.");
+      },
+    );
+  }
+
+  function handleWithdraw(questionId: string) {
+    if (!socket || !pin) return;
+    // Withdraw is terminal — two-tap confirm instead of a modal.
+    if (confirmWithdrawId !== questionId) {
+      setConfirmWithdrawId(questionId);
+      if (confirmTimerRef.current) window.clearTimeout(confirmTimerRef.current);
+      confirmTimerRef.current = window.setTimeout(() => setConfirmWithdrawId(null), 3000);
+      return;
+    }
+    setConfirmWithdrawId(null);
+    socket.emit('qa:participant:withdraw', { pin, questionId }, (res: ActionAck) => {
+      if ('error' in res) {
+        showToast(ackErrorMessage(res.error, charLimit));
+        return;
+      }
+      setPersonal(res.personal);
+      showToast('Question withdrawn.');
+    });
+  }
+
+  function handleEditSave() {
+    if (!socket || !pin || !editing) return;
+    const result = validateQuestionInput(editing.draft, charLimit);
+    if (!result.ok) {
+      showToast(
+        result.reason === 'text_too_long'
+          ? `Keep it under ${charLimit} characters.`
+          : 'Type a question first.',
+      );
+      return;
+    }
+    socket.emit(
+      'qa:participant:edit',
+      { pin, questionId: editing.id, text: result.value },
+      (res: ActionAck) => {
+        if ('error' in res) {
+          showToast(ackErrorMessage(res.error, charLimit));
+          return;
+        }
+        setPersonal(res.personal);
+        setEditing(null);
+        showToast(res.status === 'IN_REVIEW' ? 'Updated — back in review.' : 'Question updated.');
+      },
+    );
+  }
+
+  if (phase === 'gone') {
+    return (
+      <main className="min-h-screen grid place-items-center px-6">
+        <div className="max-w-md text-center">
+          <p className="chyron mb-3" style={{ color: 'var(--vermilion)' }}>
+            SIGNAL LOST
+          </p>
+          <p className="font-editorial text-xl mb-4">{goneMessage}</p>
+          <Link
+            href="/join"
+            className="ink-border stamp ticker text-[12px] tracking-widest px-4 py-3 inline-block"
+            style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
+          >
+            ↩ HEAD TO /JOIN
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  if (phase === 'name') {
+    return (
+      <main className="min-h-screen grid place-items-center px-6">
+        <form
+          className="max-w-md w-full"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const trimmed = nameDraft.trim();
+            if (!trimmed) return;
+            sessionStorage.setItem(`bc:nick:${pin}`, trimmed);
+            setPhase('connecting');
+            join(trimmed);
+          }}
+        >
+          <p className="chyron mb-2" style={{ color: 'var(--vermilion)' }}>
+            CREDENTIAL REQUIRED
+          </p>
+          <p className="font-editorial text-xl mb-4">
+            This Q&A needs a name before you can take the mic.
+          </p>
+          <input
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value.slice(0, 20))}
+            placeholder="Your name"
+            aria-label="Your name"
+            className="w-full ink-border bg-transparent font-editorial text-xl px-4 py-3"
+            style={{ background: 'var(--bone)', minHeight: 56 }}
+          />
+          <button
+            type="submit"
+            className="w-full mt-3 ink-border stamp ticker tracking-widest text-[13px] py-4"
+            style={{ background: 'var(--vermilion)', color: 'var(--bone)', minHeight: 56 }}
+          >
+            ▶ CHECK IN
+          </button>
+        </form>
+      </main>
+    );
+  }
+
+  if (phase === 'connecting' || !pub || !personal) {
+    return (
+      <main className="min-h-screen grid place-items-center px-6">
+        <p className="ticker text-[12px] tracking-widest opacity-70">TUNING IN…</p>
+      </main>
+    );
+  }
+
+  const ended = pub.status === 'ENDED';
+  const myQuestions = [...personal.questions].sort((a, b) => b.submittedAt - a.submittedAt);
+  const canToggleIdentity =
+    !!personal.displayName &&
+    (pub.privacyMode === 'ANONYMOUS_BY_DEFAULT' || pub.privacyMode === 'NAMED_BY_DEFAULT');
+  const forcedAnonymous = pub.privacyMode === 'ALWAYS_ANONYMOUS' || !personal.displayName;
+  const effectiveAnonymous = forcedAnonymous || (pub.privacyMode !== 'NAME_REQUIRED' && anonymous);
 
   return (
-    <main className="relative flex flex-col min-h-[100dvh]">
-      <CornerMarks fixed />
-      <header className="px-6 pt-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <DateStamp />
-          <span className="ticker text-[11px] opacity-40">·</span>
-          <Clock />
-        </div>
-        <OnAir live={session.status === 'OPEN'} />
-      </header>
-      <SmpteBars className="h-1.5 mt-2" />
+    <main className="relative min-h-[100dvh] pb-10 flex flex-col">
+      <CornerMarks />
 
-      <section className="px-6 pt-8 flex-1">
-        <div className="max-w-[640px] mx-auto w-full">
-          <p className="chyron mb-2" style={{ color: 'var(--vermilion)' }}>
-            AUDIENCE Q&A · PIN {pin}
+      {toast && (
+        <div
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 ink-border stamp ticker text-[11px] tracking-widest px-3 py-2"
+          style={{ background: 'var(--ink)', color: 'var(--bone)' }}
+          role="status"
+          aria-live="polite"
+        >
+          {toast}
+        </div>
+      )}
+
+      <header className="px-5 pt-4 flex items-center justify-between gap-3">
+        <span className="chyron" style={{ color: 'var(--vermilion)' }}>
+          AUDIENCE Q&A
+        </span>
+        <div className="flex items-center gap-4">
+          <FrameCounter index={pub.questionCount} />
+          <Clock />
+          <OnAir live={!ended} />
+        </div>
+      </header>
+      <SmpteBars className="h-1.5 mt-3" />
+
+      <div className="px-5 pt-4 max-w-[680px] mx-auto w-full flex-1 flex flex-col">
+        <div
+          className="flex items-center justify-between border-b-2 pb-2"
+          style={{ borderColor: 'var(--ink)' }}
+        >
+          <span className="font-editorial text-lg">
+            <span className="opacity-60">ID·</span>
+            <span className="ml-1">{personal.displayName ?? 'ANONYMOUS'}</span>
+          </span>
+          <span className="ticker text-[11px] tracking-widest opacity-70">PIN {pin}</span>
+        </div>
+
+        <section className="pt-5">
+          <p className="chyron" style={{ color: 'var(--vermilion)' }}>
+            ON THE DESK
           </p>
           <h1
-            className="font-editorial leading-[0.95]"
-            style={{ fontSize: 'clamp(32px, 8vw, 56px)' }}
+            className="font-editorial leading-tight mt-2"
+            style={{ fontSize: 'clamp(28px, 7vw, 44px)' }}
           >
-            {session.title}
+            {pub.title}
           </h1>
-          {session.description && (
-            <p className="font-editorial italic mt-2 opacity-80">{session.description}</p>
+          {pub.description && (
+            <p className="font-editorial italic text-[15px] mt-2 opacity-80">{pub.description}</p>
           )}
+        </section>
 
-          <div className="mt-8 ink-border px-4 py-5" style={{ background: 'var(--bone)' }}>
-            <p className="ticker text-[11px] tracking-widest opacity-70">
-              STAND BY · QUESTION DESK OPENS WITH THE NEXT BROADCAST UPGRADE
+        {ended ? (
+          <EndedState />
+        ) : pub.submissionsOpen ? (
+          <form onSubmit={handleSubmit} className="pt-6 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span
+                className="ticker text-[11px] tracking-widest px-2 py-[2px] ink-border"
+                style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
+              >
+                CUE · YOUR QUESTION
+              </span>
+              <span
+                className="ticker tabular-nums text-[11px] tracking-widest"
+                style={{
+                  opacity: remaining < 0 ? 1 : 0.7,
+                  color: remaining < 0 ? 'var(--vermilion)' : undefined,
+                }}
+              >
+                {remaining} LEFT
+              </span>
+            </div>
+
+            <label className="block">
+              <span className="sr-only">Your question</span>
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="Type your question"
+                aria-label="Your question"
+                rows={3}
+                className="w-full mt-1 ink-border bg-transparent font-editorial px-4 py-3 resize-none"
+                style={{
+                  // 16px+ avoids the iOS Safari focus-zoom.
+                  fontSize: '18px',
+                  background: 'var(--bone)',
+                  minHeight: 96,
+                }}
+              />
+            </label>
+
+            {inlineError && (
+              <p
+                className="ticker text-[11px] tracking-widest"
+                role="alert"
+                style={{ color: 'var(--vermilion)' }}
+              >
+                ⚠ {inlineError}
+              </p>
+            )}
+
+            <IdentityRow
+              canToggle={canToggleIdentity}
+              anonymous={effectiveAnonymous}
+              displayName={personal.displayName}
+              privacyMode={pub.privacyMode}
+              onToggle={() => setAnonymous((a) => !a)}
+            />
+
+            <button
+              type="submit"
+              disabled={!canSubmit}
+              className="ink-border stamp ticker text-[14px] tracking-widest"
+              style={{
+                background: canSubmit ? 'var(--vermilion)' : 'var(--ash)',
+                color: canSubmit ? 'var(--bone)' : 'var(--ink)',
+                minHeight: 64,
+                cursor: canSubmit ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {cooldownRemaining > 0 ? 'HOLD…' : '▶  ASK IT'}
+            </button>
+          </form>
+        ) : (
+          <div className="mt-6 ink-border px-4 py-5" style={{ background: 'var(--bone)' }}>
+            <p className="ticker text-[11px] tracking-widest opacity-80">
+              QUESTIONS CLOSED · THE HOST IS WORKING THE BOARD
             </p>
           </div>
-        </div>
-      </section>
+        )}
+
+        <section className="pt-8">
+          <div className="flex items-center justify-between">
+            <p className="chyron opacity-70">YOUR QUESTIONS</p>
+            <span className="ticker tabular-nums text-[11px] tracking-widest opacity-60">
+              {String(myQuestions.length).padStart(2, '0')} FILED
+            </span>
+          </div>
+          {myQuestions.length === 0 ? (
+            <p className="font-editorial italic text-[15px] mt-3 opacity-70">
+              Nothing filed yet — ask the first one.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-3">
+              {myQuestions.map((q) => (
+                <MyQuestionCard
+                  key={q.id}
+                  question={q}
+                  ended={ended}
+                  charLimit={charLimit}
+                  editing={editing?.id === q.id ? editing : null}
+                  confirmWithdraw={confirmWithdrawId === q.id}
+                  onWithdraw={() => handleWithdraw(q.id)}
+                  onEditStart={() => setEditing({ id: q.id, draft: q.text })}
+                  onEditChange={(v) =>
+                    setEditing((e) => (e && e.id === q.id ? { ...e, draft: v } : e))
+                  }
+                  onEditCancel={() => setEditing(null)}
+                  onEditSave={handleEditSave}
+                />
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
     </main>
+  );
+}
+
+function IdentityRow({
+  canToggle,
+  anonymous,
+  displayName,
+  privacyMode,
+  onToggle,
+}: {
+  canToggle: boolean;
+  anonymous: boolean;
+  displayName: string | null;
+  privacyMode: QAPrivacyMode;
+  onToggle: () => void;
+}) {
+  if (canToggle) {
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        className="self-start ink-border ticker text-[11px] tracking-widest px-3 py-2"
+        style={{ background: 'var(--bone)', minHeight: 44 }}
+        aria-pressed={anonymous}
+      >
+        {anonymous ? '◼ ASKING ANONYMOUSLY' : `◻ ASKING AS ${displayName?.toUpperCase()}`}
+        <span className="opacity-50 ml-2">· TAP TO SWITCH</span>
+      </button>
+    );
+  }
+  return (
+    <p className="ticker text-[11px] tracking-widest opacity-60">
+      {anonymous
+        ? privacyMode === 'ALWAYS_ANONYMOUS'
+          ? 'THIS ROOM IS ANONYMOUS · NO NAMES, EVER'
+          : 'ASKING ANONYMOUSLY'
+        : `ASKING AS ${displayName?.toUpperCase()}`}
+    </p>
+  );
+}
+
+function MyQuestionCard({
+  question,
+  ended,
+  charLimit,
+  editing,
+  confirmWithdraw,
+  onWithdraw,
+  onEditStart,
+  onEditChange,
+  onEditCancel,
+  onEditSave,
+}: {
+  question: QAPersonalQuestion;
+  ended: boolean;
+  charLimit: number;
+  editing: { id: string; draft: string } | null;
+  confirmWithdraw: boolean;
+  onWithdraw: () => void;
+  onEditStart: () => void;
+  onEditChange: (v: string) => void;
+  onEditCancel: () => void;
+  onEditSave: () => void;
+}) {
+  const badge = STATUS_BADGES[question.status];
+  // Server allows withdraw/edit only while pending or live (and not ENDED).
+  const actionable = !ended && (question.status === 'IN_REVIEW' || question.status === 'LIVE');
+  const settled = !actionable;
+  return (
+    <li
+      className="ink-border px-4 py-3"
+      style={{
+        background: 'var(--bone)',
+        opacity: settled && question.status !== 'ANSWERED' ? 0.65 : 1,
+      }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span
+          className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border"
+          style={{ background: badge.bg, color: badge.fg }}
+        >
+          {badge.label}
+        </span>
+        <span className="ticker text-[10px] tracking-widest opacity-50">
+          {question.isAnonymous ? 'ANON' : 'NAMED'}
+        </span>
+      </div>
+
+      {editing ? (
+        <div className="mt-3">
+          <textarea
+            value={editing.draft}
+            onChange={(e) => onEditChange(e.target.value)}
+            rows={3}
+            aria-label="Edit your question"
+            className="w-full ink-border bg-transparent font-editorial px-3 py-2 resize-none"
+            style={{ fontSize: '16px', background: 'var(--bone)' }}
+          />
+          <div className="flex items-center justify-between mt-2">
+            <span className="ticker tabular-nums text-[10px] tracking-widest opacity-60">
+              {charLimit - editing.draft.trim().length} LEFT
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onEditCancel}
+                className="ink-border ticker text-[11px] tracking-widest px-3 py-2"
+                style={{ background: 'var(--bone)', minHeight: 44 }}
+              >
+                CANCEL
+              </button>
+              <button
+                type="button"
+                onClick={onEditSave}
+                className="ink-border stamp ticker text-[11px] tracking-widest px-3 py-2"
+                style={{ background: 'var(--ink)', color: 'var(--bone)', minHeight: 44 }}
+              >
+                SAVE
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <p className="font-editorial text-[17px] leading-snug mt-2">{question.text}</p>
+          {actionable && (
+            <div className="flex gap-2 mt-3">
+              <button
+                type="button"
+                onClick={onEditStart}
+                className="ink-border ticker text-[11px] tracking-widest px-3 py-2"
+                style={{ background: 'var(--bone)', minHeight: 44 }}
+              >
+                ✎ EDIT
+              </button>
+              <button
+                type="button"
+                onClick={onWithdraw}
+                className="ink-border ticker text-[11px] tracking-widest px-3 py-2"
+                style={{
+                  background: confirmWithdraw ? 'var(--vermilion)' : 'var(--bone)',
+                  color: confirmWithdraw ? 'var(--bone)' : 'var(--ink)',
+                  minHeight: 44,
+                }}
+              >
+                {confirmWithdraw ? 'TAP AGAIN TO WITHDRAW' : '✕ WITHDRAW'}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </li>
+  );
+}
+
+function EndedState() {
+  return (
+    <div className="pt-8">
+      <p className="chyron mb-2" style={{ color: 'var(--vermilion)' }}>
+        FADE OUT · TRANSMISSION ENDED
+      </p>
+      <p className="display-num" style={{ fontSize: 'clamp(40px, 11vw, 88px)', lineHeight: 0.9 }}>
+        Q&A&nbsp;ENDED.
+      </p>
+      <p className="font-editorial italic text-lg mt-3 opacity-80">
+        Thanks for the questions. The desk is closed.
+      </p>
+    </div>
   );
 }

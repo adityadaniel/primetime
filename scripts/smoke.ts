@@ -157,6 +157,7 @@ async function main() {
   await assertWordCloudHostTrash();
 
   await assertQaSocketFoundation();
+  await assertQaParticipantFlow();
 
   await assertPersistenceRowsWritten();
 }
@@ -1204,6 +1205,13 @@ type QaPublicSnapshot = {
   pin: string;
   title: string;
   participantCount: number;
+  questionCount: number;
+  questions: {
+    id: string;
+    text: string;
+    isAnonymous: boolean;
+    authorDisplayName: string | null;
+  }[];
 };
 
 type QaJoinAck =
@@ -1218,6 +1226,8 @@ type QaJoinAck =
 async function qaCreateSession(args?: {
   privacyMode?: 'ANONYMOUS_BY_DEFAULT' | 'ALWAYS_ANONYMOUS' | 'NAMED_BY_DEFAULT' | 'NAME_REQUIRED';
   hostUserId?: string | null;
+  moderationEnabled?: boolean;
+  questionCharLimit?: number;
 }) {
   // Mirror wcCreate: allocate + persist via the shared libs (what the API
   // route at /api/q-and-a does), then bind sockets via qa:host:attach.
@@ -1229,6 +1239,8 @@ async function qaCreateSession(args?: {
     title: 'Smoke Q&A',
     privacyMode: args?.privacyMode ?? 'ANONYMOUS_BY_DEFAULT',
     hostUserId: args?.hostUserId ?? null,
+    moderationEnabled: args?.moderationEnabled ?? false,
+    questionCharLimit: args?.questionCharLimit,
   });
   return { pin: created.pin, sessionId: created.id };
 }
@@ -1403,6 +1415,268 @@ async function assertQaSocketFoundation() {
     probe.disconnect();
     host2?.disconnect();
     alice2?.disconnect();
+    await prisma.$disconnect();
+  }
+}
+
+// --- scenario 19 (MID-335): Q&A participant submit/withdraw/edit ---
+
+type QaPersonalSnapshot = {
+  participantId: string;
+  displayName: string | null;
+  questions: { id: string; text: string; status: string; isAnonymous: boolean }[];
+};
+
+type QaActionAck =
+  | { questionId: string; status: string; personal: QaPersonalSnapshot }
+  | { error: string };
+
+function qaOk<T>(res: T | { error: string }, label: string): T {
+  if (res && typeof res === 'object' && 'error' in res) {
+    throw new Error(`${label} failed: ${(res as { error: string }).error}`);
+  }
+  return res as T;
+}
+
+function qaExpectError(res: unknown, expected: string, label: string) {
+  const error =
+    res && typeof res === 'object' && 'error' in res ? (res as { error: string }).error : undefined;
+  if (error !== expected) {
+    throw new Error(`${label}: expected error '${expected}', got ${JSON.stringify(res)}`);
+  }
+}
+
+async function assertQaParticipantFlow() {
+  console.log('\n--- scenario 19 (MID-335): Q&A participant submit/withdraw/edit ---');
+  const prisma = new PrismaClient();
+  const host = await connectSock();
+  const display = await connectSock();
+  const alice = await connectSock();
+  const bob = await connectSock();
+  const probe = await connectSock();
+  try {
+    // -- moderation OFF: submit goes live and reaches the room without refresh
+    const { pin, sessionId } = await qaCreateSession();
+    console.log('qa participant-flow pin:', pin);
+    qaOk(await qaEmit(host, 'qa:host:attach', { pin, sessionId }), 'qa:host:attach');
+    qaOk(await qaEmit(display, 'qa:display:attach', { pin }), 'qa:display:attach');
+    const aliceJoin = qaOk<Exclude<QaJoinAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:join', { pin, displayName: 'Alice' })) as QaJoinAck,
+      'alice join',
+    );
+    qaOk(
+      (await qaEmit(bob, 'qa:participant:join', { pin, displayName: 'Bob' })) as QaJoinAck,
+      'bob join',
+    );
+
+    // empty/whitespace and over-limit submissions rejected server-side
+    qaExpectError(
+      await qaEmit(alice, 'qa:participant:submit', { pin, text: '   ' }),
+      'empty_text',
+      'whitespace submit',
+    );
+    qaExpectError(
+      await qaEmit(alice, 'qa:participant:submit', { pin, text: 'a'.repeat(281) }),
+      'text_too_long',
+      'over-limit submit',
+    );
+
+    // anonymous submit: live immediately, no author name in the public state
+    const displaySawQ1 = qaWaitForState(display, (s) => s.questionCount === 1);
+    const sub1 = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:submit', {
+        pin,
+        text: 'What is the roadmap?',
+        isAnonymous: true,
+      })) as QaActionAck,
+      'anonymous submit',
+    );
+    if (sub1.status !== 'LIVE') throw new Error(`expected LIVE, got ${sub1.status}`);
+    const snap1 = await displaySawQ1;
+    const pubQ1 = snap1.questions.find((q) => q.id === sub1.questionId);
+    if (!pubQ1 || pubQ1.text !== 'What is the roadmap?') {
+      throw new Error(`public board missing question: ${JSON.stringify(snap1.questions)}`);
+    }
+    if (!pubQ1.isAnonymous || pubQ1.authorDisplayName !== null) {
+      throw new Error(`anonymous question leaked identity: ${JSON.stringify(pubQ1)}`);
+    }
+
+    // rapid-fire second submit is rate limited with a clear error
+    qaExpectError(
+      await qaEmit(alice, 'qa:participant:submit', { pin, text: 'Too fast?' }),
+      'rate_limited',
+      'rapid-fire submit',
+    );
+
+    // after the window, a named submit carries the display name publicly
+    await sleep(1100);
+    const displaySawQ2 = qaWaitForState(display, (s) => s.questionCount === 2);
+    const sub2 = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:submit', {
+        pin,
+        text: 'Named question?',
+        isAnonymous: false,
+      })) as QaActionAck,
+      'named submit',
+    );
+    const snap2 = await displaySawQ2;
+    const pubQ2 = snap2.questions.find((q) => q.id === sub2.questionId);
+    if (!pubQ2 || pubQ2.isAnonymous || pubQ2.authorDisplayName !== 'Alice') {
+      throw new Error(`named question lost its author: ${JSON.stringify(pubQ2)}`);
+    }
+
+    // a non-owner cannot withdraw someone else's question
+    qaExpectError(
+      await qaEmit(bob, 'qa:participant:withdraw', { pin, questionId: sub1.questionId }),
+      'not_owner',
+      'non-owner withdraw',
+    );
+
+    // owner withdraws: leaves the public board, persists WITHDRAWN
+    const displaySawWithdraw = qaWaitForState(display, (s) => s.questionCount === 1);
+    const wd = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:withdraw', {
+        pin,
+        questionId: sub1.questionId,
+      })) as QaActionAck,
+      'owner withdraw',
+    );
+    if (wd.status !== 'WITHDRAWN') throw new Error(`expected WITHDRAWN, got ${wd.status}`);
+    const wdPersonal = wd.personal.questions.find((q) => q.id === sub1.questionId);
+    if (wdPersonal?.status !== 'WITHDRAWN') {
+      throw new Error(`personal state missing WITHDRAWN: ${JSON.stringify(wd.personal)}`);
+    }
+    await displaySawWithdraw;
+    const wdRow = await prisma.qAQuestion.findUnique({ where: { id: sub1.questionId } });
+    if (wdRow?.status !== 'WITHDRAWN' || wdRow.withdrawnAt === null) {
+      throw new Error(`DB row not WITHDRAWN: ${JSON.stringify(wdRow)}`);
+    }
+
+    // edit of a live question (moderation off): board text updates, stays LIVE
+    const displaySawEdit = qaWaitForState(display, (s) =>
+      s.questions.some((q) => q.text === 'Named question, edited?'),
+    );
+    const edit = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:edit', {
+        pin,
+        questionId: sub2.questionId,
+        text: 'Named question, edited?',
+      })) as QaActionAck,
+      'live edit',
+    );
+    if (edit.status !== 'LIVE') throw new Error(`expected LIVE after edit, got ${edit.status}`);
+    await displaySawEdit;
+    const editRow = await prisma.qAQuestion.findUnique({ where: { id: sub2.questionId } });
+    if (editRow?.text !== 'Named question, edited?' || editRow.originalText !== 'Named question?') {
+      throw new Error(`edit not persisted with audit text: ${JSON.stringify(editRow)}`);
+    }
+
+    // a participant cannot edit someone else's question
+    qaExpectError(
+      await qaEmit(bob, 'qa:participant:edit', {
+        pin,
+        questionId: sub2.questionId,
+        text: 'hijacked',
+      }),
+      'not_owner',
+      'non-owner edit',
+    );
+
+    // -- moderation ON: submission waits for review and never reaches the room
+    // (the LIVE->IN_REVIEW edit demotion needs host approve, which ships with
+    // the moderation queue ticket; lib/qa.test.ts covers that transition.)
+    const mod = await qaCreateSession({ moderationEnabled: true });
+    qaOk(
+      (await qaEmit(probe, 'qa:participant:join', {
+        pin: mod.pin,
+        displayName: 'Cara',
+      })) as QaJoinAck,
+      'cara join',
+    );
+    const modSub = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(probe, 'qa:participant:submit', {
+        pin: mod.pin,
+        text: 'Moderate me?',
+      })) as QaActionAck,
+      'moderated submit',
+    );
+    if (modSub.status !== 'IN_REVIEW') {
+      throw new Error(`expected IN_REVIEW, got ${modSub.status}`);
+    }
+    const modPersonal = modSub.personal.questions.find((q) => q.id === modSub.questionId);
+    if (modPersonal?.status !== 'IN_REVIEW') {
+      throw new Error(`personal state missing IN_REVIEW: ${JSON.stringify(modSub.personal)}`);
+    }
+    const modBoard = qaOk<{ state: QaPublicSnapshot }>(
+      (await qaEmit(host, 'qa:display:attach', { pin: mod.pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'moderated display attach',
+    );
+    if (modBoard.state.questionCount !== 0 || modBoard.state.questions.length !== 0) {
+      throw new Error(`in-review question leaked publicly: ${JSON.stringify(modBoard.state)}`);
+    }
+    // editing while pending keeps it in review
+    const modEdit = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(probe, 'qa:participant:edit', {
+        pin: mod.pin,
+        questionId: modSub.questionId,
+        text: 'Moderate me, edited?',
+      })) as QaActionAck,
+      'pending edit',
+    );
+    if (modEdit.status !== 'IN_REVIEW') {
+      throw new Error(`expected IN_REVIEW after pending edit, got ${modEdit.status}`);
+    }
+
+    // -- ALWAYS_ANONYMOUS: identity never persists or leaks, even if requested
+    const anon = await qaCreateSession({ privacyMode: 'ALWAYS_ANONYMOUS' });
+    qaOk(
+      (await qaEmit(bob, 'qa:participant:join', {
+        pin: anon.pin,
+        displayName: 'Bob',
+      })) as QaJoinAck,
+      'anon join',
+    );
+    const anonSub = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(bob, 'qa:participant:submit', {
+        pin: anon.pin,
+        text: 'Who am I?',
+        isAnonymous: false,
+      })) as QaActionAck,
+      'anon submit',
+    );
+    const anonRow = await prisma.qAQuestion.findUnique({ where: { id: anonSub.questionId } });
+    if (!anonRow?.isAnonymous || anonRow.authorDisplayName !== null) {
+      throw new Error(`ALWAYS_ANONYMOUS persisted identity: ${JSON.stringify(anonRow)}`);
+    }
+    const anonBoard = qaOk<{ state: QaPublicSnapshot }>(
+      (await qaEmit(host, 'qa:display:attach', { pin: anon.pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'anon display attach',
+    );
+    const anonPub = anonBoard.state.questions.find((q) => q.id === anonSub.questionId);
+    if (!anonPub?.isAnonymous || anonPub.authorDisplayName !== null) {
+      throw new Error(`ALWAYS_ANONYMOUS leaked identity publicly: ${JSON.stringify(anonPub)}`);
+    }
+
+    // foundation still intact: alice reconnects with her stored participantId
+    const aliceAgain = (await qaEmit(alice, 'qa:participant:join', {
+      pin,
+      participantId: aliceJoin.participantId,
+    })) as QaJoinAck;
+    if ('error' in aliceAgain || !aliceAgain.reconnected) {
+      throw new Error(`reconnect regressed: ${JSON.stringify(aliceAgain)}`);
+    }
+
+    console.log('✓ Q&A participant submit/withdraw/edit (MID-335)');
+  } finally {
+    host.disconnect();
+    display.disconnect();
+    alice.disconnect();
+    bob.disconnect();
+    probe.disconnect();
     await prisma.$disconnect();
   }
 }

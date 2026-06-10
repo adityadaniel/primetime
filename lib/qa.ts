@@ -7,6 +7,7 @@
 // public projection never includes participant linkage. Personal projections
 // are targeted at one participant and must never be broadcast.
 
+import { validateQuestionInput } from './qa-input';
 import type {
   QAPersonalQuestion,
   QAPersonalState,
@@ -220,13 +221,12 @@ export function bindParticipantSocket(
   return true;
 }
 
+// Delegates to the shared lib/qa-input.ts validator so the participant page
+// and the server enforce identical rules.
 function validateText(state: QAState, raw: string): { ok: true; text: string } | QAError {
-  const text = raw.trim();
-  if (!text) return { ok: false, reason: 'empty_text' };
-  if (text.length > state.settings.questionCharLimit) {
-    return { ok: false, reason: 'text_too_long' };
-  }
-  return { ok: true, text };
+  const result = validateQuestionInput(raw, state.settings.questionCharLimit);
+  if (!result.ok) return { ok: false, reason: result.reason };
+  return { ok: true, text: result.value };
 }
 
 function resolveAnonymity(mode: QAPrivacyMode, requested: boolean | undefined): boolean {
@@ -371,6 +371,8 @@ export function withdrawQuestion(
   state: QAState,
   args: { questionId: string; participantId: string },
 ): QuestionTransitionResult {
+  // ENDED is view-only for participants (see lib/qa-hydrate.ts).
+  if (state.status === 'ENDED') return { ok: false, reason: 'session_ended' };
   return withQuestion(state, args.questionId, (q) => {
     if (q.participantId !== args.participantId) return { ok: false, reason: 'not_owner' };
     return transitionQuestion(state, q, 'WITHDRAWN');
@@ -385,6 +387,11 @@ export function editQuestion(
   state: QAState,
   args: { questionId: string; text: string; editor: QAEditor },
 ): EditQuestionResult {
+  // ENDED is view-only for participants; hosts may still clean up text for
+  // export/archive purposes.
+  if (args.editor.role === 'participant' && state.status === 'ENDED') {
+    return { ok: false, reason: 'session_ended' };
+  }
   const question = state.questions.get(args.questionId);
   if (!question) return { ok: false, reason: 'unknown_question' };
   // Edits only make sense before or after approval (PRD §4.3); settled

@@ -436,6 +436,18 @@ describe('withdrawQuestion', () => {
       reason: 'invalid_transition',
     });
   });
+
+  it('rejects withdrawing after the session has ended', () => {
+    const state = makeState();
+    const pid = join(state);
+    const qid = submitLive(state, pid);
+    setSessionStatus(state, 'ENDED');
+    expect(withdrawQuestion(state, { questionId: qid, participantId: pid })).toEqual({
+      ok: false,
+      reason: 'session_ended',
+    });
+    expect(state.questions.get(qid)?.status).toBe('LIVE');
+  });
 });
 
 describe('editQuestion', () => {
@@ -496,6 +508,24 @@ describe('editQuestion', () => {
     expect(
       editQuestion(state, { questionId: qid, text: 'late', editor: { role: 'host' } }),
     ).toEqual({ ok: false, reason: 'invalid_status' });
+  });
+
+  it('rejects participant edits after the session has ended but allows host edits', () => {
+    const state = makeState();
+    const pid = join(state);
+    const qid = submitLive(state, pid, 'orig');
+    setSessionStatus(state, 'ENDED');
+    expect(
+      editQuestion(state, {
+        questionId: qid,
+        text: 'too late',
+        editor: { role: 'participant', participantId: pid },
+      }),
+    ).toEqual({ ok: false, reason: 'session_ended' });
+    expect(state.questions.get(qid)?.text).toBe('orig');
+    expect(
+      editQuestion(state, { questionId: qid, text: 'host cleanup', editor: { role: 'host' } }).ok,
+    ).toBe(true);
   });
 
   it('validates edited text against the char limit', () => {

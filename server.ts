@@ -40,12 +40,20 @@ import {
   type QAState,
   addParticipant as qaAddParticipant,
   bindParticipantSocket as qaBindParticipantSocket,
+  editQuestion as qaEditQuestion,
   personalState as qaPersonalState,
   publicState as qaPublicState,
   resolveJoinIdentity as qaResolveJoinIdentity,
+  submitQuestion as qaSubmitQuestion,
+  withdrawQuestion as qaWithdrawQuestion,
 } from './lib/qa';
 import { loadOrCreateState as loadOrCreateQaState } from './lib/qa-hydrate';
-import { addParticipant as qaRepoAddParticipant } from './lib/qa-repo';
+import {
+  addParticipant as qaRepoAddParticipant,
+  addQuestion as qaRepoAddQuestion,
+  editQuestionText as qaRepoEditQuestionText,
+  setQuestionStatus as qaRepoSetQuestionStatus,
+} from './lib/qa-repo';
 import { matchUploadsPath, resolveUploadFilePath, uploadContentType } from './lib/serve-upload';
 import type { AnswerIndex, QAPersonalState, QAPublicState, Quiz } from './lib/types';
 import {
@@ -268,6 +276,12 @@ void app.prepare().then(() => {
     string,
     { pin: string; role: 'host' | 'display' | 'participant' }
   >();
+  // Per-participant submit throttle (WC_RATE_LIMIT_MS pattern). Questions are
+  // longer-form than word-cloud words, so the window is wider: a human typing
+  // a real question never hits it, rapid-fire scripts do. Only accepted
+  // submissions arm the window so a typo'd empty submit doesn't burn it.
+  const qaLastSubmitAt = new Map<string, number>();
+  const QA_SUBMIT_RATE_LIMIT_MS = 1_000;
 
   function isValidStatus(v: unknown): v is WordCloudStateStatus {
     return v === 'LOBBY' || v === 'LIVE' || v === 'PAUSED' || v === 'ENDED';
@@ -1077,6 +1091,214 @@ void app.prepare().then(() => {
       });
       // participantCount changed: refresh the room's public projection.
       qaEmitPublicState(state);
+    });
+
+    // Shared preamble for participant question actions (MID-335): the acting
+    // socket must already be bound to a participant in this room via
+    // qa:participant:join, so no hydration is needed — if the state isn't in
+    // memory the participant can't be bound to it either.
+    function qaResolveParticipantAction(
+      payload: unknown,
+    ): { state: QAState; participantId: string; p: Record<string, unknown> } | { error: string } {
+      if (!payload || typeof payload !== 'object') return { error: 'invalid' };
+      const p = payload as Record<string, unknown>;
+      if (!isPin(p.pin)) return { error: 'invalid_pin' };
+      const state = qaStates.get(p.pin);
+      if (!state) return { error: 'not_found' };
+      const participantId = state.socketToParticipant.get(socket.id);
+      if (!participantId) return { error: 'unknown_participant' };
+      return { state, participantId, p };
+    }
+
+    // Ack shape for submit/withdraw/edit. `personal` rides in the ack so it
+    // only ever reaches the acting participant's socket — never the room.
+    type QaActionAck =
+      | { questionId: string; status: string; personal: QAPersonalState }
+      | { error: string };
+
+    socket.on('qa:participant:submit', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:participant:submit] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: QaActionAck) => void;
+      const resolved = qaResolveParticipantAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, participantId, p } = resolved;
+      if (typeof p.text !== 'string') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const now = Date.now();
+      const last = qaLastSubmitAt.get(participantId) ?? 0;
+      if (now - last < QA_SUBMIT_RATE_LIMIT_MS) {
+        cb({ error: 'rate_limited' });
+        return;
+      }
+
+      // In-memory accept first (validates submissions-open, text, privacy),
+      // then persist BEFORE broadcasting — wordcloud:player:submit pattern.
+      const result = qaSubmitQuestion(state, {
+        participantId,
+        text: p.text,
+        isAnonymous: typeof p.isAnonymous === 'boolean' ? p.isAnonymous : undefined,
+      });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      qaLastSubmitAt.set(participantId, now);
+      const question = result.question;
+      try {
+        const row = await qaRepoAddQuestion({
+          sessionId: state.sessionId,
+          participantId,
+          text: question.text,
+          isAnonymous: question.isAnonymous,
+          authorDisplayName: question.authorDisplayName,
+          status: question.status === 'IN_REVIEW' ? 'IN_REVIEW' : 'LIVE',
+        });
+        // Re-key the in-memory entry to the DB id so ownership, votes, and
+        // personal projections line up across restarts (lib/qa-hydrate.ts
+        // keys everything by DB ids).
+        state.questions.delete(question.id);
+        question.id = row.id;
+        state.questions.set(row.id, question);
+      } catch (err) {
+        console.error('[qa-repo] addQuestion', err);
+        state.questions.delete(question.id);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      const personal = qaPersonalState(state, participantId);
+      if (!personal) {
+        cb({ error: 'unknown_participant' });
+        return;
+      }
+      cb({ questionId: question.id, status: question.status, personal });
+      // Moderated submissions are IN_REVIEW: nothing public changed, so the
+      // room gets no broadcast and the question stays invisible to displays.
+      if (question.status === 'LIVE') qaEmitPublicState(state);
+    });
+
+    socket.on('qa:participant:withdraw', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:participant:withdraw] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: QaActionAck) => void;
+      const resolved = qaResolveParticipantAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, participantId, p } = resolved;
+      if (typeof p.questionId !== 'string') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const prevHighlight = state.highlightedQuestionId;
+      const result = qaWithdrawQuestion(state, { questionId: p.questionId, participantId });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      const question = state.questions.get(p.questionId);
+      try {
+        await qaRepoSetQuestionStatus({ questionId: p.questionId, status: 'WITHDRAWN' });
+      } catch (err) {
+        console.error('[qa-repo] setQuestionStatus (withdraw)', err);
+        if (question) {
+          question.status = result.from;
+          question.withdrawnAt = null;
+        }
+        state.highlightedQuestionId = prevHighlight;
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      // If the withdrawn question was highlighted, the in-memory transition
+      // already cleared it; the persisted highlight column may go stale but
+      // hydration drops pointers at non-LIVE questions (lib/qa-hydrate.ts).
+      const personal = qaPersonalState(state, participantId);
+      if (!personal) {
+        cb({ error: 'unknown_participant' });
+        return;
+      }
+      cb({ questionId: p.questionId, status: 'WITHDRAWN', personal });
+      // Only a withdrawal out of LIVE changes the public board.
+      if (result.from === 'LIVE') qaEmitPublicState(state);
+    });
+
+    // Participant edit window (PRD §4.5): allowed while the question is
+    // IN_REVIEW or LIVE — no wall-clock cap in v1. Editing a LIVE question
+    // returns it to review when moderation is enabled (enforced in lib/qa.ts).
+    socket.on('qa:participant:edit', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:participant:edit] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: QaActionAck) => void;
+      const resolved = qaResolveParticipantAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, participantId, p } = resolved;
+      if (typeof p.questionId !== 'string' || typeof p.text !== 'string') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const question = state.questions.get(p.questionId);
+      const snapshot = question
+        ? {
+            text: question.text,
+            originalText: question.originalText,
+            status: question.status,
+            highlightedQuestionId: state.highlightedQuestionId,
+          }
+        : null;
+      const result = qaEditQuestion(state, {
+        questionId: p.questionId,
+        text: p.text,
+        editor: { role: 'participant', participantId },
+      });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      const edited = result.question;
+      const statusChanged = snapshot !== null && snapshot.status !== edited.status;
+      try {
+        await qaRepoEditQuestionText({ questionId: edited.id, text: edited.text });
+        if (statusChanged) {
+          await qaRepoSetQuestionStatus({ questionId: edited.id, status: edited.status });
+        }
+      } catch (err) {
+        console.error('[qa-repo] editQuestion (participant)', err);
+        // Full in-memory rollback. If the text write landed but the status
+        // write failed, the DB keeps the new text — hydration would surface
+        // it, which is benign next to lying to the participant about status.
+        if (snapshot) {
+          edited.text = snapshot.text;
+          edited.originalText = snapshot.originalText;
+          edited.status = snapshot.status;
+          state.highlightedQuestionId = snapshot.highlightedQuestionId;
+        }
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      const personal = qaPersonalState(state, participantId);
+      if (!personal) {
+        cb({ error: 'unknown_participant' });
+        return;
+      }
+      cb({ questionId: edited.id, status: edited.status, personal });
+      // Public board changed if the question was LIVE before the edit
+      // (text update, or moderated edit pulling it back to review).
+      if (snapshot?.status === 'LIVE' || edited.status === 'LIVE') qaEmitPublicState(state);
     });
 
     socket.on('disconnect', () => {
