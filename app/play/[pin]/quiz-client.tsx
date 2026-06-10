@@ -21,6 +21,14 @@ export default function QuizClient({ pin }: { pin: string }) {
   const [personal, setPersonal] = useState<Personal | null>(null);
   const [me, setMe] = useState<{ id: string; nickname: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Optimistic answer lock: under load the server's personal confirmation can
+  // lag well behind the tap, and a button that only locks on confirmation
+  // reads as dead. The tap locks the UI instantly; a rejected ack rolls back.
+  // Tagged with the question it belongs to so it expires with the question.
+  const [pendingAnswer, setPendingAnswer] = useState<{
+    question: number;
+    option: AnswerIndex;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [evicted, setEvicted] = useState<string | null>(null);
@@ -30,6 +38,19 @@ export default function QuizClient({ pin }: { pin: string }) {
   const prevAnsweredRef = useRef(false);
   const lastTickSecRef = useRef(-1);
   const urgentArmedRef = useRef(false);
+
+  // The optimistic lock only stands in during the question phase of its own
+  // question, until the server's hasAnswered arrives. Reveal and later phases
+  // must render server truth (correct/awarded/rank), never the local guess.
+  const lockPending =
+    state?.phase === 'question' &&
+    pendingAnswer !== null &&
+    pendingAnswer.question === state.questionIndex &&
+    !personal?.hasAnswered;
+  const optimisticPersonal: Personal | null =
+    lockPending && pendingAnswer
+      ? { ...personal, hasAnswered: true, lastAnswer: pendingAnswer.option }
+      : personal;
 
   useEffect(() => {
     if (!state) return;
@@ -103,6 +124,10 @@ export default function QuizClient({ pin }: { pin: string }) {
     };
   }, [state?.phase, state?.endsAt, state?.paused, sfx]);
 
+  // The lock-in sound stays tied to the server's confirmation (which the
+  // server now sends to this socket immediately on answer): a confirmation
+  // chime must not fire for an answer the server then rejects. The visual
+  // lock above is the optimistic part.
   useEffect(() => {
     if (personal?.hasAnswered && !prevAnsweredRef.current) {
       sfx.sfxLockIn();
@@ -183,14 +208,18 @@ export default function QuizClient({ pin }: { pin: string }) {
   }, [socket, pin, me]);
 
   function submit(i: AnswerIndex) {
-    if (!socket || !pin) return;
-    if (state?.phase !== 'question') return;
-    if (personal?.hasAnswered) return;
+    if (!socket || !pin || !state) return;
+    if (state.phase !== 'question' || state.paused) return;
+    if (personal?.hasAnswered || pendingAnswer?.question === state.questionIndex) return;
+    setPendingAnswer({ question: state.questionIndex, option: i });
     setSubmitting(true);
     setError(null);
     socket.emit('player:answer', pin, i, (res: { ok: boolean; error?: string }) => {
       setSubmitting(false);
-      if (!res.ok) setError(res.error ?? 'Could not submit');
+      if (!res.ok) {
+        setPendingAnswer(null);
+        setError(res.error ?? 'Could not submit');
+      }
     });
   }
 
@@ -237,7 +266,8 @@ export default function QuizClient({ pin }: { pin: string }) {
   return (
     <PlayerView
       state={state}
-      personal={personal}
+      personal={optimisticPersonal}
+      lockPending={lockPending}
       nickname={me.nickname}
       pin={pin}
       submitting={submitting}

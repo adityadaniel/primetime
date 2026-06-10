@@ -645,12 +645,17 @@ export function publicState(game: GameSession): PublicGameState {
   };
 }
 
-export function personalState(game: GameSession, playerId: string) {
+export function personalState(
+  game: GameSession,
+  playerId: string,
+  // Callers fanning out to every player pass the board once; re-sorting per
+  // player turns a broadcast into O(N² log N).
+  board: ReturnType<typeof leaderboard> = leaderboard(game),
+) {
   const player = game.players.get(playerId);
   if (!player) return null;
   const records = game.answers.get(game.questionIndex) ?? [];
   const mine = records.find((r) => r.playerId === playerId);
-  const board = leaderboard(game);
   const rank = board.findIndex((p) => p.id === playerId) + 1;
   return {
     hasAnswered: !!mine,

@@ -425,3 +425,37 @@ and `README.md` content review notes — but `app/`, `lib/`, `server.ts`,
 orchestrator restarts the dev server and commits the diff that Claude already
 produced. The orchestrator does not write *new* application code to "finish
 the job".
+
+---
+
+## 2026-06-10 · Answer-phase fanout is coalesced; player feedback is optimistic
+
+**Status:** Accepted
+
+**Context:** At ~120-player playtests, answer buttons felt dead. Every
+successful `player:answer` ran a full `broadcast(pin)`: public `state` to the
+whole room plus a recomputed `personal` per player — O(players²) deliveries
+per answer burst. Measured with `scripts/load-fanout.ts` at 120 players:
+~14.7k state + ~14.5k personal deliveries per question, and personal
+confirmation latency that grew with answer order (first answerers ~43ms, last
+~330ms on localhost; far worse on venue WiFi). The player UI only showed the
+LOCKED state once that server-confirmed personal arrived, so late answerers
+saw an unresponsive button. Nothing public changes per answer mid-question
+except standings scores — the control room's ANSWERS counter and the display's
+distribution bars read from `state.reveal`, which only exists at reveal.
+
+**Decision:** Two-sided fix. Server: `player:answer` acks and emits `personal`
+to the answering socket only; full room broadcasts during the question phase
+coalesce into one tick per 250ms (`scheduleBroadcast`), while phase flips
+(all-answered lock, expiry) still broadcast immediately and cancel the pending
+tick. `personalState` accepts a precomputed leaderboard so one broadcast sorts
+once, not once per player. Client: the answer button locks optimistically on
+tap (`pendingAnswer`, tagged to its questionIndex); a rejected ack rolls it
+back; reveal and later phases always render server truth.
+
+**Implication:** UI feedback no longer depends on broadcast latency, and
+answer-burst traffic dropped ~38× (88,330 → 2,296 deliveries over 3 questions
+at 120 players). Anything that wants per-answer realtime updates mid-question
+(e.g. a live answer counter) must ride the coalesced tick, not per-answer
+broadcasts. `scripts/load-fanout.ts` is the measurement harness; server must
+run with `PLAYER_CAP >= PLAYERS`.
