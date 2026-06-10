@@ -642,6 +642,29 @@ describe('votes', () => {
     expect(state.questions.get(qid)?.votes.get(voter)).toBe('DOWN');
   });
 
+  it('switches DOWN back to UP and adjusts the score both ways', () => {
+    const state = makeState({ downvotesEnabled: true });
+    const author = join(state);
+    const voter = join(state);
+    const qid = submitLive(state, author);
+
+    applyVote(state, { questionId: qid, participantId: voter, type: 'DOWN' });
+    const r = applyVote(state, { questionId: qid, participantId: voter, type: 'UP' });
+    expect(r).toMatchObject({ ok: true, score: 1, upvotes: 1, downvotes: 0 });
+    expect(state.questions.get(qid)?.votes.get(voter)).toBe('UP');
+  });
+
+  it('allows a participant to vote on their own question (explicit v1 decision)', () => {
+    const state = makeState();
+    const author = join(state);
+    const qid = submitLive(state, author);
+    expect(applyVote(state, { questionId: qid, participantId: author })).toMatchObject({
+      ok: true,
+      score: 1,
+      upvotes: 1,
+    });
+  });
+
   it('rejects downvotes when downvotes are disabled', () => {
     const state = makeState();
     const author = join(state);

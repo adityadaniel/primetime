@@ -158,6 +158,7 @@ async function main() {
 
   await assertQaSocketFoundation();
   await assertQaParticipantFlow();
+  await assertQaVoting();
 
   await assertPersistenceRowsWritten();
 }
@@ -1211,6 +1212,9 @@ type QaPublicSnapshot = {
     text: string;
     isAnonymous: boolean;
     authorDisplayName: string | null;
+    score: number;
+    upvotes: number;
+    downvotes: number;
   }[];
 };
 
@@ -1227,6 +1231,7 @@ async function qaCreateSession(args?: {
   privacyMode?: 'ANONYMOUS_BY_DEFAULT' | 'ALWAYS_ANONYMOUS' | 'NAMED_BY_DEFAULT' | 'NAME_REQUIRED';
   hostUserId?: string | null;
   moderationEnabled?: boolean;
+  downvotesEnabled?: boolean;
   questionCharLimit?: number;
 }) {
   // Mirror wcCreate: allocate + persist via the shared libs (what the API
@@ -1240,6 +1245,7 @@ async function qaCreateSession(args?: {
     privacyMode: args?.privacyMode ?? 'ANONYMOUS_BY_DEFAULT',
     hostUserId: args?.hostUserId ?? null,
     moderationEnabled: args?.moderationEnabled ?? false,
+    downvotesEnabled: args?.downvotesEnabled ?? false,
     questionCharLimit: args?.questionCharLimit,
   });
   return { pin: created.pin, sessionId: created.id };
@@ -1677,6 +1683,301 @@ async function assertQaParticipantFlow() {
     alice.disconnect();
     bob.disconnect();
     probe.disconnect();
+    await prisma.$disconnect();
+  }
+}
+
+// --- scenario 20 (MID-336): Q&A voting ---
+
+type QaVoteAck =
+  | {
+      questionId: string;
+      vote: 'UP' | 'DOWN' | null;
+      score: number;
+      upvotes: number;
+      downvotes: number;
+    }
+  | { error: string };
+
+type QaScoresEvent = {
+  pin: string;
+  scores: { questionId: string; score: number; upvotes: number; downvotes: number }[];
+};
+
+function qaWaitForScores(sock: ReturnType<typeof io>, predicate: (e: QaScoresEvent) => boolean) {
+  return new Promise<QaScoresEvent>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('no matching qa:scores delta')), 3000);
+    sock.on('qa:scores', function onScores(e: QaScoresEvent) {
+      if (predicate(e)) {
+        sock.off('qa:scores', onScores);
+        clearTimeout(t);
+        resolve(e);
+      }
+    });
+  });
+}
+
+async function assertQaVoting() {
+  console.log('\n--- scenario 20 (MID-336): Q&A voting ---');
+  const prisma = new PrismaClient();
+  const host = await connectSock();
+  const display = await connectSock();
+  const alice = await connectSock();
+  const bob = await connectSock();
+  let bob2: ReturnType<typeof io> | null = null;
+  const burstVoters: ReturnType<typeof io>[] = [];
+  try {
+    const { pin, sessionId } = await qaCreateSession();
+    console.log('qa voting pin:', pin);
+    qaOk(await qaEmit(host, 'qa:host:attach', { pin, sessionId }), 'qa:host:attach');
+    qaOk(await qaEmit(display, 'qa:display:attach', { pin }), 'qa:display:attach');
+    qaOk(
+      (await qaEmit(alice, 'qa:participant:join', { pin, displayName: 'Alice' })) as QaJoinAck,
+      'alice join',
+    );
+    const bobJoin = qaOk<Exclude<QaJoinAck, { error: string }>>(
+      (await qaEmit(bob, 'qa:participant:join', { pin, displayName: 'Bob' })) as QaJoinAck,
+      'bob join',
+    );
+
+    const sub1 = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:submit', { pin, text: 'Vote for me?' })) as QaActionAck,
+      'alice submit q1',
+    );
+    await sleep(1100); // submit rate-limit window
+    const sub2 = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:submit', { pin, text: 'Or for me?' })) as QaActionAck,
+      'alice submit q2',
+    );
+
+    // upvote: ack carries server-derived counts; the room gets a coalesced
+    // qa:scores delta (not a full qa:state) without refresh
+    const sawScore1 = qaWaitForScores(display, (e) =>
+      e.scores.some((s) => s.questionId === sub1.questionId && s.score === 1),
+    );
+    const v1 = qaOk<Exclude<QaVoteAck, { error: string }>>(
+      (await qaEmit(bob, 'qa:participant:vote', {
+        pin,
+        questionId: sub1.questionId,
+        type: 'UP',
+      })) as QaVoteAck,
+      'bob upvote',
+    );
+    if (v1.vote !== 'UP' || v1.score !== 1 || v1.upvotes !== 1) {
+      throw new Error(`bad upvote ack: ${JSON.stringify(v1)}`);
+    }
+    await sawScore1;
+
+    // idempotent repeat from the same participant: still one vote
+    const v2 = qaOk<Exclude<QaVoteAck, { error: string }>>(
+      (await qaEmit(bob, 'qa:participant:vote', {
+        pin,
+        questionId: sub1.questionId,
+        type: 'UP',
+      })) as QaVoteAck,
+      'bob repeat upvote',
+    );
+    if (v2.score !== 1) throw new Error(`repeat vote double-counted: ${JSON.stringify(v2)}`);
+
+    // second tab / reconnect: same participantId on a NEW socket cannot
+    // double-count (in-memory map + DB unique constraint)
+    bob2 = await connectSock();
+    qaOk(
+      (await qaEmit(bob2, 'qa:participant:join', {
+        pin,
+        participantId: bobJoin.participantId,
+      })) as QaJoinAck,
+      'bob second-tab join',
+    );
+    const v3 = qaOk<Exclude<QaVoteAck, { error: string }>>(
+      (await qaEmit(bob2, 'qa:participant:vote', {
+        pin,
+        questionId: sub1.questionId,
+        type: 'UP',
+      })) as QaVoteAck,
+      'bob second-tab upvote',
+    );
+    if (v3.score !== 1) throw new Error(`second tab double-counted: ${JSON.stringify(v3)}`);
+    const voteRows = await prisma.qAVote.count({ where: { questionId: sub1.questionId } });
+    if (voteRows !== 1) {
+      throw new Error(`expected 1 QAVote row after reconnect votes, got ${voteRows}`);
+    }
+
+    // removing the vote decrements the score
+    const sawRemove = qaWaitForScores(display, (e) =>
+      e.scores.some((s) => s.questionId === sub1.questionId && s.score === 0),
+    );
+    const v4 = qaOk<Exclude<QaVoteAck, { error: string }>>(
+      (await qaEmit(bob2, 'qa:participant:vote', {
+        pin,
+        questionId: sub1.questionId,
+        type: null,
+      })) as QaVoteAck,
+      'bob remove vote',
+    );
+    if (v4.vote !== null || v4.score !== 0) {
+      throw new Error(`bad remove ack: ${JSON.stringify(v4)}`);
+    }
+    await sawRemove;
+    const rowsAfterRemove = await prisma.qAVote.count({ where: { questionId: sub1.questionId } });
+    if (rowsAfterRemove !== 0) {
+      throw new Error(`expected 0 QAVote rows after removal, got ${rowsAfterRemove}`);
+    }
+
+    // downvotes rejected while the session has them disabled
+    qaExpectError(
+      await qaEmit(bob2, 'qa:participant:vote', { pin, questionId: sub1.questionId, type: 'DOWN' }),
+      'downvotes_disabled',
+      'downvote while disabled',
+    );
+
+    // unknown question / unbound socket rejected with clear reasons
+    qaExpectError(
+      await qaEmit(bob2, 'qa:participant:vote', { pin, questionId: 'nope', type: 'UP' }),
+      'unknown_question',
+      'vote on unknown question',
+    );
+    qaExpectError(
+      await qaEmit(display, 'qa:participant:vote', {
+        pin,
+        questionId: sub1.questionId,
+        type: 'UP',
+      }),
+      'unknown_participant',
+      'vote from unbound socket',
+    );
+
+    // non-LIVE question (moderation queue) rejects votes
+    const mod = await qaCreateSession({ moderationEnabled: true });
+    qaOk(
+      (await qaEmit(bob, 'qa:participant:join', { pin: mod.pin, displayName: 'Bob' })) as QaJoinAck,
+      'bob joins moderated session',
+    );
+    const modSub = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(bob, 'qa:participant:submit', {
+        pin: mod.pin,
+        text: 'Pending question',
+      })) as QaActionAck,
+      'moderated submit',
+    );
+    qaExpectError(
+      await qaEmit(bob, 'qa:participant:vote', {
+        pin: mod.pin,
+        questionId: modSub.questionId,
+        type: 'UP',
+      }),
+      'not_live',
+      'vote on in-review question',
+    );
+
+    // burst: 6 voters fire at once → coalesced qa:scores deltas (not one
+    // room-wide emit per vote, and zero full-state emits)
+    for (let i = 0; i < 6; i++) {
+      const sock = await connectSock();
+      burstVoters.push(sock);
+      qaOk(
+        (await qaEmit(sock, 'qa:participant:join', {
+          pin,
+          displayName: `V${i + 1}`,
+        })) as QaJoinAck,
+        `voter ${i + 1} join`,
+      );
+    }
+    await sleep(400); // let membership broadcasts settle before counting
+    let scoresEmits = 0;
+    let stateEmits = 0;
+    const countScores = () => {
+      scoresEmits += 1;
+    };
+    const countState = () => {
+      stateEmits += 1;
+    };
+    display.on('qa:scores', countScores);
+    display.on('qa:state', countState);
+    await Promise.all(
+      burstVoters.map((sock, i) =>
+        qaEmit(sock, 'qa:participant:vote', {
+          pin,
+          // 4 votes land on q2, 2 on q1 → q2 must outrank q1
+          questionId: i < 4 ? sub2.questionId : sub1.questionId,
+          type: 'UP',
+        }).then((res) => qaOk(res as QaVoteAck, `burst vote ${i + 1}`)),
+      ),
+    );
+    await sleep(600); // > BROADCAST_COALESCE_MS so the delta flushes
+    display.off('qa:scores', countScores);
+    display.off('qa:state', countState);
+    if (scoresEmits < 1 || scoresEmits > 2) {
+      throw new Error(`expected 1-2 coalesced qa:scores emits for the burst, got ${scoresEmits}`);
+    }
+    if (stateEmits !== 0) {
+      throw new Error(`vote burst triggered ${stateEmits} full qa:state emits`);
+    }
+
+    // popular order: a fresh snapshot has q2 (4 votes) above q1 (2 votes)
+    const board = qaOk<{ state: QaPublicSnapshot }>(
+      (await qaEmit(display, 'qa:display:attach', { pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'post-burst display attach',
+    );
+    const [top, second] = board.state.questions;
+    if (top?.id !== sub2.questionId || top.score !== 4 || second?.score !== 2) {
+      throw new Error(`bad popular order after burst: ${JSON.stringify(board.state.questions)}`);
+    }
+
+    // downvotes enabled: DOWN counts against the score and switching UP↔DOWN
+    // adjusts it without a second row
+    const dv = await qaCreateSession({ downvotesEnabled: true });
+    qaOk(
+      (await qaEmit(alice, 'qa:participant:join', {
+        pin: dv.pin,
+        displayName: 'Alice',
+      })) as QaJoinAck,
+      'alice joins downvote session',
+    );
+    const dvSub = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:submit', {
+        pin: dv.pin,
+        text: 'Downvote me?',
+      })) as QaActionAck,
+      'downvote-session submit',
+    );
+    const dvDown = qaOk<Exclude<QaVoteAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:vote', {
+        pin: dv.pin,
+        questionId: dvSub.questionId,
+        type: 'DOWN',
+      })) as QaVoteAck,
+      'downvote',
+    );
+    if (dvDown.score !== -1 || dvDown.downvotes !== 1) {
+      throw new Error(`bad downvote ack: ${JSON.stringify(dvDown)}`);
+    }
+    const dvSwitch = qaOk<Exclude<QaVoteAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:vote', {
+        pin: dv.pin,
+        questionId: dvSub.questionId,
+        type: 'UP',
+      })) as QaVoteAck,
+      'switch DOWN→UP',
+    );
+    if (dvSwitch.score !== 1 || dvSwitch.upvotes !== 1 || dvSwitch.downvotes !== 0) {
+      throw new Error(`bad switch ack: ${JSON.stringify(dvSwitch)}`);
+    }
+    const dvRow = await prisma.qAVote.findMany({ where: { questionId: dvSub.questionId } });
+    if (dvRow.length !== 1 || dvRow[0].type !== 'UP') {
+      throw new Error(`switch persisted wrong: ${JSON.stringify(dvRow)}`);
+    }
+
+    console.log('✓ Q&A voting (MID-336)');
+  } finally {
+    host.disconnect();
+    display.disconnect();
+    alice.disconnect();
+    bob.disconnect();
+    bob2?.disconnect();
+    for (const sock of burstVoters) sock.disconnect();
     await prisma.$disconnect();
   }
 }

@@ -180,6 +180,18 @@ export interface QAPublicQuestion {
   submittedAt: number;
 }
 
+/**
+ * Compact per-question score delta. Vote bursts coalesce into one `qa:scores`
+ * emit per room per tick (server.ts) instead of a full `qa:state` per vote;
+ * clients patch the matching questions and re-sort locally.
+ */
+export interface QAQuestionScore {
+  questionId: string;
+  score: number;
+  upvotes: number;
+  downvotes: number;
+}
+
 /** Projection broadcast to displays and participants. */
 export interface QAPublicState {
   pin: string;

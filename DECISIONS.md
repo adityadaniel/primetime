@@ -10,6 +10,37 @@ and add a new entry below.
 
 ---
 
+## 2026-06-10 · Q&A voting: self-votes allowed, vote fanout rides compact coalesced deltas
+
+**Status:** Accepted
+
+**Context:** Q&A voting (MID-336) needed two explicit calls. PRD §4.6 left
+self-upvote behavior as an implementation decision, and PRD §9 flags vote
+bursts as a fanout risk: at venue scale a popular question can attract many
+votes in a second, and a full `qa:state` emit per vote to the mixed
+`qa:${pin}` room recreates the O(N²) answer-fanout problem already solved for
+the quiz (see 2026-06-10 answer-phase fanout entry).
+
+**Decision:** Participants may vote on their own questions — same call as
+Slido; one self-vote per question cannot meaningfully skew ranking and
+blocking it would leak authorship of anonymous questions through a disabled
+button. One vote per participant per question is enforced twice: the
+in-memory `votes` map keys on participantId, and `QAVote` has
+`@@unique([questionId, participantId])` behind an upsert, so reconnects and
+second tabs collapse onto one vote. Vote bursts never emit full state:
+per-room dirty question ids coalesce into one compact `qa:scores` delta
+(`{ questionId, score, upvotes, downvotes }[]`) per 250ms tick; a full
+`qa:state` emit cancels any pending delta it would supersede. Clients patch
+scores and re-sort locally; the voter's own confirmation rides the ack.
+
+**Implication:** Surfaces that show the live board (participant page, and the
+upcoming host control/display tickets) must listen to `qa:scores` in addition
+to `qa:state`, and anything that wants per-vote realtime updates must ride
+the coalesced delta, not per-vote broadcasts. Revisit self-voting only if it
+demonstrably skews incentives.
+
+---
+
 ## 2026-06-09 · Public projection routes behind live.theprimetime.id
 
 **Status:** Accepted

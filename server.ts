@@ -39,10 +39,13 @@ import {
 import {
   type QAState,
   addParticipant as qaAddParticipant,
+  applyVote as qaApplyVote,
   bindParticipantSocket as qaBindParticipantSocket,
   editQuestion as qaEditQuestion,
   personalState as qaPersonalState,
   publicState as qaPublicState,
+  questionVoteCounts as qaQuestionVoteCounts,
+  removeVote as qaRemoveVote,
   resolveJoinIdentity as qaResolveJoinIdentity,
   submitQuestion as qaSubmitQuestion,
   withdrawQuestion as qaWithdrawQuestion,
@@ -52,10 +55,19 @@ import {
   addParticipant as qaRepoAddParticipant,
   addQuestion as qaRepoAddQuestion,
   editQuestionText as qaRepoEditQuestionText,
+  recordVote as qaRepoRecordVote,
+  removeVote as qaRepoRemoveVote,
   setQuestionStatus as qaRepoSetQuestionStatus,
 } from './lib/qa-repo';
 import { matchUploadsPath, resolveUploadFilePath, uploadContentType } from './lib/serve-upload';
-import type { AnswerIndex, QAPersonalState, QAPublicState, Quiz } from './lib/types';
+import type {
+  AnswerIndex,
+  QAPersonalState,
+  QAPublicState,
+  QAQuestionScore,
+  QAVoteType,
+  Quiz,
+} from './lib/types';
 import {
   addPlayerToCloud,
   isValidTransition,
@@ -283,6 +295,13 @@ void app.prepare().then(() => {
   const qaLastSubmitAt = new Map<string, number>();
   const QA_SUBMIT_RATE_LIMIT_MS = 1_000;
 
+  // Vote-burst fanout guard (MID-336, PRD §9): nothing public changes per
+  // vote except the affected questions' counts, so per-room dirty question
+  // ids coalesce into one compact `qa:scores` delta per tick instead of a
+  // full qa:state emit per vote. Clients patch scores and re-sort locally.
+  const qaPendingScoreFlushes = new Map<string, NodeJS.Timeout>();
+  const qaDirtyScores = new Map<string, Set<string>>();
+
   function isValidStatus(v: unknown): v is WordCloudStateStatus {
     return v === 'LOBBY' || v === 'LIVE' || v === 'PAUSED' || v === 'ENDED';
   }
@@ -345,7 +364,47 @@ void app.prepare().then(() => {
   // participants, so personal/private payloads must never go through here —
   // they are targeted at a single participant socket instead.
   function qaEmitPublicState(state: QAState) {
+    // A full snapshot carries the latest scores, so it supersedes (and
+    // cancels) any pending coalesced score delta for this room.
+    const pending = qaPendingScoreFlushes.get(state.pin);
+    if (pending) {
+      clearTimeout(pending);
+      qaPendingScoreFlushes.delete(state.pin);
+    }
+    qaDirtyScores.delete(state.pin);
     io.to(`qa:${state.pin}`).emit('qa:state', qaPublicState(state));
+  }
+
+  function qaFlushScores(pin: string) {
+    const dirty = qaDirtyScores.get(pin);
+    qaDirtyScores.delete(pin);
+    const state = qaStates.get(pin);
+    if (!state || !dirty || dirty.size === 0) return;
+    const scores: QAQuestionScore[] = [];
+    for (const questionId of dirty) {
+      const question = state.questions.get(questionId);
+      // Questions that left LIVE since the vote landed stay private.
+      if (!question || question.status !== 'LIVE') continue;
+      scores.push({ questionId, ...qaQuestionVoteCounts(question) });
+    }
+    if (scores.length === 0) return;
+    io.to(`qa:${pin}`).emit('qa:scores', { pin, scores });
+    recordBroadcast('other', io.sockets.adapter.rooms.get(`qa:${pin}`)?.size ?? 0, 0);
+  }
+
+  function qaScheduleScoreBroadcast(pin: string, questionId: string) {
+    let dirty = qaDirtyScores.get(pin);
+    if (!dirty) {
+      dirty = new Set();
+      qaDirtyScores.set(pin, dirty);
+    }
+    dirty.add(questionId);
+    if (qaPendingScoreFlushes.has(pin)) return;
+    const t = setTimeout(() => {
+      qaPendingScoreFlushes.delete(pin);
+      qaFlushScores(pin);
+    }, BROADCAST_COALESCE_MS);
+    qaPendingScoreFlushes.set(pin, t);
   }
 
   // F2: a socket is authorized as host iff (a) it owns the host slot for this
@@ -1299,6 +1358,108 @@ void app.prepare().then(() => {
       // Public board changed if the question was LIVE before the edit
       // (text update, or moderated edit pulling it back to review).
       if (snapshot?.status === 'LIVE' || edited.status === 'LIVE') qaEmitPublicState(state);
+    });
+
+    // Participant voting (MID-336). One vote per participant per question is
+    // enforced twice: the in-memory votes map keys on participantId, and the
+    // DB has @@unique([questionId, participantId]) behind an upsert — so a
+    // reconnect or second tab collapsing onto the same participantId can
+    // never double-count. `type: null` removes the vote. The ack carries the
+    // server-derived counts for the voter only; the room gets a coalesced
+    // qa:scores delta, never a per-vote full-state emit.
+    socket.on('qa:participant:vote', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:participant:vote] missing ack — ignoring');
+        return;
+      }
+      type QaVoteAck =
+        | {
+            questionId: string;
+            vote: QAVoteType | null;
+            score: number;
+            upvotes: number;
+            downvotes: number;
+          }
+        | { error: string };
+      const cb = ack as (res: QaVoteAck) => void;
+      const resolved = qaResolveParticipantAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, participantId, p } = resolved;
+      if (typeof p.questionId !== 'string') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const type =
+        p.type === 'UP' || p.type === 'DOWN' ? p.type : p.type === null ? null : undefined;
+      if (type === undefined) {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const question = state.questions.get(p.questionId);
+      const prevVote = question?.votes.get(participantId) ?? null;
+
+      if (type === null) {
+        const result = qaRemoveVote(state, { questionId: p.questionId, participantId });
+        if (!result.ok) {
+          cb({ error: result.reason });
+          return;
+        }
+        // Persist BEFORE acking/broadcasting; roll the in-memory vote back if
+        // the delete fails so memory and DB never disagree.
+        if (result.removed) {
+          try {
+            await qaRepoRemoveVote({ questionId: p.questionId, participantId });
+          } catch (err) {
+            console.error('[qa-repo] removeVote', err);
+            if (question && prevVote) question.votes.set(participantId, prevVote);
+            cb({ error: 'persistence_failed' });
+            return;
+          }
+        }
+        cb({
+          questionId: p.questionId,
+          vote: null,
+          score: result.score,
+          upvotes: result.upvotes,
+          downvotes: result.downvotes,
+        });
+        if (result.removed && question?.status === 'LIVE') {
+          qaScheduleScoreBroadcast(state.pin, p.questionId);
+        }
+        return;
+      }
+
+      const result = qaApplyVote(state, { questionId: p.questionId, participantId, type });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      // Idempotent repeat (same vote again, e.g. a second tab): nothing
+      // changed, so skip the DB write and the room delta.
+      if (prevVote !== type) {
+        try {
+          await qaRepoRecordVote({ questionId: p.questionId, participantId, type });
+        } catch (err) {
+          console.error('[qa-repo] recordVote', err);
+          if (question) {
+            if (prevVote) question.votes.set(participantId, prevVote);
+            else question.votes.delete(participantId);
+          }
+          cb({ error: 'persistence_failed' });
+          return;
+        }
+      }
+      cb({
+        questionId: p.questionId,
+        vote: type,
+        score: result.score,
+        upvotes: result.upvotes,
+        downvotes: result.downvotes,
+      });
+      if (prevVote !== type) qaScheduleScoreBroadcast(state.pin, p.questionId);
     });
 
     socket.on('disconnect', () => {

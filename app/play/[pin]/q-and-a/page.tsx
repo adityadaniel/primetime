@@ -15,8 +15,22 @@ import type {
   QAPersonalQuestion,
   QAPersonalState,
   QAPrivacyMode,
+  QAQuestionScore,
   QAQuestionStatus,
+  QAVoteType,
 } from '@/lib/types';
+
+type PublicQuestion = {
+  id: string;
+  text: string;
+  isAnonymous: boolean;
+  authorDisplayName: string | null;
+  score: number;
+  upvotes: number;
+  downvotes: number;
+  highlighted: boolean;
+  submittedAt: number;
+};
 
 type PublicSnapshot = {
   pin: string;
@@ -25,9 +39,12 @@ type PublicSnapshot = {
   privacyMode: QAPrivacyMode;
   status: 'OPEN' | 'CLOSED' | 'ENDED';
   submissionsOpen: boolean;
+  votingOpen: boolean;
+  downvotesEnabled: boolean;
   questionCharLimit: number;
   questionCount: number;
   participantCount: number;
+  questions: PublicQuestion[];
 };
 
 type JoinAck =
@@ -41,6 +58,16 @@ type JoinAck =
 
 type ActionAck =
   | { questionId: string; status: QAQuestionStatus; personal: QAPersonalState }
+  | { error: string };
+
+type VoteAck =
+  | {
+      questionId: string;
+      vote: QAVoteType | null;
+      score: number;
+      upvotes: number;
+      downvotes: number;
+    }
   | { error: string };
 
 // Mirrors QA_SUBMIT_RATE_LIMIT_MS in server.ts so the button re-enables right
@@ -66,9 +93,24 @@ function ackErrorMessage(error: string | undefined, charLimit: number): string {
     case 'invalid_transition':
     case 'invalid_status':
       return 'That question can no longer be changed.';
+    case 'voting_closed':
+      return 'Voting is closed.';
+    case 'not_live':
+    case 'unknown_question':
+      return "That question isn't on the board anymore.";
+    case 'downvotes_disabled':
+      return 'Downvotes are off in this room.';
     default:
       return "Couldn't send — try again.";
   }
+}
+
+// Popular order (PRD §4.7 default): score first, earliest submission breaks
+// ties — same comparator as the server's publicState projection, so the board
+// can re-sort locally from qa:scores deltas without a full snapshot.
+function byPopular(a: PublicQuestion, b: PublicQuestion): number {
+  if (b.score !== a.score) return b.score - a.score;
+  return a.submittedAt - b.submittedAt;
 }
 
 const STATUS_BADGES: Record<QAQuestionStatus, { label: string; bg: string; fg: string }> = {
@@ -185,12 +227,30 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
       if (s.pin !== pin) return;
       setPub(s);
     };
+    // Coalesced vote deltas: patch the affected questions' counts in place;
+    // the render path re-sorts by popularity, so the order updates live.
+    const onScores = (delta: { pin: string; scores: QAQuestionScore[] }) => {
+      if (delta.pin !== pin) return;
+      setPub((prev) => {
+        if (!prev) return prev;
+        const byId = new Map(delta.scores.map((s) => [s.questionId, s]));
+        return {
+          ...prev,
+          questions: prev.questions.map((q) => {
+            const s = byId.get(q.id);
+            return s ? { ...q, score: s.score, upvotes: s.upvotes, downvotes: s.downvotes } : q;
+          }),
+        };
+      });
+    };
     const onConnect = () => join();
     socket.on('qa:state', onState);
+    socket.on('qa:scores', onScores);
     socket.on('connect', onConnect);
     if (socket.connected) join();
     return () => {
       socket.off('qa:state', onState);
+      socket.off('qa:scores', onScores);
       socket.off('connect', onConnect);
     };
   }, [socket, pin, join]);
@@ -282,6 +342,76 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
     );
   }
 
+  // Local vote flip for optimistic feedback (and rollback on rejection). The
+  // server ack and qa:scores deltas remain the source of truth.
+  const applyLocalVote = useCallback(
+    (questionId: string, from: QAVoteType | null, to: QAVoteType | null) => {
+      if (from === to) return;
+      setPersonal((prev) => {
+        if (!prev) return prev;
+        const votes = { ...prev.votes };
+        if (to === null) delete votes[questionId];
+        else votes[questionId] = to;
+        return { ...prev, votes };
+      });
+      setPub((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          questions: prev.questions.map((q) => {
+            if (q.id !== questionId) return q;
+            let { upvotes, downvotes } = q;
+            if (from === 'UP') upvotes -= 1;
+            if (from === 'DOWN') downvotes -= 1;
+            if (to === 'UP') upvotes += 1;
+            if (to === 'DOWN') downvotes += 1;
+            return { ...q, upvotes, downvotes, score: upvotes - downvotes };
+          }),
+        };
+      });
+    },
+    [],
+  );
+
+  function handleVote(questionId: string, control: QAVoteType) {
+    if (!socket || !pin || !pub) return;
+    if (!pub.votingOpen || pub.status === 'ENDED') {
+      showToast('Voting is closed.');
+      return;
+    }
+    const current = personal?.votes[questionId] ?? null;
+    // Tapping the active control removes the vote; the other one switches it.
+    const next = current === control ? null : control;
+    applyLocalVote(questionId, current, next);
+    socket.emit('qa:participant:vote', { pin, questionId, type: next }, (res: VoteAck) => {
+      if ('error' in res) {
+        applyLocalVote(questionId, next, current);
+        showToast(ackErrorMessage(res.error, charLimit));
+        return;
+      }
+      // Reconcile with the server-derived truth (counts may include other
+      // participants' votes that landed since the optimistic flip).
+      setPersonal((prev) => {
+        if (!prev) return prev;
+        const votes = { ...prev.votes };
+        if (res.vote === null) delete votes[res.questionId];
+        else votes[res.questionId] = res.vote;
+        return { ...prev, votes };
+      });
+      setPub((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          questions: prev.questions.map((q) =>
+            q.id === res.questionId
+              ? { ...q, score: res.score, upvotes: res.upvotes, downvotes: res.downvotes }
+              : q,
+          ),
+        };
+      });
+    });
+  }
+
   if (phase === 'gone') {
     return (
       <main className="min-h-screen grid place-items-center px-6">
@@ -352,6 +482,8 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
 
   const ended = pub.status === 'ENDED';
   const myQuestions = [...personal.questions].sort((a, b) => b.submittedAt - a.submittedAt);
+  const boardQuestions = [...pub.questions].sort(byPopular);
+  const votingEnabled = pub.votingOpen && !ended;
   const canToggleIdentity =
     !!personal.displayName &&
     (pub.privacyMode === 'ANONYMOUS_BY_DEFAULT' || pub.privacyMode === 'NAMED_BY_DEFAULT');
@@ -494,6 +626,33 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
 
         <section className="pt-8">
           <div className="flex items-center justify-between">
+            <p className="chyron opacity-70">ON THE BOARD</p>
+            <span className="ticker text-[11px] tracking-widest opacity-60">
+              {votingEnabled ? 'MOST VOTED FIRST' : 'VOTING CLOSED'}
+            </span>
+          </div>
+          {boardQuestions.length === 0 ? (
+            <p className="font-editorial italic text-[15px] mt-3 opacity-70">
+              The board is empty — questions land here once they're live.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-3">
+              {boardQuestions.map((q) => (
+                <BoardQuestionCard
+                  key={q.id}
+                  question={q}
+                  myVote={personal.votes[q.id] ?? null}
+                  votingEnabled={votingEnabled}
+                  downvotesEnabled={pub.downvotesEnabled}
+                  onVote={(control) => handleVote(q.id, control)}
+                />
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="pt-8">
+          <div className="flex items-center justify-between">
             <p className="chyron opacity-70">YOUR QUESTIONS</p>
             <span className="ticker tabular-nums text-[11px] tracking-widest opacity-60">
               {String(myQuestions.length).padStart(2, '0')} FILED
@@ -565,6 +724,109 @@ function IdentityRow({
           : 'ASKING ANONYMOUSLY'
         : `ASKING AS ${displayName?.toUpperCase()}`}
     </p>
+  );
+}
+
+// Public board card with the vote rail. Tap targets stay ≥44px for one-handed
+// mobile use; the active vote is shown as a filled stamp (shape + fill, not
+// color alone) and exposed via aria-pressed.
+function BoardQuestionCard({
+  question,
+  myVote,
+  votingEnabled,
+  downvotesEnabled,
+  onVote,
+}: {
+  question: PublicQuestion;
+  myVote: QAVoteType | null;
+  votingEnabled: boolean;
+  downvotesEnabled: boolean;
+  onVote: (control: QAVoteType) => void;
+}) {
+  const author =
+    question.isAnonymous || !question.authorDisplayName
+      ? 'ANONYMOUS'
+      : question.authorDisplayName.toUpperCase();
+  return (
+    <li
+      className="ink-border px-4 py-3 flex items-stretch gap-3"
+      style={{
+        background: 'var(--bone)',
+        borderLeft: question.highlighted ? '6px solid var(--vermilion)' : undefined,
+      }}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          {question.highlighted && (
+            <span
+              className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border"
+              style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
+            >
+              ON AIR
+            </span>
+          )}
+          <span className="ticker text-[10px] tracking-widest opacity-50">{author}</span>
+        </div>
+        <p className="font-editorial text-[17px] leading-snug mt-2">{question.text}</p>
+      </div>
+      <div className="flex flex-col items-center justify-center gap-1 shrink-0">
+        <VoteButton
+          label="Upvote"
+          glyph="▲"
+          active={myVote === 'UP'}
+          disabled={!votingEnabled}
+          onClick={() => onVote('UP')}
+        />
+        <span className="ticker tabular-nums text-[13px] tracking-widest">
+          <span className="sr-only">Score </span>
+          {question.score}
+        </span>
+        {downvotesEnabled && (
+          <VoteButton
+            label="Downvote"
+            glyph="▼"
+            active={myVote === 'DOWN'}
+            disabled={!votingEnabled}
+            onClick={() => onVote('DOWN')}
+          />
+        )}
+      </div>
+    </li>
+  );
+}
+
+function VoteButton({
+  label,
+  glyph,
+  active,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  glyph: string;
+  active: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={active}
+      aria-label={label}
+      className={`ink-border ticker text-[14px] leading-none px-3 ${active ? 'stamp' : ''}`}
+      style={{
+        background: active ? 'var(--vermilion)' : 'var(--bone)',
+        color: active ? 'var(--bone)' : 'var(--ink)',
+        minHeight: 44,
+        minWidth: 44,
+        opacity: disabled ? 0.4 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+      }}
+    >
+      {glyph}
+    </button>
   );
 }
 
