@@ -8,6 +8,7 @@ export const config = {
     '/host/((?!.*\\.csv$).*)',
     '/api/quiz/:path*',
     '/api/wordcloud/:path*',
+    '/api/q-and-a/:path*',
     '/api/stripe/:path*',
   ],
 };

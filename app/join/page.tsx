@@ -33,24 +33,24 @@ export default function JoinPage() {
     setPending(true);
 
     // Look up the session type FIRST so we know which player flow to follow.
-    // The /join socket event is quiz-only; a word-cloud PIN must redirect
-    // to /play/[pin]/wordcloud (which mounts its own socket join). Doing the
-    // lookup here over HTTP avoids a "is this a quiz or a wordcloud" guessing
-    // game at the socket layer (F1 from the codex review).
+    // The /join socket event is quiz-only; a word-cloud or Q&A PIN must
+    // redirect to its own player surface (which mounts its own socket join).
+    // Doing the lookup here over HTTP avoids a "which activity is this"
+    // guessing game at the socket layer (F1 from the codex review).
     fetch('/api/lookup-pin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin }),
     })
-      .then((r) => r.json() as Promise<{ type: 'quiz' | 'wordcloud' | null }>)
+      .then((r) => r.json() as Promise<{ type: 'quiz' | 'wordcloud' | 'q-and-a' | null }>)
       .then((res) => {
-        if (res.type === 'wordcloud') {
+        if (res.type === 'wordcloud' || res.type === 'q-and-a') {
           if (typeof window !== 'undefined') {
             sessionStorage.setItem(`bc:nick:${pin}`, nickname.trim());
           }
           inFlight.current = false;
           setPending(false);
-          router.push(`/play/${pin}/wordcloud`);
+          router.push(res.type === 'wordcloud' ? `/play/${pin}/wordcloud` : `/play/${pin}/q-and-a`);
           return;
         }
         // Either an explicit quiz or no DB row (in-memory anonymous quiz):
