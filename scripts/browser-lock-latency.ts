@@ -108,7 +108,10 @@ async function main() {
     // Fire the bot burst, then tap from the browser while it is in flight.
     // One bot abstains so the browser's answer never completes the question:
     // otherwise the all-answered reveal cut can land in the same React commit
-    // as the LOCKED confirmation and the stamp is never painted.
+    // as the LOCKED confirmation and the stamp is never painted. This means
+    // tap→LOCKED measures the targeted-personal path — the path every answer
+    // takes except the question-closing one, whose confirmation rides the
+    // phase-flip broadcast and is superseded by the reveal cut anyway.
     const abstainer = bots[bots.length - 1];
     const botAcks = bots.slice(0, -1).map(
       (s) =>
@@ -162,6 +165,11 @@ async function main() {
     console.log(
       `round ${q + 1}: tap→LOCKING… ${fmt(marks.tapToLocking)} · tap→LOCKED ${fmt(marks.tapToLocked)}`,
     );
+    if (marks.tapToLocking === null || marks.tapToLocked === null) {
+      console.warn(
+        `round ${q + 1}: INCOMPLETE — a transition was not observed within 10s; treat this run's numbers as suspect`,
+      );
+    }
     await sleep(500);
   }
 

@@ -12,7 +12,7 @@ realtime transport behavior.
 | --- | --- |
 | `scripts/load-fanout.ts` | Socket-level: N clients burst-answer each question; counts every `state`/`personal` delivery per client, reports ack and confirmation latency percentiles, and pulls the server-side counters below. |
 | `scripts/browser-lock-latency.ts` | Browser-level: one real Chromium player taps while N bots burst-answer; MutationObserver timestamps tap→`LOCKING…` (optimistic render) and tap→`LOCKED` (server-confirmed personal). |
-| `lib/fanout-metrics.ts` + `GET /__fanout-metrics?reset=1` | Server-side, gated behind `FANOUT_METRICS=1`: `player:answer` handler-start→ack timings, event-loop delay histogram, `state`/`personal` emit counts split by cause (answer-driven / phase-transition / membership), rejection counts. |
+| `lib/fanout-metrics.ts` + `GET /__fanout-metrics?reset=1` | Server-side, gated behind `FANOUT_METRICS=1` and loopback-only: `player:answer` handler-start→ack timings, event-loop delay histogram, `state`/`personal` emit counts split by cause (answer-driven / phase-transition / membership), rejection counts. |
 
 ## Running
 
@@ -41,7 +41,13 @@ run once with it on if the change touches the persistence path.
   flips (question start, all-answered lock, expiry) are supposed to broadcast
   immediately; per-answer traffic is what must stay flat. In a full burst the
   coalesced answer tick may legitimately read 0 — the all-answered phase flip
-  cancels it.
+  cancels it. The harness opens each question's window before `host:advance`,
+  so `phase = 2–3` per question is expected (advance ×2 + start/flip); only
+  the `answer` column is the gate signal.
+- **Browser tap→`LOCKED` measures the targeted-personal path** (one bot
+  abstains so the question stays open). That is the path every answer takes
+  except the question-closing one, whose confirmation rides the phase-flip
+  broadcast and is visually superseded by the reveal cut.
 - **`confirm` latency by answer order is the dead-button detector.** Flat
   across answer order = healthy. Growing with order (late answerers wait for
   everyone ahead) = fanout backlog, the original bug. Note since the

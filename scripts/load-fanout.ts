@@ -180,7 +180,11 @@ async function main() {
     }
     hostStateCount = 0;
     displayStateCount = 0;
-    await fetchServerMetrics(true); // zero the server-side window
+    // Zero the server window BEFORE advancing so the question's own phase
+    // broadcasts (advance ×2, start, all-answered flip) are counted — they
+    // show up under `phase`, deliberately separate from the `answer` counts
+    // the gate cares about.
+    await fetchServerMetrics(true);
 
     if (q === 0) {
       host.emit('host:start', pin);
@@ -194,12 +198,20 @@ async function main() {
 
     // synchronized burst: every player answers in the same tick
     let rejectedAcks = 0;
+    let timedOutAcks = 0;
     const burstStart = performance.now();
     const acks = players.map(
       (p) =>
         new Promise<void>((resolve) => {
+          // a dropped socket never acks — don't let one player hang the run
+          const bail = setTimeout(() => {
+            timedOutAcks++;
+            console.error(`  !! ack timeout for ${p.nickname}`);
+            resolve();
+          }, 10_000);
           p.tEmit = performance.now();
           p.sock.emit('player:answer', pin, (p.tEmit % 4) | 0, (res: { ok: boolean }) => {
+            clearTimeout(bail);
             p.tAck = performance.now();
             if (!res.ok) {
               rejectedAcks++;
@@ -235,8 +247,13 @@ async function main() {
       `    personal deliveries: ${personalDeliveries} (O(N²) prediction ≈ answers×players = ${players.length * players.length})`,
     );
     console.log(
-      `    all acks returned in ${Math.round(allAcked)}ms; rejected: ${rejectedAcks}; unconfirmed after 30s: ${unconfirmed}`,
+      `    all acks returned in ${Math.round(allAcked)}ms; rejected: ${rejectedAcks}; ack timeouts: ${timedOutAcks}; unconfirmed after 30s: ${unconfirmed}`,
     );
+    if (unconfirmed > 0) {
+      console.log(
+        `    !! ${unconfirmed} unconfirmed players are EXCLUDED from the confirm percentiles below`,
+      );
+    }
     if (server) {
       const a = server.ackTimingMs;
       const e = server.eventLoopDelayMs;

@@ -156,8 +156,15 @@ function validateQuiz(input: unknown): Quiz {
 void app.prepare().then(() => {
   const httpServer = createServer((req, res) => {
     // Load-test instrumentation readout; only mounted when the operator
-    // opted in via FANOUT_METRICS=1 (never in normal serving).
+    // opted in via FANOUT_METRICS=1, and loopback-only even then so a flag
+    // left on in production never exposes counters to the room.
     if (fanoutMetricsEnabled && req.url?.startsWith('/__fanout-metrics')) {
+      const remote = req.socket.remoteAddress;
+      if (remote !== '127.0.0.1' && remote !== '::1' && remote !== '::ffff:127.0.0.1') {
+        res.statusCode = 403;
+        res.end('forbidden');
+        return;
+      }
       const reset = req.url.includes('reset=1');
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
