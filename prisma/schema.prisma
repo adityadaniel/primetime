@@ -263,6 +263,13 @@ model QASession {
   downvotesEnabled          Boolean             @default(false)
   questionCharLimit         Int                 @default(280)
   status                    QASessionStatus     @default(OPEN)
+  // Live presentation state persisted so restart hydration (lib/qa-hydrate.ts)
+  // can restore the room exactly. submissionsOpen is derived from status
+  // (OPEN <-> open), so only voting needs its own column.
+  votingOpen                Boolean             @default(true)
+  // Pointer to the currently highlighted LIVE question. Plain column (no FK):
+  // validated against question status on hydration.
+  highlightedQuestionId     String?
   hostUserId                String?
   hostUser                  User?               @relation(fields: [hostUserId], references: [id], onDelete: SetNull)
   createdAt                 DateTime            @default(now())

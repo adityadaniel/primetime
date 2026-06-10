@@ -108,3 +108,116 @@ export interface QuizSummary {
   questionCount: number;
   updatedAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Q&A live activity (MID-332). String-literal twins of the Prisma enums so the
+// in-memory state module stays pure and testable without @prisma/client.
+// ---------------------------------------------------------------------------
+
+/** Live session lifecycle. Prisma's ARCHIVED collapses to ENDED in memory. */
+export type QASessionStatus = 'OPEN' | 'CLOSED' | 'ENDED';
+
+export type QAQuestionStatus =
+  | 'IN_REVIEW'
+  | 'LIVE'
+  | 'ANSWERED'
+  | 'ARCHIVED'
+  | 'DISMISSED'
+  | 'WITHDRAWN';
+
+export type QAPrivacyMode =
+  | 'ANONYMOUS_BY_DEFAULT'
+  | 'ALWAYS_ANONYMOUS'
+  | 'NAMED_BY_DEFAULT'
+  | 'NAME_REQUIRED';
+
+export type QAVoteType = 'UP' | 'DOWN';
+
+export interface QASettings {
+  title: string;
+  description: string | null;
+  privacyMode: QAPrivacyMode;
+  moderationEnabled: boolean;
+  participantRepliesEnabled: boolean;
+  downvotesEnabled: boolean;
+  questionCharLimit: number;
+}
+
+export interface QAPublicLabel {
+  id: string;
+  name: string;
+  participantSelectable: boolean;
+}
+
+/**
+ * A reply that is safe to show to everyone. Replies never expose participant
+ * identity; only the host marker is public.
+ */
+export interface QAPublicReply {
+  id: string;
+  isHostReply: boolean;
+  text: string;
+  createdAt: number;
+}
+
+/**
+ * Display/participant-safe question. Only LIVE questions are projected, so
+ * IN_REVIEW, DISMISSED, WITHDRAWN, ANSWERED, and ARCHIVED never leak here.
+ * Anonymous questions carry a null author name.
+ */
+export interface QAPublicQuestion {
+  id: string;
+  text: string;
+  isAnonymous: boolean;
+  authorDisplayName: string | null;
+  score: number;
+  upvotes: number;
+  downvotes: number;
+  labelIds: string[];
+  replyCount: number;
+  replies: QAPublicReply[];
+  highlighted: boolean;
+  submittedAt: number;
+}
+
+/** Projection broadcast to displays and participants. */
+export interface QAPublicState {
+  pin: string;
+  title: string;
+  description: string | null;
+  privacyMode: QAPrivacyMode;
+  status: QASessionStatus;
+  submissionsOpen: boolean;
+  votingOpen: boolean;
+  downvotesEnabled: boolean;
+  participantRepliesEnabled: boolean;
+  questionCharLimit: number;
+  participantCount: number;
+  questionCount: number;
+  highlightedQuestionId: string | null;
+  labels: QAPublicLabel[];
+  questions: QAPublicQuestion[];
+}
+
+/**
+ * The participant's own question in any status, including pending review and
+ * withdrawn, with all replies (private host replies included — they are only
+ * ever sent to the owner).
+ */
+export interface QAPersonalQuestion {
+  id: string;
+  text: string;
+  status: QAQuestionStatus;
+  isAnonymous: boolean;
+  submittedAt: number;
+  replies: QAPublicReply[];
+}
+
+/** Projection targeted at a single participant. Never broadcast. */
+export interface QAPersonalState {
+  participantId: string;
+  displayName: string | null;
+  questions: QAPersonalQuestion[];
+  /** questionId -> this participant's current vote. */
+  votes: Record<string, QAVoteType>;
+}

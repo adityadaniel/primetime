@@ -116,6 +116,29 @@ export async function setSessionStatus(args: {
   });
 }
 
+// Persisted live presentation state so restart hydration (lib/qa-hydrate.ts)
+// can restore voting/highlight exactly. submissionsOpen has no column — it is
+// derived from session status (OPEN <-> open).
+export async function setVotingOpen(args: {
+  sessionId: string;
+  votingOpen: boolean;
+}): Promise<QASession> {
+  return prisma.qASession.update({
+    where: { id: args.sessionId },
+    data: { votingOpen: args.votingOpen },
+  });
+}
+
+export async function setHighlightedQuestion(args: {
+  sessionId: string;
+  questionId: string | null;
+}): Promise<QASession> {
+  return prisma.qASession.update({
+    where: { id: args.sessionId },
+    data: { highlightedQuestionId: args.questionId },
+  });
+}
+
 export async function addParticipant(args: {
   sessionId: string;
   displayName?: string | null;

@@ -1,0 +1,575 @@
+// In-memory state machine for the Q&A live activity (MID-332). Mirrors
+// lib/wordcloud.ts: pure, server-authoritative transition helpers with no I/O,
+// consumed by the socket layer (persist-before-broadcast) and rebuilt on
+// restart by lib/qa-hydrate.ts.
+//
+// Privacy rule: anonymous questions never carry an author name, and the
+// public projection never includes participant linkage. Personal projections
+// are targeted at one participant and must never be broadcast.
+
+import type {
+  QAPersonalQuestion,
+  QAPersonalState,
+  QAPrivacyMode,
+  QAPublicQuestion,
+  QAPublicReply,
+  QAPublicState,
+  QAQuestionStatus,
+  QASessionStatus,
+  QASettings,
+  QAVoteType,
+} from './types';
+
+export type QAParticipantEntry = {
+  displayName: string | null;
+};
+
+export type QAReplyEntry = {
+  id: string;
+  // Null for host replies. Participant linkage is for personal state only.
+  participantId: string | null;
+  isHostReply: boolean;
+  text: string;
+  createdAt: number;
+};
+
+export type QAQuestionEntry = {
+  id: string;
+  // Owner linkage for withdraw/edit/personal views. Never projected publicly.
+  participantId: string | null;
+  text: string;
+  // Preserved verbatim the first time the text is edited (audit/export).
+  originalText: string | null;
+  isAnonymous: boolean;
+  authorDisplayName: string | null;
+  status: QAQuestionStatus;
+  submittedAt: number;
+  approvedAt: number | null;
+  answeredAt: number | null;
+  archivedAt: number | null;
+  dismissedAt: number | null;
+  withdrawnAt: number | null;
+  labelIds: Set<string>;
+  // participantId -> vote type. Idempotency and up/down exclusivity fall out
+  // of the map shape; score is always derived from this, never client-fed.
+  votes: Map<string, QAVoteType>;
+  replies: QAReplyEntry[];
+};
+
+export type QALabelEntry = {
+  name: string;
+  participantSelectable: boolean;
+};
+
+export type QAState = {
+  pin: string;
+  sessionId: string;
+  settings: QASettings;
+  status: QASessionStatus;
+  hostUserId: string | null;
+  hostSocketId?: string;
+  displaySocketIds: Set<string>;
+  participants: Map<string, QAParticipantEntry>;
+  socketToParticipant: Map<string, string>;
+  questions: Map<string, QAQuestionEntry>;
+  labels: Map<string, QALabelEntry>;
+  highlightedQuestionId: string | null;
+  // Synced with status: OPEN <-> true, CLOSED/ENDED -> false. Toggle via
+  // setSubmissionsOpen/setSessionStatus only.
+  submissionsOpen: boolean;
+  votingOpen: boolean;
+  createdAt: number;
+};
+
+export type QAErrorReason =
+  | 'submissions_closed'
+  | 'voting_closed'
+  | 'empty_text'
+  | 'text_too_long'
+  | 'name_required'
+  | 'unknown_participant'
+  | 'unknown_question'
+  | 'not_owner'
+  | 'not_live'
+  | 'invalid_transition'
+  | 'invalid_status'
+  | 'downvotes_disabled'
+  | 'session_ended';
+
+export type QAError = { ok: false; reason: QAErrorReason };
+
+const QUESTION_TRANSITIONS: Record<QAQuestionStatus, ReadonlySet<QAQuestionStatus>> = {
+  // PRD §4.3: approve, dismiss, or let the owner withdraw a pending question.
+  IN_REVIEW: new Set<QAQuestionStatus>(['LIVE', 'DISMISSED', 'WITHDRAWN']),
+  // Answered/archived leave the live board; a moderated participant edit
+  // sends a live question back to review; owners can withdraw.
+  LIVE: new Set<QAQuestionStatus>(['ANSWERED', 'ARCHIVED', 'WITHDRAWN', 'IN_REVIEW']),
+  ANSWERED: new Set<QAQuestionStatus>(['LIVE']),
+  ARCHIVED: new Set<QAQuestionStatus>(['LIVE']),
+  DISMISSED: new Set<QAQuestionStatus>(['IN_REVIEW']),
+  // Withdrawn is terminal: the participant took it back.
+  WITHDRAWN: new Set<QAQuestionStatus>(),
+};
+
+const SESSION_TRANSITIONS: Record<QASessionStatus, ReadonlySet<QASessionStatus>> = {
+  OPEN: new Set<QASessionStatus>(['CLOSED', 'ENDED']),
+  CLOSED: new Set<QASessionStatus>(['OPEN', 'ENDED']),
+  // ENDED is terminal for live sockets — ARCHIVED is a DB-only concern.
+  ENDED: new Set<QASessionStatus>(),
+};
+
+export function isValidQuestionTransition(from: QAQuestionStatus, to: QAQuestionStatus): boolean {
+  return QUESTION_TRANSITIONS[from]?.has(to) ?? false;
+}
+
+export function isValidSessionTransition(from: QASessionStatus, to: QASessionStatus): boolean {
+  return SESSION_TRANSITIONS[from]?.has(to) ?? false;
+}
+
+export function createQAState(args: {
+  pin: string;
+  sessionId: string;
+  title: string;
+  description?: string | null;
+  privacyMode?: QAPrivacyMode;
+  moderationEnabled?: boolean;
+  participantRepliesEnabled?: boolean;
+  downvotesEnabled?: boolean;
+  questionCharLimit?: number;
+  hostUserId?: string | null;
+}): QAState {
+  return {
+    pin: args.pin,
+    sessionId: args.sessionId,
+    settings: {
+      title: args.title,
+      description: args.description ?? null,
+      privacyMode: args.privacyMode ?? 'ANONYMOUS_BY_DEFAULT',
+      moderationEnabled: args.moderationEnabled ?? false,
+      participantRepliesEnabled: args.participantRepliesEnabled ?? false,
+      downvotesEnabled: args.downvotesEnabled ?? false,
+      questionCharLimit: args.questionCharLimit ?? 280,
+    },
+    status: 'OPEN',
+    hostUserId: args.hostUserId ?? null,
+    displaySocketIds: new Set(),
+    participants: new Map(),
+    socketToParticipant: new Map(),
+    questions: new Map(),
+    labels: new Map(),
+    highlightedQuestionId: null,
+    submissionsOpen: true,
+    votingOpen: true,
+    createdAt: Date.now(),
+  };
+}
+
+function genId(prefix: string): string {
+  return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+export type AddParticipantResult = { ok: true; participantId: string } | QAError;
+
+export function addParticipant(
+  state: QAState,
+  args: { displayName?: string | null; participantId?: string },
+): AddParticipantResult {
+  if (state.status === 'ENDED') return { ok: false, reason: 'session_ended' };
+  const trimmed = args.displayName?.trim() || null;
+  if (state.settings.privacyMode === 'NAME_REQUIRED' && !trimmed) {
+    return { ok: false, reason: 'name_required' };
+  }
+  // Always-anonymous sessions never store a name: anonymous means anonymous
+  // to the host and export, not merely hidden.
+  const displayName = state.settings.privacyMode === 'ALWAYS_ANONYMOUS' ? null : trimmed;
+  const participantId = args.participantId ?? genId('qap');
+  state.participants.set(participantId, { displayName });
+  return { ok: true, participantId };
+}
+
+function validateText(state: QAState, raw: string): { ok: true; text: string } | QAError {
+  const text = raw.trim();
+  if (!text) return { ok: false, reason: 'empty_text' };
+  if (text.length > state.settings.questionCharLimit) {
+    return { ok: false, reason: 'text_too_long' };
+  }
+  return { ok: true, text };
+}
+
+function resolveAnonymity(mode: QAPrivacyMode, requested: boolean | undefined): boolean {
+  switch (mode) {
+    case 'ALWAYS_ANONYMOUS':
+      return true;
+    case 'NAME_REQUIRED':
+      return false;
+    case 'NAMED_BY_DEFAULT':
+      return requested ?? false;
+    default:
+      return requested ?? true;
+  }
+}
+
+export type SubmitQuestionResult = { ok: true; question: QAQuestionEntry } | QAError;
+
+export function submitQuestion(
+  state: QAState,
+  args: { participantId: string; text: string; isAnonymous?: boolean; questionId?: string },
+): SubmitQuestionResult {
+  if (!state.submissionsOpen) return { ok: false, reason: 'submissions_closed' };
+  const participant = state.participants.get(args.participantId);
+  if (!participant) return { ok: false, reason: 'unknown_participant' };
+
+  const validated = validateText(state, args.text);
+  if (!validated.ok) return validated;
+
+  const isAnonymous = resolveAnonymity(state.settings.privacyMode, args.isAnonymous);
+  if (!isAnonymous && !participant.displayName) {
+    return { ok: false, reason: 'name_required' };
+  }
+
+  const question: QAQuestionEntry = {
+    id: args.questionId ?? genId('qaq'),
+    participantId: args.participantId,
+    text: validated.text,
+    originalText: null,
+    isAnonymous,
+    authorDisplayName: isAnonymous ? null : participant.displayName,
+    status: state.settings.moderationEnabled ? 'IN_REVIEW' : 'LIVE',
+    submittedAt: Date.now(),
+    approvedAt: null,
+    answeredAt: null,
+    archivedAt: null,
+    dismissedAt: null,
+    withdrawnAt: null,
+    labelIds: new Set(),
+    votes: new Map(),
+    replies: [],
+  };
+  state.questions.set(question.id, question);
+  return { ok: true, question };
+}
+
+export type QuestionTransitionResult =
+  | { ok: true; from: QAQuestionStatus; to: QAQuestionStatus }
+  | QAError;
+
+// Central transition gate: validates against the PRD §4.3 matrix, stamps the
+// status timestamp, and keeps the single-highlight invariant by clearing the
+// highlight whenever the highlighted question leaves LIVE.
+function transitionQuestion(
+  state: QAState,
+  question: QAQuestionEntry,
+  to: QAQuestionStatus,
+): QuestionTransitionResult {
+  const from = question.status;
+  if (!isValidQuestionTransition(from, to)) {
+    return { ok: false, reason: 'invalid_transition' };
+  }
+  question.status = to;
+  const now = Date.now();
+  if (to === 'LIVE' && question.approvedAt === null) question.approvedAt = now;
+  if (to === 'ANSWERED') question.answeredAt = now;
+  if (to === 'ARCHIVED') question.archivedAt = now;
+  if (to === 'DISMISSED') question.dismissedAt = now;
+  if (to === 'WITHDRAWN') question.withdrawnAt = now;
+  if (to !== 'LIVE' && state.highlightedQuestionId === question.id) {
+    state.highlightedQuestionId = null;
+  }
+  return { ok: true, from, to };
+}
+
+function withQuestion(
+  state: QAState,
+  questionId: string,
+  fn: (question: QAQuestionEntry) => QuestionTransitionResult,
+): QuestionTransitionResult {
+  const question = state.questions.get(questionId);
+  if (!question) return { ok: false, reason: 'unknown_question' };
+  return fn(question);
+}
+
+export function approveQuestion(
+  state: QAState,
+  args: { questionId: string },
+): QuestionTransitionResult {
+  return withQuestion(state, args.questionId, (q) => {
+    if (q.status !== 'IN_REVIEW') return { ok: false, reason: 'invalid_transition' };
+    return transitionQuestion(state, q, 'LIVE');
+  });
+}
+
+export function dismissQuestion(
+  state: QAState,
+  args: { questionId: string },
+): QuestionTransitionResult {
+  return withQuestion(state, args.questionId, (q) => transitionQuestion(state, q, 'DISMISSED'));
+}
+
+// Restore is status-directed (PRD §4.3): DISMISSED returns to review,
+// ANSWERED/ARCHIVED return to the live board.
+export function restoreQuestion(
+  state: QAState,
+  args: { questionId: string },
+): QuestionTransitionResult {
+  return withQuestion(state, args.questionId, (q) => {
+    if (q.status === 'DISMISSED') return transitionQuestion(state, q, 'IN_REVIEW');
+    if (q.status === 'ANSWERED' || q.status === 'ARCHIVED') {
+      return transitionQuestion(state, q, 'LIVE');
+    }
+    return { ok: false, reason: 'invalid_transition' };
+  });
+}
+
+export function markAnswered(
+  state: QAState,
+  args: { questionId: string },
+): QuestionTransitionResult {
+  return withQuestion(state, args.questionId, (q) => transitionQuestion(state, q, 'ANSWERED'));
+}
+
+export function archiveQuestion(
+  state: QAState,
+  args: { questionId: string },
+): QuestionTransitionResult {
+  return withQuestion(state, args.questionId, (q) => transitionQuestion(state, q, 'ARCHIVED'));
+}
+
+export function withdrawQuestion(
+  state: QAState,
+  args: { questionId: string; participantId: string },
+): QuestionTransitionResult {
+  return withQuestion(state, args.questionId, (q) => {
+    if (q.participantId !== args.participantId) return { ok: false, reason: 'not_owner' };
+    return transitionQuestion(state, q, 'WITHDRAWN');
+  });
+}
+
+export type QAEditor = { role: 'host' } | { role: 'participant'; participantId: string };
+
+export type EditQuestionResult = { ok: true; question: QAQuestionEntry } | QAError;
+
+export function editQuestion(
+  state: QAState,
+  args: { questionId: string; text: string; editor: QAEditor },
+): EditQuestionResult {
+  const question = state.questions.get(args.questionId);
+  if (!question) return { ok: false, reason: 'unknown_question' };
+  // Edits only make sense before or after approval (PRD §4.3); settled
+  // questions (answered/archived/dismissed/withdrawn) are immutable.
+  if (question.status !== 'IN_REVIEW' && question.status !== 'LIVE') {
+    return { ok: false, reason: 'invalid_status' };
+  }
+  if (args.editor.role === 'participant' && question.participantId !== args.editor.participantId) {
+    return { ok: false, reason: 'not_owner' };
+  }
+
+  const validated = validateText(state, args.text);
+  if (!validated.ok) return validated;
+
+  if (question.originalText === null) question.originalText = question.text;
+  question.text = validated.text;
+
+  // An edited approved question returns to review when moderation is on
+  // (PRD §4.5). Host edits never demote the question.
+  if (
+    args.editor.role === 'participant' &&
+    question.status === 'LIVE' &&
+    state.settings.moderationEnabled
+  ) {
+    transitionQuestion(state, question, 'IN_REVIEW');
+  }
+  return { ok: true, question };
+}
+
+export type HighlightResult = { ok: true; previousQuestionId: string | null } | QAError;
+
+export function highlightQuestion(
+  state: QAState,
+  args: { questionId: string | null },
+): HighlightResult {
+  const previousQuestionId = state.highlightedQuestionId;
+  if (args.questionId === null) {
+    state.highlightedQuestionId = null;
+    return { ok: true, previousQuestionId };
+  }
+  const question = state.questions.get(args.questionId);
+  if (!question) return { ok: false, reason: 'unknown_question' };
+  if (question.status !== 'LIVE') return { ok: false, reason: 'not_live' };
+  // A single field holds the invariant: highlighting a second question
+  // implicitly un-highlights the first.
+  state.highlightedQuestionId = args.questionId;
+  return { ok: true, previousQuestionId };
+}
+
+export function questionVoteCounts(question: QAQuestionEntry): {
+  score: number;
+  upvotes: number;
+  downvotes: number;
+} {
+  let upvotes = 0;
+  let downvotes = 0;
+  for (const type of question.votes.values()) {
+    if (type === 'UP') upvotes += 1;
+    else downvotes += 1;
+  }
+  return { score: upvotes - downvotes, upvotes, downvotes };
+}
+
+export type VoteResult = { ok: true; score: number; upvotes: number; downvotes: number } | QAError;
+
+// Idempotent per participant: the votes map keys on participantId, so a
+// repeat vote is a no-op and an opposite vote switches type (up/down are
+// mutually exclusive). Participants may vote on their own questions — same
+// call as Slido; revisit if it skews incentives.
+export function applyVote(
+  state: QAState,
+  args: { questionId: string; participantId: string; type?: QAVoteType },
+): VoteResult {
+  if (!state.votingOpen) return { ok: false, reason: 'voting_closed' };
+  if (!state.participants.has(args.participantId)) {
+    return { ok: false, reason: 'unknown_participant' };
+  }
+  const question = state.questions.get(args.questionId);
+  if (!question) return { ok: false, reason: 'unknown_question' };
+  if (question.status !== 'LIVE') return { ok: false, reason: 'not_live' };
+  const type = args.type ?? 'UP';
+  if (type === 'DOWN' && !state.settings.downvotesEnabled) {
+    return { ok: false, reason: 'downvotes_disabled' };
+  }
+  question.votes.set(args.participantId, type);
+  return { ok: true, ...questionVoteCounts(question) };
+}
+
+export type RemoveVoteResult =
+  | { ok: true; removed: boolean; score: number; upvotes: number; downvotes: number }
+  | QAError;
+
+export function removeVote(
+  state: QAState,
+  args: { questionId: string; participantId: string },
+): RemoveVoteResult {
+  if (!state.votingOpen) return { ok: false, reason: 'voting_closed' };
+  const question = state.questions.get(args.questionId);
+  if (!question) return { ok: false, reason: 'unknown_question' };
+  const removed = question.votes.delete(args.participantId);
+  return { ok: true, removed, ...questionVoteCounts(question) };
+}
+
+export type SetSessionStatusResult =
+  | { ok: true; from: QASessionStatus; to: QASessionStatus }
+  | { ok: false; reason: 'invalid_transition'; from: QASessionStatus; to: QASessionStatus };
+
+export function setSessionStatus(state: QAState, status: QASessionStatus): SetSessionStatusResult {
+  const from = state.status;
+  if (!isValidSessionTransition(from, status)) {
+    return { ok: false, reason: 'invalid_transition', from, to: status };
+  }
+  state.status = status;
+  state.submissionsOpen = status === 'OPEN';
+  if (status === 'ENDED') state.votingOpen = false;
+  return { ok: true, from, to: status };
+}
+
+// Sugar over the session status machine: closing submissions is the CLOSED
+// state, reopening them is OPEN (PRD §4.10). Idempotent.
+export function setSubmissionsOpen(state: QAState, open: boolean): SetSessionStatusResult {
+  if (state.submissionsOpen === open && state.status !== 'ENDED') {
+    return { ok: true, from: state.status, to: state.status };
+  }
+  return setSessionStatus(state, open ? 'OPEN' : 'CLOSED');
+}
+
+export type SetVotingOpenResult = { ok: true; votingOpen: boolean } | QAError;
+
+export function setVotingOpen(state: QAState, open: boolean): SetVotingOpenResult {
+  if (state.status === 'ENDED') return { ok: false, reason: 'session_ended' };
+  state.votingOpen = open;
+  return { ok: true, votingOpen: open };
+}
+
+function toPublicReply(reply: QAReplyEntry): QAPublicReply {
+  return {
+    id: reply.id,
+    isHostReply: reply.isHostReply,
+    text: reply.text,
+    createdAt: reply.createdAt,
+  };
+}
+
+// Display/participant-safe projection. Only LIVE questions are included, so
+// in-review and dismissed questions — and any private replies attached to
+// them — never reach displays or other participants.
+export function publicState(state: QAState): QAPublicState {
+  const questions: QAPublicQuestion[] = [];
+  for (const q of state.questions.values()) {
+    if (q.status !== 'LIVE') continue;
+    questions.push({
+      id: q.id,
+      text: q.text,
+      isAnonymous: q.isAnonymous,
+      authorDisplayName: q.isAnonymous ? null : q.authorDisplayName,
+      ...questionVoteCounts(q),
+      labelIds: [...q.labelIds],
+      replyCount: q.replies.length,
+      replies: q.replies.map(toPublicReply),
+      highlighted: state.highlightedQuestionId === q.id,
+      submittedAt: q.submittedAt,
+    });
+  }
+  questions.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.submittedAt - b.submittedAt;
+  });
+  return {
+    pin: state.pin,
+    title: state.settings.title,
+    description: state.settings.description,
+    privacyMode: state.settings.privacyMode,
+    status: state.status,
+    submissionsOpen: state.submissionsOpen,
+    votingOpen: state.votingOpen,
+    downvotesEnabled: state.settings.downvotesEnabled,
+    participantRepliesEnabled: state.settings.participantRepliesEnabled,
+    questionCharLimit: state.settings.questionCharLimit,
+    participantCount: state.participants.size,
+    questionCount: questions.length,
+    highlightedQuestionId: state.highlightedQuestionId,
+    labels: [...state.labels.entries()].map(([id, l]) => ({
+      id,
+      name: l.name,
+      participantSelectable: l.participantSelectable,
+    })),
+    questions,
+  };
+}
+
+// Targeted projection for one participant: their own questions in every
+// status (pending review, withdrawn, dismissed, …) with all replies,
+// including private host replies, plus their current votes.
+export function personalState(state: QAState, participantId: string): QAPersonalState | null {
+  const participant = state.participants.get(participantId);
+  if (!participant) return null;
+  const questions: QAPersonalQuestion[] = [];
+  const votes: Record<string, QAVoteType> = {};
+  for (const q of state.questions.values()) {
+    if (q.participantId === participantId) {
+      questions.push({
+        id: q.id,
+        text: q.text,
+        status: q.status,
+        isAnonymous: q.isAnonymous,
+        submittedAt: q.submittedAt,
+        replies: q.replies.map(toPublicReply),
+      });
+    }
+    const vote = q.votes.get(participantId);
+    if (vote) votes[q.id] = vote;
+  }
+  questions.sort((a, b) => a.submittedAt - b.submittedAt);
+  return {
+    participantId,
+    displayName: participant.displayName,
+    questions,
+    votes,
+  };
+}
