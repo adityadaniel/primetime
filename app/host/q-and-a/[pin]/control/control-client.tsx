@@ -22,12 +22,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AccountMenu from '@/components/AccountMenu';
 import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
 import { publicUrl } from '@/lib/public-origin';
-import { QA_LABEL_NAME_LIMIT, validateLabelName } from '@/lib/qa-input';
+import { QA_HOST_REPLY_CHAR_LIMIT, QA_LABEL_NAME_LIMIT, validateLabelName } from '@/lib/qa-input';
 import { useSocket } from '@/lib/socket';
 import type {
   QAHostQuestion,
   QAHostState,
   QAPublicLabel,
+  QAPublicReply,
   QAQuestionScore,
   QAQuestionStatus,
   QASessionStatus,
@@ -47,6 +48,8 @@ type EditAck = { ok: true; questionId: string; text: string } | { error: string 
 type LabelCreateAck = { ok: true; label: QAPublicLabel } | { error: string };
 
 type LabelAssignAck = { ok: true; questionId: string; labelIds: string[] } | { error: string };
+
+type ReplyAck = { ok: true; questionId: string; reply: QAPublicReply } | { error: string };
 
 type SortMode = 'popular' | 'recent' | 'oldest';
 
@@ -112,6 +115,25 @@ function editErrorMessage(error: string): string {
   }
 }
 
+function replyErrorMessage(error: string): string {
+  switch (error) {
+    case 'empty_text':
+      return 'A reply needs some words.';
+    case 'text_too_long':
+      return `Keep replies under ${QA_HOST_REPLY_CHAR_LIMIT} characters.`;
+    case 'invalid_status':
+      return 'That question already settled — restore it to reply.';
+    case 'unknown_reply':
+      return 'That reply is gone — refresh the thread.';
+    case 'not_host_reply':
+      return 'Only your own replies can be rewritten.';
+    case 'session_ended':
+      return 'The session has ended.';
+    default:
+      return moderationErrorMessage(error);
+  }
+}
+
 function labelErrorMessage(error: string): string {
   switch (error) {
     case 'empty_label':
@@ -154,6 +176,16 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
   const [labelDraft, setLabelDraft] = useState('');
   const [labelSelectable, setLabelSelectable] = useState(false);
   const [labelPickerId, setLabelPickerId] = useState<string | null>(null);
+  // Reply desk (MID-341): one open thread at a time; the composer draft and
+  // any in-flight reply rewrite are kept locally so live re-sorts never
+  // clobber the host's typing.
+  const [replyThreadId, setReplyThreadId] = useState<string | null>(null);
+  const [replyDraft, setReplyDraft] = useState('');
+  const [replyEditing, setReplyEditing] = useState<{
+    questionId: string;
+    replyId: string;
+    text: string;
+  } | null>(null);
   const toastTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -280,6 +312,13 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
       const q = (host?.questions ?? []).find((row) => row.id === prev.id);
       return q && (q.status === 'LIVE' || q.status === 'IN_REVIEW') ? prev : null;
     });
+    // Same staleness rule for an in-flight reply rewrite (MID-341): replies
+    // are only editable while their question is still boardable.
+    setReplyEditing((prev) => {
+      if (!prev) return prev;
+      const q = (host?.questions ?? []).find((row) => row.id === prev.questionId);
+      return q && (q.status === 'LIVE' || q.status === 'IN_REVIEW') ? prev : null;
+    });
   }, [host?.questions]);
 
   // Selection only ever holds in-review ids: approve/dismiss/withdraw from
@@ -365,6 +404,49 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
       setEditing(null);
       showToast('Rewritten — original kept on file.');
     });
+  }
+
+  // Reply desk (MID-341): replies to LIVE questions go out to the room;
+  // replies to IN_REVIEW questions stay private to the submitter until the
+  // question is approved (server routes the fanout — see qa:host:reply).
+  function sendReply(q: QAHostQuestion) {
+    if (!socket) return;
+    const text = replyDraft.trim();
+    if (!text) {
+      showToast(replyErrorMessage('empty_text'));
+      return;
+    }
+    socket.emit('qa:host:reply', { pin, questionId: q.id, text }, (res: ReplyAck) => {
+      if ('error' in res) {
+        showToast(replyErrorMessage(res.error));
+        return;
+      }
+      setReplyDraft('');
+      showToast(
+        q.status === 'IN_REVIEW' ? 'Replied — private until approved.' : 'Reply on the wire.',
+      );
+    });
+  }
+
+  function saveReplyEdit() {
+    if (!socket || !replyEditing) return;
+    const text = replyEditing.text.trim();
+    if (!text) {
+      showToast(replyErrorMessage('empty_text'));
+      return;
+    }
+    socket.emit(
+      'qa:host:reply:edit',
+      { pin, questionId: replyEditing.questionId, replyId: replyEditing.replyId, text },
+      (res: ReplyAck) => {
+        if ('error' in res) {
+          showToast(replyErrorMessage(res.error));
+          return;
+        }
+        setReplyEditing(null);
+        showToast('Reply rewritten.');
+      },
+    );
   }
 
   function createLabel() {
@@ -966,14 +1048,182 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
                         {q.text}
                       </p>
                     )}
-                    <p className="ticker text-[10px] tracking-widest opacity-60 mt-1">
-                      {q.isAnonymous ? 'ANONYMOUS' : (q.authorDisplayName ?? 'ANONYMOUS')} ·{' '}
-                      {new Date(q.submittedAt).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                      {' · '}↩ {q.replyCount}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <p className="ticker text-[10px] tracking-widest opacity-60">
+                        {q.isAnonymous ? 'ANONYMOUS' : (q.authorDisplayName ?? 'ANONYMOUS')} ·{' '}
+                        {new Date(q.submittedAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReplyThreadId((id) => (id === q.id ? null : q.id));
+                          setReplyDraft('');
+                          setReplyEditing(null);
+                        }}
+                        aria-expanded={replyThreadId === q.id}
+                        aria-label={`${replyThreadId === q.id ? 'Close' : 'Open'} reply thread: ${q.text}`}
+                        className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border opacity-70 hover:opacity-100"
+                      >
+                        {replyThreadId === q.id
+                          ? '✕ THREAD'
+                          : `↩ REPLY${q.replyCount > 0 ? ` (${q.replyCount})` : ''}`}
+                      </button>
+                    </div>
+                    {/* Reply desk (MID-341): thread + composer. Replies to an
+                        in-review question are a private desk note to the
+                        submitter; approval makes the whole thread public. */}
+                    {replyThreadId === q.id && (
+                      <div
+                        className="mt-2 ink-border px-3 py-2"
+                        style={{ background: 'var(--bone)' }}
+                      >
+                        {q.status === 'IN_REVIEW' && (
+                          <p
+                            className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border inline-block"
+                            style={{ background: 'var(--marigold)', color: 'var(--ink)' }}
+                          >
+                            ◆ PRIVATE NOTE · ONLY THE SUBMITTER SEES THIS UNTIL APPROVAL
+                          </p>
+                        )}
+                        {q.replies.length > 0 && (
+                          <ul className="mt-2">
+                            {q.replies.map((r) => (
+                              <li
+                                key={r.id}
+                                className="py-2 border-b last:border-b-0"
+                                style={{ borderColor: 'rgba(15,15,15,.14)' }}
+                              >
+                                {replyEditing?.replyId === r.id ? (
+                                  <div>
+                                    <textarea
+                                      value={replyEditing.text}
+                                      onChange={(e) =>
+                                        setReplyEditing((prev) =>
+                                          prev ? { ...prev, text: e.target.value } : prev,
+                                        )
+                                      }
+                                      maxLength={QA_HOST_REPLY_CHAR_LIMIT}
+                                      rows={2}
+                                      aria-label="Edit reply text"
+                                      className="w-full ink-border font-editorial text-[15px] leading-snug p-2 bg-transparent outline-none resize-y"
+                                      style={{ background: 'var(--bone)' }}
+                                    />
+                                    <div className="mt-1 flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={saveReplyEdit}
+                                        className="ink-border stamp ticker text-[9px] tracking-widest px-2"
+                                        style={{
+                                          minHeight: 36,
+                                          background: 'var(--ivy)',
+                                          color: 'var(--bone)',
+                                        }}
+                                      >
+                                        ✓ SAVE REPLY
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setReplyEditing(null)}
+                                        className="ink-border ticker text-[9px] tracking-widest px-2"
+                                        style={{
+                                          minHeight: 36,
+                                          background: 'var(--bone)',
+                                          color: 'var(--ink)',
+                                        }}
+                                      >
+                                        ✕ CANCEL
+                                      </button>
+                                      <span className="ticker text-[10px] tracking-widest opacity-60 ml-auto tabular-nums">
+                                        {replyEditing.text.trim().length}/{QA_HOST_REPLY_CHAR_LIMIT}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className="ticker text-[9px] tracking-widest px-2 py-[2px] ink-border"
+                                        style={
+                                          r.isHostReply
+                                            ? { background: 'var(--ink)', color: 'var(--bone)' }
+                                            : { background: 'var(--bone)', color: 'var(--ink)' }
+                                        }
+                                      >
+                                        {r.isHostReply ? '◼ THE DESK' : '◻ AUDIENCE'}
+                                      </span>
+                                      <span className="ticker text-[10px] tracking-widest opacity-50">
+                                        {new Date(r.createdAt).toLocaleTimeString([], {
+                                          hour: '2-digit',
+                                          minute: '2-digit',
+                                        })}
+                                      </span>
+                                      {r.isHostReply && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setReplyEditing({
+                                              questionId: q.id,
+                                              replyId: r.id,
+                                              text: r.text,
+                                            })
+                                          }
+                                          aria-label={`Edit reply: ${r.text}`}
+                                          className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border opacity-60 hover:opacity-100 ml-auto"
+                                        >
+                                          ✎ EDIT
+                                        </button>
+                                      )}
+                                    </div>
+                                    <p
+                                      className="font-editorial text-[15px] leading-snug mt-1"
+                                      style={{ wordBreak: 'break-word' }}
+                                    >
+                                      {r.text}
+                                    </p>
+                                  </div>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <div className="mt-2">
+                          <textarea
+                            value={replyDraft}
+                            onChange={(e) => setReplyDraft(e.target.value)}
+                            maxLength={QA_HOST_REPLY_CHAR_LIMIT}
+                            rows={2}
+                            placeholder={
+                              q.status === 'IN_REVIEW'
+                                ? 'Write a private reply to the submitter…'
+                                : 'Write a reply for the room…'
+                            }
+                            aria-label="Write a reply"
+                            className="w-full ink-border font-editorial text-[15px] leading-snug p-2 bg-transparent outline-none resize-y"
+                            style={{ background: 'var(--bone)' }}
+                          />
+                          <div className="mt-1 flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => sendReply(q)}
+                              className="ink-border stamp ticker text-[9px] tracking-widest px-2"
+                              style={{
+                                minHeight: 36,
+                                background: 'var(--vermilion)',
+                                color: 'var(--bone)',
+                              }}
+                            >
+                              ↩ SEND REPLY
+                            </button>
+                            <span className="ticker text-[10px] tracking-widest opacity-60 ml-auto tabular-nums">
+                              {replyDraft.trim().length}/{QA_HOST_REPLY_CHAR_LIMIT}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
                     <span

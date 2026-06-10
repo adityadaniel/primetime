@@ -38,8 +38,11 @@ import {
 } from './lib/game';
 import {
   type QAQuestionEntry,
+  type QAReplyEntry,
   type QAState,
+  addHostReply as qaAddHostReply,
   addParticipant as qaAddParticipant,
+  addParticipantReply as qaAddParticipantReply,
   applyVote as qaApplyVote,
   approveQuestion as qaApproveQuestion,
   archiveQuestion as qaArchiveQuestion,
@@ -47,6 +50,7 @@ import {
   bindParticipantSocket as qaBindParticipantSocket,
   createLabel as qaCreateLabel,
   dismissQuestion as qaDismissQuestion,
+  editHostReply as qaEditHostReply,
   editQuestion as qaEditQuestion,
   highlightQuestion as qaHighlightQuestion,
   hostState as qaHostState,
@@ -66,6 +70,7 @@ import {
   DuplicateLabelError,
   addParticipant as qaRepoAddParticipant,
   addQuestion as qaRepoAddQuestion,
+  addReply as qaRepoAddReply,
   assignLabel as qaRepoAssignLabel,
   createLabel as qaRepoCreateLabel,
   editQuestionText as qaRepoEditQuestionText,
@@ -75,6 +80,7 @@ import {
   setQuestionStatus as qaRepoSetQuestionStatus,
   setQuestionStatusWithModerationEvent as qaRepoSetQuestionStatusWithModerationEvent,
   unassignLabel as qaRepoUnassignLabel,
+  updateReplyText as qaRepoUpdateReplyText,
 } from './lib/qa-repo';
 import { matchUploadsPath, resolveUploadFilePath, uploadContentType } from './lib/serve-upload';
 import type {
@@ -82,6 +88,7 @@ import type {
   QAHostState,
   QAPersonalState,
   QAPublicLabel,
+  QAPublicReply,
   QAPublicState,
   QAQuestionScore,
   QAQuestionStatus,
@@ -2006,6 +2013,190 @@ void app.prepare().then(() => {
 
     socket.on('qa:host:label:assign', qaHostLabelAssignmentHandler('assign'));
     socket.on('qa:host:label:unassign', qaHostLabelAssignmentHandler('unassign'));
+
+    // --- Q&A replies (MID-341, PRD §4.3 / §4.8) ---
+
+    type QaReplyAck = { ok: true; questionId: string; reply: QAPublicReply } | { error: string };
+
+    function qaPublicReply(reply: QAReplyEntry): QAPublicReply {
+      // Participant linkage stays server-side: only the host marker, text,
+      // and timestamp ever leave in acks/projections.
+      return {
+        id: reply.id,
+        isHostReply: reply.isHostReply,
+        text: reply.text,
+        createdAt: reply.createdAt,
+      };
+    }
+
+    // Reply fanout follows the question's current status: a thread on a LIVE
+    // question is public (one full snapshot — participants and displays both
+    // ride qa:state), while a thread on an IN_REVIEW question is private, so
+    // only the host board refreshes. The question's owner always gets a
+    // targeted personal push — that is how a private in-review reply reaches
+    // the submitter (and only the submitter).
+    function qaBroadcastAfterReply(state: QAState, question: QAQuestionEntry) {
+      if (question.status === 'LIVE') qaEmitPublicState(state);
+      else qaEmitHostState(state);
+      if (question.participantId) qaEmitPersonalState(state, question.participantId);
+    }
+
+    // Host written reply (PRD §4.3): public on LIVE questions, private to the
+    // submitter on IN_REVIEW questions (it becomes public when the question
+    // is approved, because approval moves the whole thread into qa:state).
+    socket.on('qa:host:reply', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:host:reply] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: QaReplyAck) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      if (
+        typeof p.questionId !== 'string' ||
+        p.questionId.length === 0 ||
+        typeof p.text !== 'string'
+      ) {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const result = qaAddHostReply(state, { questionId: p.questionId, text: p.text });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      const { reply, question } = result;
+      try {
+        const row = await qaRepoAddReply({
+          questionId: question.id,
+          isHostReply: true,
+          text: reply.text,
+        });
+        // Re-key to the DB id so reply edits and hydration line up.
+        reply.id = row.id;
+      } catch (err) {
+        console.error('[qa-repo] addReply (host)', err);
+        question.replies = question.replies.filter((r) => r !== reply);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      cb({ ok: true, questionId: question.id, reply: qaPublicReply(reply) });
+      qaBroadcastAfterReply(state, question);
+    });
+
+    // Host edits their own reply (PRD §4.3). Same privacy routing as posting:
+    // the question's current status decides public vs host-only fanout.
+    socket.on('qa:host:reply:edit', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:host:reply:edit] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: QaReplyAck) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      if (
+        typeof p.questionId !== 'string' ||
+        p.questionId.length === 0 ||
+        typeof p.replyId !== 'string' ||
+        p.replyId.length === 0 ||
+        typeof p.text !== 'string'
+      ) {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const previousText = state.questions
+        .get(p.questionId)
+        ?.replies.find((r) => r.id === p.replyId)?.text;
+      const result = qaEditHostReply(state, {
+        questionId: p.questionId,
+        replyId: p.replyId,
+        text: p.text,
+      });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      const { reply, question } = result;
+      try {
+        await qaRepoUpdateReplyText({ replyId: reply.id, text: reply.text });
+      } catch (err) {
+        console.error('[qa-repo] updateReplyText', err);
+        if (previousText !== undefined) reply.text = previousText;
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      cb({ ok: true, questionId: question.id, reply: qaPublicReply(reply) });
+      qaBroadcastAfterReply(state, question);
+    });
+
+    // Participant reply (PRD §4.8): only when the host enabled replies, only
+    // under LIVE questions, published immediately (no reply moderation queue
+    // in v1 — see DECISIONS.md). Shares the submit throttle so a participant
+    // can't machine-gun threads any faster than questions.
+    socket.on('qa:participant:reply', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:participant:reply] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: QaReplyAck) => void;
+      const resolved = qaResolveParticipantAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, participantId, p } = resolved;
+      if (
+        typeof p.questionId !== 'string' ||
+        p.questionId.length === 0 ||
+        typeof p.text !== 'string'
+      ) {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const now = Date.now();
+      const last = qaLastSubmitAt.get(participantId) ?? 0;
+      if (now - last < QA_SUBMIT_RATE_LIMIT_MS) {
+        cb({ error: 'rate_limited' });
+        return;
+      }
+      const result = qaAddParticipantReply(state, {
+        questionId: p.questionId,
+        participantId,
+        text: p.text,
+      });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      qaLastSubmitAt.set(participantId, now);
+      const { reply, question } = result;
+      try {
+        const row = await qaRepoAddReply({
+          questionId: question.id,
+          participantId,
+          isHostReply: false,
+          text: reply.text,
+        });
+        reply.id = row.id;
+      } catch (err) {
+        console.error('[qa-repo] addReply (participant)', err);
+        question.replies = question.replies.filter((r) => r !== reply);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      cb({ ok: true, questionId: question.id, reply: qaPublicReply(reply) });
+      // Participant replies only land on LIVE questions, so this is always a
+      // public-snapshot fanout plus the owner's personal push.
+      qaBroadcastAfterReply(state, question);
+    });
 
     socket.on('disconnect', () => {
       const wcLink = wcSocketToPin.get(socket.id);

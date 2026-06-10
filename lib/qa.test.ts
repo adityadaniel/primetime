@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addHostReply,
   addParticipant,
+  addParticipantReply,
   applyVote,
   approveQuestion,
   archiveQuestion,
@@ -9,6 +11,7 @@ import {
   createLabel,
   createQAState,
   dismissQuestion,
+  editHostReply,
   editQuestion,
   highlightQuestion,
   hostState,
@@ -34,6 +37,7 @@ import type { QAQuestionStatus, QASessionStatus } from './types';
 function makeState(overrides?: {
   privacyMode?: QAState['settings']['privacyMode'];
   moderationEnabled?: boolean;
+  participantRepliesEnabled?: boolean;
   downvotesEnabled?: boolean;
   questionCharLimit?: number;
 }): QAState {
@@ -44,7 +48,7 @@ function makeState(overrides?: {
     description: 'Workshop questions',
     privacyMode: overrides?.privacyMode ?? 'ANONYMOUS_BY_DEFAULT',
     moderationEnabled: overrides?.moderationEnabled ?? false,
-    participantRepliesEnabled: false,
+    participantRepliesEnabled: overrides?.participantRepliesEnabled ?? false,
     downvotesEnabled: overrides?.downvotesEnabled ?? false,
     questionCharLimit: overrides?.questionCharLimit ?? 280,
     hostUserId: 'user_a',
@@ -1387,5 +1391,264 @@ describe('labels (MID-340)', () => {
       ]);
       expect(host.questions[0].labelIds.sort()).toEqual([visible, hostOnly].sort());
     });
+  });
+});
+
+// --- Replies (MID-341, PRD §4.3 / §4.8) ---
+
+describe('addHostReply', () => {
+  it('replies to a LIVE question and projects it in public, host, and personal state', () => {
+    const state = makeState();
+    const pid = join(state, 'Alice');
+    const qid = submitLive(state, pid, 'live question');
+    const r = addHostReply(state, { questionId: qid, text: '  We ship next week.  ' });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.reply.isHostReply).toBe(true);
+    expect(r.reply.participantId).toBeNull();
+    expect(r.reply.text).toBe('We ship next week.');
+
+    const pub = publicState(state);
+    expect(pub.questions[0].replyCount).toBe(1);
+    expect(pub.questions[0].replies.map((x) => x.text)).toEqual(['We ship next week.']);
+    expect(hostState(state).questions[0].replies.map((x) => x.text)).toEqual([
+      'We ship next week.',
+    ]);
+    expect(personalState(state, pid)?.questions[0].replies.map((x) => x.text)).toEqual([
+      'We ship next week.',
+    ]);
+    // No participant linkage in any projection payload.
+    expect(JSON.stringify(pub.questions[0].replies)).not.toContain('participantId');
+  });
+
+  it('keeps a reply to an IN_REVIEW question out of public state until approval', () => {
+    const state = makeState({ moderationEnabled: true });
+    const pid = join(state);
+    const r = submitQuestion(state, { participantId: pid, text: 'pending question' });
+    if (!r.ok) throw new Error('submit failed');
+    const qid = r.question.id;
+
+    const reply = addHostReply(state, { questionId: qid, text: 'private note' });
+    expect(reply.ok).toBe(true);
+
+    // Private while in review: absent from public, present for host + owner.
+    expect(JSON.stringify(publicState(state))).not.toContain('private note');
+    expect(
+      hostState(state)
+        .questions.find((q) => q.id === qid)
+        ?.replies.map((x) => x.text),
+    ).toEqual(['private note']);
+    expect(personalState(state, pid)?.questions[0].replies.map((x) => x.text)).toEqual([
+      'private note',
+    ]);
+
+    // Approval makes the same reply public.
+    approveQuestion(state, { questionId: qid });
+    expect(publicState(state).questions[0].replies.map((x) => x.text)).toEqual(['private note']);
+  });
+
+  it('keeps the prior private reply visible to the owner after a dismissal', () => {
+    const state = makeState({ moderationEnabled: true });
+    const pid = join(state);
+    const r = submitQuestion(state, { participantId: pid, text: 'pending question' });
+    if (!r.ok) throw new Error('submit failed');
+    addHostReply(state, { questionId: r.question.id, text: 'sorry, off topic' });
+    dismissQuestion(state, { questionId: r.question.id });
+
+    const personal = personalState(state, pid);
+    expect(personal?.questions[0].status).toBe('DISMISSED');
+    expect(personal?.questions[0].replies.map((x) => x.text)).toEqual(['sorry, off topic']);
+    expect(JSON.stringify(publicState(state))).not.toContain('sorry, off topic');
+  });
+
+  it('allows up to 1,000 characters regardless of the question limit', () => {
+    const state = makeState({ questionCharLimit: 140 });
+    const pid = join(state);
+    const qid = submitLive(state, pid);
+    const long = addHostReply(state, { questionId: qid, text: 'r'.repeat(1000) });
+    expect(long.ok).toBe(true);
+    expect(addHostReply(state, { questionId: qid, text: 'r'.repeat(1001) })).toEqual({
+      ok: false,
+      reason: 'text_too_long',
+    });
+    expect(addHostReply(state, { questionId: qid, text: '   ' })).toEqual({
+      ok: false,
+      reason: 'empty_text',
+    });
+  });
+
+  it('rejects replies on settled or unknown questions and after the session ends', () => {
+    const state = makeState();
+    const pid = join(state);
+    const qid = submitLive(state, pid);
+    markAnswered(state, { questionId: qid });
+    expect(addHostReply(state, { questionId: qid, text: 'too late' })).toEqual({
+      ok: false,
+      reason: 'invalid_status',
+    });
+    expect(addHostReply(state, { questionId: 'ghost', text: 'hello' })).toEqual({
+      ok: false,
+      reason: 'unknown_question',
+    });
+    restoreQuestion(state, { questionId: qid });
+    setSessionStatus(state, 'ENDED');
+    expect(addHostReply(state, { questionId: qid, text: 'after end' })).toEqual({
+      ok: false,
+      reason: 'session_ended',
+    });
+  });
+});
+
+describe('editHostReply', () => {
+  it('rewrites a host reply in place', () => {
+    const state = makeState();
+    const pid = join(state);
+    const qid = submitLive(state, pid);
+    const created = addHostReply(state, { questionId: qid, text: 'first take' });
+    if (!created.ok) throw new Error('reply failed');
+    const edited = editHostReply(state, {
+      questionId: qid,
+      replyId: created.reply.id,
+      text: 'second take',
+    });
+    expect(edited.ok).toBe(true);
+    expect(publicState(state).questions[0].replies.map((x) => x.text)).toEqual(['second take']);
+  });
+
+  it('keeps an edited in-review reply private until approval', () => {
+    const state = makeState({ moderationEnabled: true });
+    const pid = join(state);
+    const r = submitQuestion(state, { participantId: pid, text: 'pending question' });
+    if (!r.ok) throw new Error('submit failed');
+    const created = addHostReply(state, { questionId: r.question.id, text: 'draft answer' });
+    if (!created.ok) throw new Error('reply failed');
+    const edited = editHostReply(state, {
+      questionId: r.question.id,
+      replyId: created.reply.id,
+      text: 'final answer',
+    });
+    expect(edited.ok).toBe(true);
+    expect(JSON.stringify(publicState(state))).not.toContain('final answer');
+    expect(personalState(state, pid)?.questions[0].replies.map((x) => x.text)).toEqual([
+      'final answer',
+    ]);
+    approveQuestion(state, { questionId: r.question.id });
+    expect(publicState(state).questions[0].replies.map((x) => x.text)).toEqual(['final answer']);
+  });
+
+  it('rejects unknown replies, participant replies, and over-long rewrites', () => {
+    const state = makeState({ participantRepliesEnabled: true });
+    const pid = join(state);
+    const qid = submitLive(state, pid);
+    const fromAudience = addParticipantReply(state, {
+      questionId: qid,
+      participantId: pid,
+      text: 'audience take',
+    });
+    if (!fromAudience.ok) throw new Error('reply failed');
+    expect(editHostReply(state, { questionId: qid, replyId: 'ghost', text: 'x' })).toEqual({
+      ok: false,
+      reason: 'unknown_reply',
+    });
+    expect(
+      editHostReply(state, { questionId: qid, replyId: fromAudience.reply.id, text: 'hijack' }),
+    ).toEqual({ ok: false, reason: 'not_host_reply' });
+    const hostReply = addHostReply(state, { questionId: qid, text: 'fine' });
+    if (!hostReply.ok) throw new Error('reply failed');
+    expect(
+      editHostReply(state, {
+        questionId: qid,
+        replyId: hostReply.reply.id,
+        text: 'r'.repeat(1001),
+      }),
+    ).toEqual({ ok: false, reason: 'text_too_long' });
+  });
+});
+
+describe('addParticipantReply', () => {
+  it('threads under a LIVE question when enabled and stays anonymous in projections', () => {
+    const state = makeState({ participantRepliesEnabled: true });
+    const author = join(state, 'Alice');
+    const replier = join(state, 'Bob');
+    const qid = submitLive(state, author, 'live question');
+    const r = addParticipantReply(state, {
+      questionId: qid,
+      participantId: replier,
+      text: 'same question here!',
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.reply.isHostReply).toBe(false);
+    expect(r.reply.participantId).toBe(replier);
+
+    const pub = publicState(state);
+    expect(pub.questions[0].replies.map((x) => x.text)).toEqual(['same question here!']);
+    // Reply authorship never leaves the server — not even for the host.
+    expect(JSON.stringify(pub)).not.toContain(replier);
+    expect(JSON.stringify(hostState(state))).not.toContain(replier);
+  });
+
+  it('is rejected when the feature is disabled', () => {
+    const state = makeState();
+    const pid = join(state);
+    const qid = submitLive(state, pid);
+    expect(
+      addParticipantReply(state, { questionId: qid, participantId: pid, text: 'hello' }),
+    ).toEqual({ ok: false, reason: 'replies_disabled' });
+  });
+
+  it('is rejected when the target question is not LIVE', () => {
+    const state = makeState({ participantRepliesEnabled: true, moderationEnabled: true });
+    const pid = join(state);
+    const pending = submitQuestion(state, { participantId: pid, text: 'pending question' });
+    if (!pending.ok) throw new Error('submit failed');
+    expect(
+      addParticipantReply(state, {
+        questionId: pending.question.id,
+        participantId: pid,
+        text: 'too early',
+      }),
+    ).toEqual({ ok: false, reason: 'not_live' });
+    expect(
+      addParticipantReply(state, { questionId: 'ghost', participantId: pid, text: 'hello' }),
+    ).toEqual({ ok: false, reason: 'unknown_question' });
+  });
+
+  it('enforces the question char limit, unknown participants, and closed/ended sessions', () => {
+    const state = makeState({ participantRepliesEnabled: true, questionCharLimit: 140 });
+    const pid = join(state);
+    const qid = submitLive(state, pid);
+    expect(
+      addParticipantReply(state, { questionId: qid, participantId: pid, text: 'r'.repeat(141) }),
+    ).toEqual({ ok: false, reason: 'text_too_long' });
+    expect(
+      addParticipantReply(state, { questionId: qid, participantId: 'ghost', text: 'hello' }),
+    ).toEqual({ ok: false, reason: 'unknown_participant' });
+
+    // Closing submissions closes reply threads too (see DECISIONS.md).
+    setSubmissionsOpen(state, false);
+    expect(
+      addParticipantReply(state, { questionId: qid, participantId: pid, text: 'hello' }),
+    ).toEqual({ ok: false, reason: 'submissions_closed' });
+    setSessionStatus(state, 'ENDED');
+    expect(
+      addParticipantReply(state, { questionId: qid, participantId: pid, text: 'hello' }),
+    ).toEqual({ ok: false, reason: 'session_ended' });
+  });
+
+  it('publishes immediately even when question moderation is enabled', () => {
+    const state = makeState({ participantRepliesEnabled: true, moderationEnabled: true });
+    const author = join(state);
+    const replier = join(state);
+    const r = submitQuestion(state, { participantId: author, text: 'pending question' });
+    if (!r.ok) throw new Error('submit failed');
+    approveQuestion(state, { questionId: r.question.id });
+    const reply = addParticipantReply(state, {
+      questionId: r.question.id,
+      participantId: replier,
+      text: 'instant thread',
+    });
+    expect(reply.ok).toBe(true);
+    expect(publicState(state).questions[0].replies.map((x) => x.text)).toEqual(['instant thread']);
   });
 });

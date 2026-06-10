@@ -19,6 +19,7 @@ import type {
   QAPersonalQuestion,
   QAPersonalState,
   QAPrivacyMode,
+  QAPublicReply,
   QAQuestionScore,
   QAQuestionStatus,
   QAVoteType,
@@ -33,6 +34,8 @@ type PublicQuestion = {
   upvotes: number;
   downvotes: number;
   labelIds: string[];
+  replyCount: number;
+  replies: QAPublicReply[];
   highlighted: boolean;
   submittedAt: number;
 };
@@ -52,6 +55,7 @@ type PublicSnapshot = {
   submissionsOpen: boolean;
   votingOpen: boolean;
   downvotesEnabled: boolean;
+  participantRepliesEnabled: boolean;
   questionCharLimit: number;
   questionCount: number;
   participantCount: number;
@@ -81,6 +85,8 @@ type VoteAck =
       downvotes: number;
     }
   | { error: string };
+
+type ReplyAck = { ok: true; questionId: string; reply: QAPublicReply } | { error: string };
 
 // Mirrors QA_SUBMIT_RATE_LIMIT_MS in server.ts so the button re-enables right
 // as the server window reopens.
@@ -115,6 +121,8 @@ function ackErrorMessage(error: string | undefined, charLimit: number): string {
     case 'unknown_label':
     case 'label_not_selectable':
       return "That label isn't available — refresh and pick again.";
+    case 'replies_disabled':
+      return 'Replies are off in this room.';
     default:
       return "Couldn't send — try again.";
   }
@@ -157,6 +165,10 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
   const [now, setNow] = useState(Date.now());
   const [editing, setEditing] = useState<{ id: string; draft: string } | null>(null);
   const [confirmWithdrawId, setConfirmWithdrawId] = useState<string | null>(null);
+  // Reply threads (MID-341): one open thread at a time with a local draft, so
+  // live board re-sorts never clobber what the participant is typing.
+  const [openThreadId, setOpenThreadId] = useState<string | null>(null);
+  const [replyDraft, setReplyDraft] = useState('');
 
   const participantIdRef = useRef<string | null>(null);
   const toastTimerRef = useRef<number | null>(null);
@@ -383,6 +395,36 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
         setPersonal(res.personal);
         setEditing(null);
         showToast(res.status === 'IN_REVIEW' ? 'Updated — back in review.' : 'Question updated.');
+      },
+    );
+  }
+
+  // Reply to a live question (MID-341, PRD §4.8). Replies share the server's
+  // submit throttle, so posting one arms the same local cooldown as a
+  // question. The qa:state broadcast brings the new reply back to the board.
+  function handleReply(questionId: string) {
+    if (!socket || !pin || !pub) return;
+    const result = validateQuestionInput(replyDraft, charLimit);
+    if (!result.ok) {
+      showToast(
+        result.reason === 'text_too_long'
+          ? `Keep it under ${charLimit} characters.`
+          : 'Type a reply first.',
+      );
+      return;
+    }
+    setCooldownUntil(Date.now() + COOLDOWN_MS);
+    setNow(Date.now());
+    socket.emit(
+      'qa:participant:reply',
+      { pin, questionId, text: result.value },
+      (res: ReplyAck) => {
+        if ('error' in res) {
+          showToast(ackErrorMessage(res.error, charLimit));
+          return;
+        }
+        setReplyDraft('');
+        showToast('Reply posted.');
       },
     );
   }
@@ -774,6 +816,17 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
                   votingEnabled={votingEnabled}
                   downvotesEnabled={pub.downvotesEnabled}
                   onVote={(control) => handleVote(q.id, control)}
+                  threadOpen={openThreadId === q.id}
+                  canReply={pub.participantRepliesEnabled && pub.submissionsOpen && !ended}
+                  replyDraft={openThreadId === q.id ? replyDraft : ''}
+                  charLimit={charLimit}
+                  replyCoolingDown={cooldownRemaining > 0}
+                  onToggleThread={() => {
+                    setOpenThreadId((id) => (id === q.id ? null : q.id));
+                    setReplyDraft('');
+                  }}
+                  onReplyDraftChange={setReplyDraft}
+                  onReplySend={() => handleReply(q.id)}
                 />
               ))}
             </ul>
@@ -859,6 +912,11 @@ function IdentityRow({
 // Public board card with the vote rail. Tap targets stay ≥44px for one-handed
 // mobile use; the active vote is shown as a filled stamp (shape + fill, not
 // color alone) and exposed via aria-pressed.
+//
+// Reply threads (MID-341, PRD §4.8): host replies on live questions are
+// public to everyone, so the thread is readable whenever it has replies; the
+// composer only appears when the host enabled participant replies (and
+// submissions are open). Threads never render on projection displays.
 function BoardQuestionCard({
   question,
   labelNames,
@@ -866,6 +924,14 @@ function BoardQuestionCard({
   votingEnabled,
   downvotesEnabled,
   onVote,
+  threadOpen,
+  canReply,
+  replyDraft,
+  charLimit,
+  replyCoolingDown,
+  onToggleThread,
+  onReplyDraftChange,
+  onReplySend,
 }: {
   question: PublicQuestion;
   // Participant-selectable labels only — host-only label ids miss the map
@@ -875,64 +941,170 @@ function BoardQuestionCard({
   votingEnabled: boolean;
   downvotesEnabled: boolean;
   onVote: (control: QAVoteType) => void;
+  threadOpen: boolean;
+  canReply: boolean;
+  replyDraft: string;
+  charLimit: number;
+  replyCoolingDown: boolean;
+  onToggleThread: () => void;
+  onReplyDraftChange: (v: string) => void;
+  onReplySend: () => void;
 }) {
   const author =
     question.isAnonymous || !question.authorDisplayName
       ? 'ANONYMOUS'
       : question.authorDisplayName.toUpperCase();
   const visibleLabels = question.labelIds.filter((id) => labelNames.has(id));
+  const showThreadToggle = question.replyCount > 0 || canReply;
   return (
     <li
-      className="ink-border px-4 py-3 flex items-stretch gap-3"
+      className="ink-border px-4 py-3"
       style={{
         background: 'var(--bone)',
         borderLeft: question.highlighted ? '6px solid var(--vermilion)' : undefined,
       }}
     >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          {question.highlighted && (
-            <span
-              className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border"
-              style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
-            >
-              ON AIR
-            </span>
-          )}
-          {visibleLabels.map((id) => (
-            <span
-              key={id}
-              className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border opacity-80"
-            >
-              {labelNames.get(id)?.toUpperCase()}
-            </span>
-          ))}
-          <span className="ticker text-[10px] tracking-widest opacity-50">{author}</span>
+      <div className="flex items-stretch gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            {question.highlighted && (
+              <span
+                className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border"
+                style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
+              >
+                ON AIR
+              </span>
+            )}
+            {visibleLabels.map((id) => (
+              <span
+                key={id}
+                className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border opacity-80"
+              >
+                {labelNames.get(id)?.toUpperCase()}
+              </span>
+            ))}
+            <span className="ticker text-[10px] tracking-widest opacity-50">{author}</span>
+          </div>
+          <p className="font-editorial text-[17px] leading-snug mt-2">{question.text}</p>
         </div>
-        <p className="font-editorial text-[17px] leading-snug mt-2">{question.text}</p>
-      </div>
-      <div className="flex flex-col items-center justify-center gap-1 shrink-0">
-        <VoteButton
-          label="Upvote"
-          glyph="▲"
-          active={myVote === 'UP'}
-          disabled={!votingEnabled}
-          onClick={() => onVote('UP')}
-        />
-        <span className="ticker tabular-nums text-[13px] tracking-widest">
-          <span className="sr-only">Score </span>
-          {question.score}
-        </span>
-        {downvotesEnabled && (
+        <div className="flex flex-col items-center justify-center gap-1 shrink-0">
           <VoteButton
-            label="Downvote"
-            glyph="▼"
-            active={myVote === 'DOWN'}
+            label="Upvote"
+            glyph="▲"
+            active={myVote === 'UP'}
             disabled={!votingEnabled}
-            onClick={() => onVote('DOWN')}
+            onClick={() => onVote('UP')}
           />
-        )}
+          <span className="ticker tabular-nums text-[13px] tracking-widest">
+            <span className="sr-only">Score </span>
+            {question.score}
+          </span>
+          {downvotesEnabled && (
+            <VoteButton
+              label="Downvote"
+              glyph="▼"
+              active={myVote === 'DOWN'}
+              disabled={!votingEnabled}
+              onClick={() => onVote('DOWN')}
+            />
+          )}
+        </div>
       </div>
+      {showThreadToggle && (
+        <button
+          type="button"
+          onClick={onToggleThread}
+          aria-expanded={threadOpen}
+          className="mt-2 ink-border ticker text-[11px] tracking-widest px-3 py-2"
+          style={{
+            background: threadOpen ? 'var(--ink)' : 'var(--bone)',
+            color: threadOpen ? 'var(--bone)' : 'var(--ink)',
+            minHeight: 44,
+          }}
+        >
+          {threadOpen
+            ? '✕ CLOSE THREAD'
+            : question.replyCount > 0
+              ? `↩ ${question.replyCount} ${question.replyCount === 1 ? 'REPLY' : 'REPLIES'}`
+              : '↩ REPLY'}
+        </button>
+      )}
+      {threadOpen && (
+        <div className="mt-2 ink-border px-3 py-2" style={{ background: 'var(--bone)' }}>
+          {question.replies.length === 0 ? (
+            <p className="font-editorial italic text-[14px] opacity-70">
+              No replies yet — start the thread.
+            </p>
+          ) : (
+            <ul>
+              {question.replies.map((r) => (
+                <li
+                  key={r.id}
+                  className="py-2 border-b last:border-b-0"
+                  style={{ borderColor: 'rgba(15,15,15,.14)' }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="ticker text-[9px] tracking-widest px-2 py-[2px] ink-border"
+                      style={
+                        r.isHostReply
+                          ? { background: 'var(--ink)', color: 'var(--bone)' }
+                          : { background: 'var(--bone)', color: 'var(--ink)' }
+                      }
+                    >
+                      {r.isHostReply ? '◼ THE DESK' : '◻ AUDIENCE'}
+                    </span>
+                    <span className="ticker text-[10px] tracking-widest opacity-50">
+                      {new Date(r.createdAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                  <p
+                    className="font-editorial text-[15px] leading-snug mt-1"
+                    style={{ wordBreak: 'break-word' }}
+                  >
+                    {r.text}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+          {canReply && (
+            <div className="mt-2">
+              <textarea
+                value={replyDraft}
+                onChange={(e) => onReplyDraftChange(e.target.value)}
+                placeholder="Add to the thread"
+                aria-label="Your reply"
+                rows={2}
+                className="w-full ink-border bg-transparent font-editorial px-3 py-2 resize-none"
+                style={{ fontSize: '16px', background: 'var(--bone)', minHeight: 64 }}
+              />
+              <div className="flex items-center justify-between mt-1">
+                <span className="ticker tabular-nums text-[10px] tracking-widest opacity-60">
+                  {charLimit - replyDraft.trim().length} LEFT
+                </span>
+                <button
+                  type="button"
+                  onClick={onReplySend}
+                  disabled={replyCoolingDown}
+                  className="ink-border stamp ticker text-[11px] tracking-widest px-3 py-2"
+                  style={{
+                    background: replyCoolingDown ? 'var(--ash)' : 'var(--ink)',
+                    color: replyCoolingDown ? 'var(--ink)' : 'var(--bone)',
+                    minHeight: 44,
+                    cursor: replyCoolingDown ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {replyCoolingDown ? 'HOLD…' : '↩ REPLY'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </li>
   );
 }
@@ -1056,6 +1228,51 @@ function MyQuestionCard({
       ) : (
         <>
           <p className="font-editorial text-[17px] leading-snug mt-2">{question.text}</p>
+          {/* Replies on own questions (MID-341): private host replies arrive
+              here while the question is in review — and stay readable even
+              after a dismissal (PRD §4.3). */}
+          {question.replies.length > 0 && (
+            <div
+              className="mt-2 pl-3 border-l-2"
+              style={{ borderColor: question.status === 'LIVE' ? 'var(--ink)' : 'var(--marigold)' }}
+            >
+              {question.status !== 'LIVE' && (
+                <p className="ticker text-[10px] tracking-widest opacity-70">
+                  ◆ PRIVATE · ONLY YOU SEE {question.replies.length === 1 ? 'THIS' : 'THESE'}
+                </p>
+              )}
+              <ul>
+                {question.replies.map((r) => (
+                  <li key={r.id} className="py-1">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="ticker text-[9px] tracking-widest px-2 py-[2px] ink-border"
+                        style={
+                          r.isHostReply
+                            ? { background: 'var(--ink)', color: 'var(--bone)' }
+                            : { background: 'var(--bone)', color: 'var(--ink)' }
+                        }
+                      >
+                        {r.isHostReply ? '◼ THE DESK' : '◻ AUDIENCE'}
+                      </span>
+                      <span className="ticker text-[10px] tracking-widest opacity-50">
+                        {new Date(r.createdAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    <p
+                      className="font-editorial text-[15px] leading-snug mt-1"
+                      style={{ wordBreak: 'break-word' }}
+                    >
+                      {r.text}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {actionable && (
             <div className="flex gap-2 mt-3">
               <button

@@ -7,7 +7,7 @@
 // public projection never includes participant linkage. Personal projections
 // are targeted at one participant and must never be broadcast.
 
-import { validateLabelName, validateQuestionInput } from './qa-input';
+import { QA_HOST_REPLY_CHAR_LIMIT, validateLabelName, validateQuestionInput } from './qa-input';
 import type {
   QAHostQuestion,
   QAHostState,
@@ -102,7 +102,10 @@ export type QAErrorReason =
   | 'label_too_long'
   | 'duplicate_label'
   | 'unknown_label'
-  | 'label_not_selectable';
+  | 'label_not_selectable'
+  | 'replies_disabled'
+  | 'unknown_reply'
+  | 'not_host_reply';
 
 export type QAError = { ok: false; reason: QAErrorReason };
 
@@ -516,6 +519,97 @@ export function editQuestion(
     transitionQuestion(state, question, 'IN_REVIEW');
   }
   return { ok: true, question };
+}
+
+// --- Replies (MID-341, PRD §4.3 / §4.8) ---
+//
+// Reply privacy falls out of the projection rules, not per-reply flags: a
+// reply on an IN_REVIEW question is private because IN_REVIEW questions never
+// enter publicState (only hostState and the owner's personalState see them);
+// once the question is approved to LIVE the same reply projects publicly.
+// Dismissing a question keeps prior replies visible to the owner via
+// personalState, which includes own questions in every status.
+
+export type AddReplyResult = { ok: true; reply: QAReplyEntry; question: QAQuestionEntry } | QAError;
+
+// Host reply (PRD §4.3): up to QA_HOST_REPLY_CHAR_LIMIT characters, on LIVE
+// (public) or IN_REVIEW (private to submitter until approved) questions only.
+// Settled questions (answered/archived/dismissed/withdrawn) are immutable.
+export function addHostReply(
+  state: QAState,
+  args: { questionId: string; text: string; replyId?: string },
+): AddReplyResult {
+  if (state.status === 'ENDED') return { ok: false, reason: 'session_ended' };
+  const question = state.questions.get(args.questionId);
+  if (!question) return { ok: false, reason: 'unknown_question' };
+  if (question.status !== 'LIVE' && question.status !== 'IN_REVIEW') {
+    return { ok: false, reason: 'invalid_status' };
+  }
+  const validated = validateQuestionInput(args.text, QA_HOST_REPLY_CHAR_LIMIT);
+  if (!validated.ok) return { ok: false, reason: validated.reason };
+  const reply: QAReplyEntry = {
+    id: args.replyId ?? genId('qar'),
+    participantId: null,
+    isHostReply: true,
+    text: validated.value,
+    createdAt: Date.now(),
+  };
+  question.replies.push(reply);
+  return { ok: true, reply, question };
+}
+
+// Participant reply (PRD §4.8): only when the host enabled replies, only on
+// LIVE questions, same character limit as questions. Closing submissions
+// (PRD §4.10) closes reply threads too — closed means no new participant
+// content, while voting stays on its own switch. Replies publish immediately
+// even when question moderation is enabled (v1 decision — see DECISIONS.md).
+export function addParticipantReply(
+  state: QAState,
+  args: { questionId: string; participantId: string; text: string; replyId?: string },
+): AddReplyResult {
+  if (state.status === 'ENDED') return { ok: false, reason: 'session_ended' };
+  if (!state.settings.participantRepliesEnabled) return { ok: false, reason: 'replies_disabled' };
+  if (!state.submissionsOpen) return { ok: false, reason: 'submissions_closed' };
+  if (!state.participants.has(args.participantId)) {
+    return { ok: false, reason: 'unknown_participant' };
+  }
+  const question = state.questions.get(args.questionId);
+  if (!question) return { ok: false, reason: 'unknown_question' };
+  if (question.status !== 'LIVE') return { ok: false, reason: 'not_live' };
+  const validated = validateText(state, args.text);
+  if (!validated.ok) return validated;
+  const reply: QAReplyEntry = {
+    id: args.replyId ?? genId('qar'),
+    // Linkage is for ownership/audit only — projections never expose it, so
+    // replies stay anonymous to the host and the room alike.
+    participantId: args.participantId,
+    isHostReply: false,
+    text: validated.text,
+    createdAt: Date.now(),
+  };
+  question.replies.push(reply);
+  return { ok: true, reply, question };
+}
+
+// Host edits their own replies (PRD §4.3). Routing on broadcast follows the
+// question's CURRENT status, so an edit made while the question is still
+// IN_REVIEW stays private and an edit on a LIVE thread propagates publicly.
+export function editHostReply(
+  state: QAState,
+  args: { questionId: string; replyId: string; text: string },
+): AddReplyResult {
+  const question = state.questions.get(args.questionId);
+  if (!question) return { ok: false, reason: 'unknown_question' };
+  if (question.status !== 'LIVE' && question.status !== 'IN_REVIEW') {
+    return { ok: false, reason: 'invalid_status' };
+  }
+  const reply = question.replies.find((r) => r.id === args.replyId);
+  if (!reply) return { ok: false, reason: 'unknown_reply' };
+  if (!reply.isHostReply) return { ok: false, reason: 'not_host_reply' };
+  const validated = validateQuestionInput(args.text, QA_HOST_REPLY_CHAR_LIMIT);
+  if (!validated.ok) return { ok: false, reason: validated.reason };
+  reply.text = validated.value;
+  return { ok: true, reply, question };
 }
 
 export type HighlightResult = { ok: true; previousQuestionId: string | null } | QAError;

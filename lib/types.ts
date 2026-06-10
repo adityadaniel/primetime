@@ -175,6 +175,12 @@ export interface QAPublicQuestion {
   downvotes: number;
   labelIds: string[];
   replyCount: number;
+  /**
+   * All replies here are public by construction (only LIVE questions project,
+   * so private in-review replies never enter this state). Display/projection
+   * surfaces must still not RENDER replies (PRD §4.8) — threads are a
+   * participant/host reading surface, not a room-projection one.
+   */
   replies: QAPublicReply[];
   highlighted: boolean;
   submittedAt: number;

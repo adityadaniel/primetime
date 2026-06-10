@@ -18,6 +18,7 @@ const labelFindMany = vi.fn();
 const questionLabelUpsert = vi.fn();
 const questionLabelDeleteMany = vi.fn();
 const replyCreate = vi.fn();
+const replyUpdate = vi.fn();
 const moderationEventCreate = vi.fn();
 
 vi.mock('./db', () => {
@@ -53,6 +54,7 @@ vi.mock('./db', () => {
     },
     qAReply: {
       create: (args: unknown) => replyCreate(args),
+      update: (args: unknown) => replyUpdate(args),
     },
     qAModerationEvent: {
       create: (args: unknown) => moderationEventCreate(args),
@@ -87,6 +89,7 @@ import {
   toHostVisibleQuestion,
   unassignLabel,
   updateLabel,
+  updateReplyText,
 } from './qa-repo';
 
 beforeEach(() => {
@@ -108,6 +111,7 @@ beforeEach(() => {
   questionLabelUpsert.mockReset();
   questionLabelDeleteMany.mockReset();
   replyCreate.mockReset();
+  replyUpdate.mockReset();
   moderationEventCreate.mockReset();
 });
 
@@ -684,6 +688,28 @@ describe('addReply', () => {
     await expect(
       addReply({ questionId: 'q_1', isHostReply: true, text: 'x'.repeat(1001) }),
     ).rejects.toThrow('Reply text too long');
+  });
+});
+
+describe('updateReplyText', () => {
+  it('updates the text only, trimmed', async () => {
+    replyUpdate.mockResolvedValueOnce({ id: 'r_1', text: 'Rewritten' });
+    const out = await updateReplyText({ replyId: 'r_1', text: '  Rewritten  ' });
+    expect(out).toEqual({ id: 'r_1', text: 'Rewritten' });
+    expect(replyUpdate).toHaveBeenCalledWith({
+      where: { id: 'r_1' },
+      data: { text: 'Rewritten' },
+    });
+  });
+
+  it('rejects empty and over-long rewrites', async () => {
+    await expect(updateReplyText({ replyId: 'r_1', text: '  ' })).rejects.toThrow(
+      'Reply text required',
+    );
+    await expect(updateReplyText({ replyId: 'r_1', text: 'x'.repeat(1001) })).rejects.toThrow(
+      'Reply text too long',
+    );
+    expect(replyUpdate).not.toHaveBeenCalled();
   });
 });
 

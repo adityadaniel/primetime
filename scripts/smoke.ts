@@ -160,6 +160,7 @@ async function main() {
   await assertQaParticipantFlow();
   await assertQaVoting();
   await assertQaModerationQueue();
+  await assertQaReplies();
 
   await assertPersistenceRowsWritten();
 }
@@ -1246,6 +1247,7 @@ async function qaCreateSession(args?: {
   privacyMode?: 'ANONYMOUS_BY_DEFAULT' | 'ALWAYS_ANONYMOUS' | 'NAMED_BY_DEFAULT' | 'NAME_REQUIRED';
   hostUserId?: string | null;
   moderationEnabled?: boolean;
+  participantRepliesEnabled?: boolean;
   downvotesEnabled?: boolean;
   questionCharLimit?: number;
 }) {
@@ -1260,6 +1262,7 @@ async function qaCreateSession(args?: {
     privacyMode: args?.privacyMode ?? 'ANONYMOUS_BY_DEFAULT',
     hostUserId: args?.hostUserId ?? null,
     moderationEnabled: args?.moderationEnabled ?? false,
+    participantRepliesEnabled: args?.participantRepliesEnabled ?? false,
     downvotesEnabled: args?.downvotesEnabled ?? false,
     questionCharLimit: args?.questionCharLimit,
   });
@@ -1445,7 +1448,13 @@ async function assertQaSocketFoundation() {
 type QaPersonalSnapshot = {
   participantId: string;
   displayName: string | null;
-  questions: { id: string; text: string; status: string; isAnonymous: boolean }[];
+  questions: {
+    id: string;
+    text: string;
+    status: string;
+    isAnonymous: boolean;
+    replies?: { id: string; isHostReply: boolean; text: string }[];
+  }[];
 };
 
 type QaActionAck =
@@ -2386,6 +2395,188 @@ async function assertQaModerationQueue() {
     }
 
     console.log('✓ Q&A moderation queue (MID-338)');
+  } finally {
+    host.disconnect();
+    display.disconnect();
+    alice.disconnect();
+    bob.disconnect();
+    await prisma.$disconnect();
+  }
+}
+
+// --- scenario 22 (MID-341): Q&A replies ---
+
+type QaReplyAck =
+  | { ok: true; questionId: string; reply: { id: string; isHostReply: boolean; text: string } }
+  | { error: string };
+
+async function assertQaReplies() {
+  console.log('\n--- scenario 22 (MID-341): Q&A replies ---');
+  const prisma = new PrismaClient();
+  const host = await connectSock();
+  const display = await connectSock();
+  const alice = await connectSock();
+  const bob = await connectSock();
+  try {
+    const { pin, sessionId } = await qaCreateSession({
+      moderationEnabled: true,
+      participantRepliesEnabled: true,
+    });
+    console.log('qa replies pin:', pin);
+    qaOk(await qaEmit(host, 'qa:host:attach', { pin, sessionId }), 'qa:host:attach');
+    qaOk(
+      (await qaEmit(display, 'qa:display:attach', { pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'qa:display:attach',
+    );
+    qaOk(
+      (await qaEmit(alice, 'qa:participant:join', { pin, displayName: 'Alice' })) as QaJoinAck,
+      'alice join',
+    );
+    const bobJoin = qaOk<Exclude<QaJoinAck, { error: string }>>(
+      (await qaEmit(bob, 'qa:participant:join', { pin, displayName: 'Bob' })) as QaJoinAck,
+      'bob join',
+    );
+
+    // a non-host socket cannot use the host reply route
+    qaExpectError(
+      await qaEmit(alice, 'qa:host:reply', { pin, questionId: 'whatever', text: 'hijack' }),
+      'forbidden',
+      'non-host reply',
+    );
+
+    // host reply to an IN_REVIEW question: private — the submitter gets a
+    // targeted personal push, the public board never carries the text
+    const sub = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:submit', {
+        pin,
+        text: 'Reply to me privately?',
+      })) as QaActionAck,
+      'moderated submit',
+    );
+    if (sub.status !== 'IN_REVIEW') throw new Error(`expected IN_REVIEW, got ${sub.status}`);
+    const aliceSawPrivateReply = qaWaitForPersonal(alice, (p) =>
+      p.questions.some(
+        (q) =>
+          q.id === sub.questionId &&
+          (q.replies ?? []).some((r) => r.isHostReply && r.text === 'Soon — private answer.'),
+      ),
+    );
+    const hostReplyAck = (await qaEmit(host, 'qa:host:reply', {
+      pin,
+      questionId: sub.questionId,
+      text: 'Soon — private answer.',
+    })) as QaReplyAck;
+    if (!('ok' in hostReplyAck) || !hostReplyAck.reply.isHostReply) {
+      throw new Error(`bad host reply ack: ${JSON.stringify(hostReplyAck)}`);
+    }
+    await aliceSawPrivateReply;
+    const boardWhilePrivate = qaOk<{ state: QaPublicSnapshot }>(
+      (await qaEmit(display, 'qa:display:attach', { pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'pre-approve display attach',
+    );
+    if (JSON.stringify(boardWhilePrivate.state).includes('Soon — private answer.')) {
+      throw new Error(`private reply leaked publicly: ${JSON.stringify(boardWhilePrivate.state)}`);
+    }
+
+    // approval makes the existing reply public with the question
+    const displaySawApprove = qaWaitForState(
+      display,
+      (s) => s.questionCount === 1 && JSON.stringify(s).includes('Soon — private answer.'),
+    );
+    const approveAck = (await qaEmit(host, 'qa:host:approve', {
+      pin,
+      questionId: sub.questionId,
+    })) as QaModerationAck;
+    if (!('ok' in approveAck)) throw new Error(`approve failed: ${JSON.stringify(approveAck)}`);
+    await displaySawApprove;
+
+    // participant reply threads under the LIVE question, anonymously
+    const roomSawBobReply = qaWaitForState(display, (s) =>
+      JSON.stringify(s).includes('Same question here!'),
+    );
+    const bobReplyAck = (await qaEmit(bob, 'qa:participant:reply', {
+      pin,
+      questionId: sub.questionId,
+      text: 'Same question here!',
+    })) as QaReplyAck;
+    if (!('ok' in bobReplyAck) || bobReplyAck.reply.isHostReply) {
+      throw new Error(`bad participant reply ack: ${JSON.stringify(bobReplyAck)}`);
+    }
+    const threadSnap = await roomSawBobReply;
+    if (JSON.stringify(threadSnap).includes(bobJoin.participantId)) {
+      throw new Error('participant reply leaked its author id into the public projection');
+    }
+
+    // host edits their own reply; the rewrite propagates to the room. A
+    // participant reply cannot be rewritten through the host route.
+    const roomSawRewrite = qaWaitForState(display, (s) =>
+      JSON.stringify(s).includes('Soon — public answer.'),
+    );
+    const editAck = (await qaEmit(host, 'qa:host:reply:edit', {
+      pin,
+      questionId: sub.questionId,
+      replyId: hostReplyAck.reply.id,
+      text: 'Soon — public answer.',
+    })) as QaReplyAck;
+    if (!('ok' in editAck)) throw new Error(`reply edit failed: ${JSON.stringify(editAck)}`);
+    await roomSawRewrite;
+    qaExpectError(
+      await qaEmit(host, 'qa:host:reply:edit', {
+        pin,
+        questionId: sub.questionId,
+        replyId: bobReplyAck.reply.id,
+        text: 'hijack',
+      }),
+      'not_host_reply',
+      'host edit of participant reply',
+    );
+
+    // both replies persisted (persist-before-broadcast)
+    const rows = await prisma.qAReply.findMany({
+      where: { question: { sessionId } },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (rows.length !== 2) throw new Error(`expected 2 reply rows, got ${rows.length}`);
+    if (rows[0].text !== 'Soon — public answer.' || !rows[0].isHostReply) {
+      throw new Error(`bad host reply row: ${JSON.stringify(rows[0])}`);
+    }
+    if (rows[1].participantId !== bobJoin.participantId || rows[1].isHostReply) {
+      throw new Error(`bad participant reply row: ${JSON.stringify(rows[1])}`);
+    }
+
+    // participant replies are rejected in a room that never enabled them
+    const plain = await qaCreateSession({});
+    qaOk(
+      (await qaEmit(alice, 'qa:participant:join', {
+        pin: plain.pin,
+        displayName: 'Alice',
+      })) as QaJoinAck,
+      'alice join (replies off)',
+    );
+    const plainSub = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:submit', {
+        pin: plain.pin,
+        text: 'No threads here?',
+      })) as QaActionAck,
+      'submit (replies off)',
+    );
+    if (plainSub.status !== 'LIVE') throw new Error(`expected LIVE, got ${plainSub.status}`);
+    await sleep(1100); // submit rate-limit window is shared with replies
+    qaExpectError(
+      await qaEmit(alice, 'qa:participant:reply', {
+        pin: plain.pin,
+        questionId: plainSub.questionId,
+        text: 'should bounce',
+      }),
+      'replies_disabled',
+      'reply with feature off',
+    );
+
+    console.log('✓ Q&A replies (MID-341)');
   } finally {
     host.disconnect();
     display.disconnect();

@@ -10,6 +10,40 @@ and add a new entry below.
 
 ---
 
+## 2026-06-11 · Q&A participant replies publish immediately — no reply moderation queue in v1
+
+**Status:** Accepted
+
+**Context:** PRD §4.8 leaves participant-reply moderation open: when question
+moderation is enabled, replies "may either go live immediately, or require
+review like questions", and the implementation must pick one and document it
+(MID-341). A reply review queue would need its own IN_REVIEW state on
+QAReply, a second moderation surface on the host board, and private-reply
+personal routing for non-owners — significant machinery for a v1 feature that
+is off by default.
+
+**Decision:** Participant replies are allowed only on LIVE questions and
+publish immediately when `participantRepliesEnabled` is true — even when
+question moderation is on. There is no separate reply moderation queue in v1.
+Guardrails instead of review: replies only thread under questions the host
+already approved (LIVE), they follow the session's question character limit
+(host replies get their own 1,000-char limit, `QA_HOST_REPLY_CHAR_LIMIT`),
+they share the participant submit throttle, and closing submissions
+(PRD §4.10) closes reply composers too — closed means no new participant
+content, while voting stays on its own switch.
+
+**Implication:** Reply privacy falls out of question-status projection, not
+per-reply flags: a host reply to an IN_REVIEW question is private because
+IN_REVIEW questions never enter `qa:state` (the submitter reads it from their
+targeted personal push), and approval makes the whole thread public at once.
+Dismissed questions keep prior private replies visible to their owner via
+personal state. Replies ride the public projection for LIVE questions, but
+projection displays must never RENDER them (PRD §4.8) — threads are a
+participant/host reading surface. If reply abuse shows up in practice, the
+v2 lever is a reply review queue, not silent filtering.
+
+---
+
 ## 2026-06-10 · Q&A voting: self-votes allowed, vote fanout rides compact coalesced deltas
 
 **Status:** Accepted

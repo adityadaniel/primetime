@@ -24,6 +24,13 @@ export function validateQuestionInput(
   return { ok: true, value: trimmed };
 }
 
+// Host reply limit (MID-341, PRD §4.3): written host replies run up to 1,000
+// characters regardless of the session's question limit. Shared by the host
+// control room and lib/qa.ts so the limit can never drift from the DB column
+// (QAReply.text VarChar(1000)). Participant replies follow the session's
+// questionCharLimit instead (PRD §4.8).
+export const QA_HOST_REPLY_CHAR_LIMIT = 1000;
+
 // Label name validation (MID-340). Shared by the session-creation form, the
 // host control room, the API route, and lib/qa.ts so the limit can never
 // drift from the DB column (QALabel.name VarChar(50)).

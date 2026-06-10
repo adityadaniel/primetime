@@ -386,6 +386,18 @@ export async function addReply(args: {
   });
 }
 
+// Host reply edit (MID-341, PRD §4.3). Text-only update; authorship flags and
+// linkage are immutable after creation.
+export async function updateReplyText(args: { replyId: string; text: string }): Promise<QAReply> {
+  const text = args.text.trim();
+  if (!text) throw new Error('Reply text required');
+  if (text.length > QA_REPLY_TEXT_MAX) throw new Error('Reply text too long');
+  return prisma.qAReply.update({
+    where: { id: args.replyId },
+    data: { text },
+  });
+}
+
 export async function createLabel(args: {
   sessionId: string;
   name: string;

@@ -93,6 +93,17 @@ const fullSession = {
           createdAt: t1,
           updatedAt: t1,
         },
+        // Participant reply (MID-341): linkage restores for ownership/audit
+        // but never projects — public replies stay anonymous.
+        {
+          id: 'r3',
+          questionId: 'q1',
+          participantId: 'p2',
+          isHostReply: false,
+          text: 'audience thread reply',
+          createdAt: t1,
+          updatedAt: t1,
+        },
       ],
     }),
     makeQuestion({
@@ -160,6 +171,13 @@ describe('hydrateStateFromSession', () => {
         text: 'Great question',
         createdAt: t1.getTime(),
       },
+      {
+        id: 'r3',
+        participantId: 'p2',
+        isHostReply: false,
+        text: 'audience thread reply',
+        createdAt: t1.getTime(),
+      },
     ]);
 
     const q2 = state.questions.get('q2');
@@ -180,6 +198,12 @@ describe('hydrateStateFromSession', () => {
     expect(pub.questions[0].downvotes).toBe(1);
     expect(pub.highlightedQuestionId).toBe('q1');
     expect(JSON.stringify(pub)).not.toContain('private reply');
+    // Replies on the LIVE question round-trip publicly, without authorship.
+    expect(pub.questions[0].replies.map((r) => r.text)).toEqual([
+      'Great question',
+      'audience thread reply',
+    ]);
+    expect(JSON.stringify(pub.questions[0].replies)).not.toContain('p2');
 
     const personal = personalState(state, 'p2');
     expect(personal?.questions.map((q) => q.id)).toEqual(['q2']);
