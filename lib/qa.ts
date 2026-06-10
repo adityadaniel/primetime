@@ -637,6 +637,18 @@ function toPublicReply(reply: QAReplyEntry): QAPublicReply {
 // in-review and dismissed questions — and any private replies attached to
 // them — never reach displays or other participants.
 export function publicState(state: QAState): QAPublicState {
+  // Participant/display projection only exposes labels the host explicitly made
+  // audience-selectable. Host-only labels stay in hostState() so their names
+  // and ids never cross the mixed qa:${pin} room boundary.
+  const publicLabels = [...state.labels.entries()]
+    .filter(([, label]) => label.participantSelectable)
+    .map(([id, label]) => ({
+      id,
+      name: label.name,
+      participantSelectable: label.participantSelectable,
+    }));
+  const publicLabelIds = new Set(publicLabels.map((label) => label.id));
+
   const questions: QAPublicQuestion[] = [];
   for (const q of state.questions.values()) {
     if (q.status !== 'LIVE') continue;
@@ -646,7 +658,7 @@ export function publicState(state: QAState): QAPublicState {
       isAnonymous: q.isAnonymous,
       authorDisplayName: q.isAnonymous ? null : q.authorDisplayName,
       ...questionVoteCounts(q),
-      labelIds: [...q.labelIds],
+      labelIds: [...q.labelIds].filter((labelId) => publicLabelIds.has(labelId)),
       replyCount: q.replies.length,
       replies: q.replies.map(toPublicReply),
       highlighted: state.highlightedQuestionId === q.id,
@@ -671,11 +683,7 @@ export function publicState(state: QAState): QAPublicState {
     participantCount: state.participants.size,
     questionCount: questions.length,
     highlightedQuestionId: state.highlightedQuestionId,
-    labels: [...state.labels.entries()].map(([id, l]) => ({
-      id,
-      name: l.name,
-      participantSelectable: l.participantSelectable,
-    })),
+    labels: publicLabels,
     questions,
   };
 }

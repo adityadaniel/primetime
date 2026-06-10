@@ -1365,7 +1365,7 @@ describe('labels (MID-340)', () => {
   });
 
   describe('projections', () => {
-    it('public and host projections carry labels and per-question labelIds', () => {
+    it('public projection strips host-only labels while host projection keeps them', () => {
       const state = makeState();
       const pid = join(state);
       const qid = submitLive(state, pid);
@@ -1377,12 +1377,14 @@ describe('labels (MID-340)', () => {
       const pub = publicState(state);
       expect(pub.labels).toEqual([
         { id: visible, name: 'Audience pick', participantSelectable: true },
-        { id: hostOnly, name: 'Follow up', participantSelectable: false },
       ]);
-      expect(pub.questions[0].labelIds.sort()).toEqual([visible, hostOnly].sort());
+      expect(pub.questions[0].labelIds).toEqual([visible]);
 
       const host = hostState(state);
-      expect(host.labels).toEqual(pub.labels);
+      expect(host.labels).toEqual([
+        { id: visible, name: 'Audience pick', participantSelectable: true },
+        { id: hostOnly, name: 'Follow up', participantSelectable: false },
+      ]);
       expect(host.questions[0].labelIds.sort()).toEqual([visible, hostOnly].sort());
     });
   });
