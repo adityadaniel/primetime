@@ -4,6 +4,7 @@ import {
   applyVote,
   approveQuestion,
   archiveQuestion,
+  bindParticipantSocket,
   createQAState,
   dismissQuestion,
   editQuestion,
@@ -15,6 +16,7 @@ import {
   publicState,
   type QAState,
   removeVote,
+  resolveJoinIdentity,
   restoreQuestion,
   setSessionStatus,
   setSubmissionsOpen,
@@ -107,6 +109,73 @@ describe('addParticipant', () => {
     const r = addParticipant(state, { displayName: 'Alice', participantId: 'db_p1' });
     expect(r).toEqual({ ok: true, participantId: 'db_p1' });
     expect(state.participants.has('db_p1')).toBe(true);
+  });
+});
+
+describe('resolveJoinIdentity', () => {
+  it('trims the display name', () => {
+    const state = makeState();
+    expect(resolveJoinIdentity(state, '  Alice  ')).toEqual({ ok: true, displayName: 'Alice' });
+  });
+
+  it('treats a blank name as anonymous when names are optional', () => {
+    const state = makeState();
+    expect(resolveJoinIdentity(state, '   ')).toEqual({ ok: true, displayName: null });
+    expect(resolveJoinIdentity(state)).toEqual({ ok: true, displayName: null });
+  });
+
+  it('rejects missing or blank names under NAME_REQUIRED', () => {
+    const state = makeState({ privacyMode: 'NAME_REQUIRED' });
+    expect(resolveJoinIdentity(state)).toEqual({ ok: false, reason: 'name_required' });
+    expect(resolveJoinIdentity(state, '   ')).toEqual({ ok: false, reason: 'name_required' });
+  });
+
+  it('never returns a name under ALWAYS_ANONYMOUS', () => {
+    const state = makeState({ privacyMode: 'ALWAYS_ANONYMOUS' });
+    expect(resolveJoinIdentity(state, 'Alice')).toEqual({ ok: true, displayName: null });
+  });
+
+  it('rejects joins after the session has ended', () => {
+    const state = makeState();
+    setSessionStatus(state, 'ENDED');
+    expect(resolveJoinIdentity(state, 'Late')).toEqual({ ok: false, reason: 'session_ended' });
+  });
+});
+
+describe('bindParticipantSocket', () => {
+  it('binds a socket to an existing participant', () => {
+    const state = makeState();
+    const pid = join(state, 'Alice');
+    expect(bindParticipantSocket(state, 'sock-1', pid)).toBe(true);
+    expect(state.socketToParticipant.get('sock-1')).toBe(pid);
+  });
+
+  it('rebinds a reconnecting participant without duplicating them', () => {
+    const state = makeState();
+    const pid = join(state, 'Alice');
+    bindParticipantSocket(state, 'sock-old', pid);
+    expect(bindParticipantSocket(state, 'sock-new', pid)).toBe(true);
+    expect(state.participants.size).toBe(1);
+    expect(state.socketToParticipant.has('sock-old')).toBe(false);
+    expect(state.socketToParticipant.get('sock-new')).toBe(pid);
+  });
+
+  it('refuses to bind an unknown participant', () => {
+    const state = makeState();
+    expect(bindParticipantSocket(state, 'sock-1', 'nope')).toBe(false);
+    expect(state.socketToParticipant.size).toBe(0);
+  });
+
+  it('leaves other participants bindings untouched', () => {
+    const state = makeState();
+    const alice = join(state, 'Alice');
+    const bob = join(state, 'Bob');
+    bindParticipantSocket(state, 'sock-a', alice);
+    bindParticipantSocket(state, 'sock-b', bob);
+    bindParticipantSocket(state, 'sock-a2', alice);
+    expect(state.socketToParticipant.get('sock-b')).toBe(bob);
+    expect(state.socketToParticipant.get('sock-a2')).toBe(alice);
+    expect(state.socketToParticipant.has('sock-a')).toBe(false);
   });
 });
 

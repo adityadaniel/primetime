@@ -168,23 +168,56 @@ function genId(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
+export type ResolveJoinIdentityResult = { ok: true; displayName: string | null } | QAError;
+
+// Validates a join attempt against the session's privacy mode and returns the
+// display name to store. Split out of addParticipant so the socket layer can
+// validate BEFORE persisting the QAParticipant row (persist-before-accept).
+export function resolveJoinIdentity(
+  state: QAState,
+  displayName?: string | null,
+): ResolveJoinIdentityResult {
+  if (state.status === 'ENDED') return { ok: false, reason: 'session_ended' };
+  const trimmed = displayName?.trim() || null;
+  if (state.settings.privacyMode === 'NAME_REQUIRED' && !trimmed) {
+    return { ok: false, reason: 'name_required' };
+  }
+  // Always-anonymous sessions never store a name: anonymous means anonymous
+  // to the host and export, not merely hidden.
+  return {
+    ok: true,
+    displayName: state.settings.privacyMode === 'ALWAYS_ANONYMOUS' ? null : trimmed,
+  };
+}
+
 export type AddParticipantResult = { ok: true; participantId: string } | QAError;
 
 export function addParticipant(
   state: QAState,
   args: { displayName?: string | null; participantId?: string },
 ): AddParticipantResult {
-  if (state.status === 'ENDED') return { ok: false, reason: 'session_ended' };
-  const trimmed = args.displayName?.trim() || null;
-  if (state.settings.privacyMode === 'NAME_REQUIRED' && !trimmed) {
-    return { ok: false, reason: 'name_required' };
-  }
-  // Always-anonymous sessions never store a name: anonymous means anonymous
-  // to the host and export, not merely hidden.
-  const displayName = state.settings.privacyMode === 'ALWAYS_ANONYMOUS' ? null : trimmed;
+  const identity = resolveJoinIdentity(state, args.displayName);
+  if (!identity.ok) return identity;
   const participantId = args.participantId ?? genId('qap');
-  state.participants.set(participantId, { displayName });
+  state.participants.set(participantId, { displayName: identity.displayName });
   return { ok: true, participantId };
+}
+
+// Reconnect-safe socket binding: a participant returning on a new socket
+// (page refresh, mobile sleep, HMR) rebinds without creating a duplicate
+// participant. Stale socket entries for the same participant are dropped so
+// personal state is never targeted at a dead socket id.
+export function bindParticipantSocket(
+  state: QAState,
+  socketId: string,
+  participantId: string,
+): boolean {
+  if (!state.participants.has(participantId)) return false;
+  for (const [sid, pid] of state.socketToParticipant.entries()) {
+    if (pid === participantId) state.socketToParticipant.delete(sid);
+  }
+  state.socketToParticipant.set(socketId, participantId);
+  return true;
 }
 
 function validateText(state: QAState, raw: string): { ok: true; text: string } | QAError {

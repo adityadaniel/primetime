@@ -156,6 +156,8 @@ async function main() {
   await assertWordCloudProfanityRejection();
   await assertWordCloudHostTrash();
 
+  await assertQaSocketFoundation();
+
   await assertPersistenceRowsWritten();
 }
 
@@ -1194,6 +1196,215 @@ async function assertWordCloudProfanityRejection() {
 
   host.disconnect();
   a.disconnect();
+}
+
+// --- scenario 18 (MID-334): Q&A socket foundation ---
+
+type QaPublicSnapshot = {
+  pin: string;
+  title: string;
+  participantCount: number;
+};
+
+type QaJoinAck =
+  | {
+      participantId: string;
+      reconnected: boolean;
+      state: QaPublicSnapshot;
+      personal: { participantId: string; displayName: string | null };
+    }
+  | { error: string };
+
+async function qaCreateSession(args?: {
+  privacyMode?: 'ANONYMOUS_BY_DEFAULT' | 'ALWAYS_ANONYMOUS' | 'NAMED_BY_DEFAULT' | 'NAME_REQUIRED';
+  hostUserId?: string | null;
+}) {
+  // Mirror wcCreate: allocate + persist via the shared libs (what the API
+  // route at /api/q-and-a does), then bind sockets via qa:host:attach.
+  const { allocatePin: allocateQaPin } = await import('../lib/pin-allocator');
+  const { createSession: createQaSession } = await import('../lib/qa-repo');
+  const pin = await allocateQaPin();
+  const created = await createQaSession({
+    pin,
+    title: 'Smoke Q&A',
+    privacyMode: args?.privacyMode ?? 'ANONYMOUS_BY_DEFAULT',
+    hostUserId: args?.hostUserId ?? null,
+  });
+  return { pin: created.pin, sessionId: created.id };
+}
+
+function qaEmit<T>(sock: ReturnType<typeof io>, event: string, payload: unknown) {
+  return new Promise<T | { error: string }>((r) => sock.emit(event, payload, r));
+}
+
+function qaWaitForState(sock: ReturnType<typeof io>, predicate: (s: QaPublicSnapshot) => boolean) {
+  return new Promise<QaPublicSnapshot>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('no matching qa:state broadcast')), 3000);
+    sock.on('qa:state', function onState(s: QaPublicSnapshot) {
+      if (predicate(s)) {
+        sock.off('qa:state', onState);
+        clearTimeout(t);
+        resolve(s);
+      }
+    });
+  });
+}
+
+async function assertQaSocketFoundation() {
+  console.log('\n--- scenario 18 (MID-334): Q&A socket foundation ---');
+  const prisma = new PrismaClient();
+  const host = await connectSock();
+  const display = await connectSock();
+  const alice = await connectSock();
+  const probe = await connectSock();
+  let host2: ReturnType<typeof io> | null = null;
+  let alice2: ReturnType<typeof io> | null = null;
+  try {
+    const { pin, sessionId } = await qaCreateSession();
+    console.log('qa pin:', pin);
+
+    // host attach: ack carries the hydrated public state
+    const hostAck = await qaEmit<{ pin: string; sessionId: string; state: QaPublicSnapshot }>(
+      host,
+      'qa:host:attach',
+      { pin, sessionId },
+    );
+    if ('error' in hostAck) throw new Error(`qa:host:attach failed: ${hostAck.error}`);
+    if (hostAck.state.title !== 'Smoke Q&A' || hostAck.state.pin !== pin) {
+      throw new Error(`bad host attach state: ${JSON.stringify(hostAck.state)}`);
+    }
+
+    // host attach with a mismatched sessionId is rejected
+    const mismatch = await qaEmit<{ pin: string }>(host, 'qa:host:attach', {
+      pin,
+      sessionId: 'wrong-session',
+    });
+    if (!('error' in mismatch) || mismatch.error !== 'session_mismatch') {
+      throw new Error(`expected session_mismatch, got ${JSON.stringify(mismatch)}`);
+    }
+
+    // display attach: public state only
+    const dispAck = await qaEmit<{ state: QaPublicSnapshot }>(display, 'qa:display:attach', {
+      pin,
+    });
+    if ('error' in dispAck) throw new Error(`qa:display:attach failed: ${dispAck.error}`);
+    if (dispAck.state.participantCount !== 0) {
+      throw new Error(`expected participantCount 0, got ${dispAck.state.participantCount}`);
+    }
+
+    // participant join broadcasts the public projection to host + display
+    const hostSawJoin = qaWaitForState(host, (s) => s.participantCount === 1);
+    const displaySawJoin = qaWaitForState(display, (s) => s.participantCount === 1);
+    const joinAck = (await qaEmit(alice, 'qa:participant:join', {
+      pin,
+      displayName: 'Alice',
+    })) as QaJoinAck;
+    if ('error' in joinAck) throw new Error(`qa:participant:join failed: ${joinAck.error}`);
+    if (joinAck.reconnected) throw new Error('fresh join must not be flagged reconnected');
+    if (joinAck.personal.displayName !== 'Alice') {
+      throw new Error(`expected personal displayName Alice, got ${joinAck.personal.displayName}`);
+    }
+    await hostSawJoin;
+    await displaySawJoin;
+
+    // reconnect with stored participantId rebinds without a duplicate row
+    const rowsBefore = await prisma.qAParticipant.count({ where: { sessionId } });
+    alice.disconnect();
+    await sleep(100);
+    alice2 = await connectSock();
+    const rejoinAck = (await qaEmit(alice2, 'qa:participant:join', {
+      pin,
+      participantId: joinAck.participantId,
+    })) as QaJoinAck;
+    if ('error' in rejoinAck) throw new Error(`qa reconnect failed: ${rejoinAck.error}`);
+    if (!rejoinAck.reconnected) throw new Error('expected reconnected: true');
+    if (rejoinAck.participantId !== joinAck.participantId) {
+      throw new Error(
+        `expected same participantId, got ${rejoinAck.participantId} vs ${joinAck.participantId}`,
+      );
+    }
+    const rowsAfter = await prisma.qAParticipant.count({ where: { sessionId } });
+    if (rowsAfter !== rowsBefore) {
+      throw new Error(`reconnect created a duplicate QAParticipant: ${rowsBefore} → ${rowsAfter}`);
+    }
+
+    // HMR/dev edge: host returns on a NEW socket, re-attaches, and must land
+    // back in qa:${pin} — broadcasts go to the new socket, not the orphan.
+    host.disconnect();
+    await sleep(100);
+    host2 = await connectSock();
+    const reattach = await qaEmit<{ pin: string; state: QaPublicSnapshot }>(
+      host2,
+      'qa:host:attach',
+      { pin, sessionId },
+    );
+    if ('error' in reattach) throw new Error(`host re-attach failed: ${reattach.error}`);
+    const host2SawJoin = qaWaitForState(host2, (s) => s.participantCount === 2);
+    const bobAck = (await qaEmit(probe, 'qa:participant:join', {
+      pin,
+      displayName: 'Bob',
+    })) as QaJoinAck;
+    if ('error' in bobAck) throw new Error(`Bob join failed: ${bobAck.error}`);
+    await host2SawJoin;
+
+    // unknown PIN rejected with a clear reason
+    const ghostJoin = (await qaEmit(probe, 'qa:participant:join', {
+      pin: '000000',
+      displayName: 'Ghost',
+    })) as QaJoinAck;
+    if (!('error' in ghostJoin) || ghostJoin.error !== 'not_found') {
+      throw new Error(`expected not_found, got ${JSON.stringify(ghostJoin)}`);
+    }
+
+    // NAME_REQUIRED rejects a missing name
+    const named = await qaCreateSession({ privacyMode: 'NAME_REQUIRED' });
+    const noName = (await qaEmit(probe, 'qa:participant:join', { pin: named.pin })) as QaJoinAck;
+    if (!('error' in noName) || noName.error !== 'name_required') {
+      throw new Error(`expected name_required, got ${JSON.stringify(noName)}`);
+    }
+
+    // ALWAYS_ANONYMOUS never stores the provided name (memory or DB)
+    const anon = await qaCreateSession({ privacyMode: 'ALWAYS_ANONYMOUS' });
+    const anonJoin = (await qaEmit(probe, 'qa:participant:join', {
+      pin: anon.pin,
+      displayName: 'Bob',
+    })) as QaJoinAck;
+    if ('error' in anonJoin) throw new Error(`anonymous join failed: ${anonJoin.error}`);
+    if (anonJoin.personal.displayName !== null) {
+      throw new Error(`ALWAYS_ANONYMOUS stored a name: ${anonJoin.personal.displayName}`);
+    }
+    const anonRow = await prisma.qAParticipant.findUnique({
+      where: { id: anonJoin.participantId },
+    });
+    if (!anonRow || anonRow.displayName !== null) {
+      throw new Error(`ALWAYS_ANONYMOUS persisted a name: ${JSON.stringify(anonRow)}`);
+    }
+
+    // owned session: an anonymous socket cannot attach as host
+    const owner = await prisma.user.upsert({
+      where: { email: 'qa-smoke@example.com' },
+      update: {},
+      create: { email: 'qa-smoke@example.com' },
+    });
+    const owned = await qaCreateSession({ hostUserId: owner.id });
+    const forbidden = await qaEmit<{ pin: string }>(probe, 'qa:host:attach', {
+      pin: owned.pin,
+      sessionId: owned.sessionId,
+    });
+    if (!('error' in forbidden) || forbidden.error !== 'forbidden') {
+      throw new Error(`expected forbidden, got ${JSON.stringify(forbidden)}`);
+    }
+
+    console.log('✓ Q&A socket foundation (MID-334)');
+  } finally {
+    host.disconnect();
+    display.disconnect();
+    alice.disconnect();
+    probe.disconnect();
+    host2?.disconnect();
+    alice2?.disconnect();
+    await prisma.$disconnect();
+  }
 }
 
 // --- scenario 17: word cloud host trash + CSV preserves trashed rows ---

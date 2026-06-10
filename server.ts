@@ -36,8 +36,18 @@ import {
   startGame,
   submitAnswer,
 } from './lib/game';
+import {
+  type QAState,
+  addParticipant as qaAddParticipant,
+  bindParticipantSocket as qaBindParticipantSocket,
+  personalState as qaPersonalState,
+  publicState as qaPublicState,
+  resolveJoinIdentity as qaResolveJoinIdentity,
+} from './lib/qa';
+import { loadOrCreateState as loadOrCreateQaState } from './lib/qa-hydrate';
+import { addParticipant as qaRepoAddParticipant } from './lib/qa-repo';
 import { matchUploadsPath, resolveUploadFilePath, uploadContentType } from './lib/serve-upload';
-import type { AnswerIndex, Quiz } from './lib/types';
+import type { AnswerIndex, QAPersonalState, QAPublicState, Quiz } from './lib/types';
 import {
   addPlayerToCloud,
   isValidTransition,
@@ -253,6 +263,12 @@ void app.prepare().then(() => {
   const wcLastSubmitAt = new Map<string, number>();
   const WC_RATE_LIMIT_MS = 800;
 
+  const qaStates = new Map<string, QAState>();
+  const qaSocketToPin = new Map<
+    string,
+    { pin: string; role: 'host' | 'display' | 'participant' }
+  >();
+
   function isValidStatus(v: unknown): v is WordCloudStateStatus {
     return v === 'LOBBY' || v === 'LIVE' || v === 'PAUSED' || v === 'ENDED';
   }
@@ -309,6 +325,13 @@ void app.prepare().then(() => {
 
   function wcEmitState(state: WordCloudState) {
     io.to(`wc:${state.pin}`).emit('wordcloud:state', wcSnapshot(state));
+  }
+
+  // Public projection only: the qa:${pin} room mixes host, displays, and
+  // participants, so personal/private payloads must never go through here —
+  // they are targeted at a single participant socket instead.
+  function qaEmitPublicState(state: QAState) {
+    io.to(`qa:${state.pin}`).emit('qa:state', qaPublicState(state));
   }
 
   // F2: a socket is authorized as host iff (a) it owns the host slot for this
@@ -860,6 +883,202 @@ void app.prepare().then(() => {
       );
     });
 
+    // Q&A socket foundation (MID-334): room lifecycle, host/display attach,
+    // participant join with privacy modes, reconnect-safe identity. Attach
+    // handlers are idempotent so an HMR/dev reconnect (new socket id, see
+    // docs/2026-06-05-socket-hmr-broadcast-bug.md) can simply re-emit attach
+    // and land back in qa:${pin} with fresh state.
+    socket.on('qa:host:attach', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:host:attach] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (
+        res: { pin: string; sessionId: string; state: QAPublicState } | { error: string },
+      ) => void;
+      if (!payload || typeof payload !== 'object') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const p = payload as Record<string, unknown>;
+      if (!isPin(p.pin)) {
+        cb({ error: 'invalid_pin' });
+        return;
+      }
+      if (typeof p.sessionId !== 'string' || p.sessionId.length === 0) {
+        cb({ error: 'missing_session' });
+        return;
+      }
+      let state: QAState | null;
+      try {
+        state = await loadOrCreateQaState(qaStates, p.pin);
+      } catch (err) {
+        console.error('[qa-repo] loadOrCreateState (host attach)', err);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      if (!state) {
+        cb({ error: 'not_found' });
+        return;
+      }
+      if (state.sessionId !== p.sessionId) {
+        cb({ error: 'session_mismatch' });
+        return;
+      }
+      // Anonymous sessions (hostUserId === null) can be bound by any socket —
+      // smoke harness and dev flows. Owned sessions require the authenticated
+      // user to match the host.
+      const userId = (socket.data as { userId?: string | null }).userId ?? null;
+      if (state.hostUserId !== null && state.hostUserId !== userId) {
+        cb({ error: 'forbidden' });
+        return;
+      }
+      state.hostSocketId = socket.id;
+      qaSocketToPin.set(socket.id, { pin: state.pin, role: 'host' });
+      socket.join(`qa:${state.pin}`);
+      cb({ pin: state.pin, sessionId: state.sessionId, state: qaPublicState(state) });
+    });
+
+    socket.on('qa:display:attach', async (payload: unknown, ack: unknown) => {
+      const cb =
+        typeof ack === 'function'
+          ? (ack as (res: { state: QAPublicState } | { error: string }) => void)
+          : undefined;
+      const p = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
+      if (!isPin(p.pin)) {
+        cb?.({ error: 'invalid_pin' });
+        return;
+      }
+      let state: QAState | null;
+      try {
+        state = await loadOrCreateQaState(qaStates, p.pin);
+      } catch (err) {
+        console.error('[qa-repo] loadOrCreateState (display attach)', err);
+        cb?.({ error: 'persistence_failed' });
+        return;
+      }
+      if (!state) {
+        cb?.({ error: 'not_found' });
+        return;
+      }
+      state.displaySocketIds.add(socket.id);
+      qaSocketToPin.set(socket.id, { pin: state.pin, role: 'display' });
+      socket.join(`qa:${state.pin}`);
+      // Displays are public and get the public projection only.
+      const publicSnapshot = qaPublicState(state);
+      socket.emit('qa:state', publicSnapshot);
+      cb?.({ state: publicSnapshot });
+    });
+
+    socket.on('qa:participant:join', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:participant:join] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (
+        res:
+          | {
+              participantId: string;
+              reconnected: boolean;
+              state: QAPublicState;
+              personal: QAPersonalState;
+            }
+          | { error: string },
+      ) => void;
+      if (!payload || typeof payload !== 'object') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const p = payload as Record<string, unknown>;
+      if (!isPin(p.pin)) {
+        cb({ error: 'invalid_pin' });
+        return;
+      }
+      let state: QAState | null;
+      try {
+        state = await loadOrCreateQaState(qaStates, p.pin);
+      } catch (err) {
+        console.error('[qa-repo] loadOrCreateState (participant join)', err);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      if (!state) {
+        cb({ error: 'not_found' });
+        return;
+      }
+
+      // Reconnect path: a stored participantId from a prior socket (page
+      // refresh, mobile sleep, HMR) rebinds the new socket without creating a
+      // duplicate QAParticipant. Allowed even after the session ended so a
+      // returning participant can still view the final state.
+      const providedParticipantId = typeof p.participantId === 'string' ? p.participantId : null;
+      if (providedParticipantId && state.participants.has(providedParticipantId)) {
+        qaBindParticipantSocket(state, socket.id, providedParticipantId);
+        qaSocketToPin.set(socket.id, { pin: state.pin, role: 'participant' });
+        socket.join(`qa:${state.pin}`);
+        const personal = qaPersonalState(state, providedParticipantId);
+        if (!personal) {
+          cb({ error: 'unknown_participant' });
+          return;
+        }
+        // Personal state goes to the joining socket only — never the room.
+        cb({
+          participantId: providedParticipantId,
+          reconnected: true,
+          state: qaPublicState(state),
+          personal,
+        });
+        return;
+      }
+
+      const displayName = typeof p.displayName === 'string' ? p.displayName : null;
+      const identity = qaResolveJoinIdentity(state, displayName);
+      if (!identity.ok) {
+        cb({ error: identity.reason });
+        return;
+      }
+
+      // Persist BEFORE accepting so we never bind a participant whose row
+      // failed to write; the in-memory entry is keyed by the DB id so
+      // ownership and votes line up across restarts.
+      let participantId: string;
+      try {
+        const row = await qaRepoAddParticipant({
+          sessionId: state.sessionId,
+          displayName: identity.displayName,
+        });
+        participantId = row.id;
+      } catch (err) {
+        console.error('[qa-repo] addParticipant', err);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      const added = qaAddParticipant(state, {
+        displayName: identity.displayName,
+        participantId,
+      });
+      if (!added.ok) {
+        cb({ error: added.reason });
+        return;
+      }
+      qaBindParticipantSocket(state, socket.id, participantId);
+      qaSocketToPin.set(socket.id, { pin: state.pin, role: 'participant' });
+      socket.join(`qa:${state.pin}`);
+      const personal = qaPersonalState(state, participantId);
+      if (!personal) {
+        cb({ error: 'unknown_participant' });
+        return;
+      }
+      cb({
+        participantId,
+        reconnected: false,
+        state: qaPublicState(state),
+        personal,
+      });
+      // participantCount changed: refresh the room's public projection.
+      qaEmitPublicState(state);
+    });
+
     socket.on('disconnect', () => {
       const wcLink = wcSocketToPin.get(socket.id);
       if (wcLink) {
@@ -868,6 +1087,24 @@ void app.prepare().then(() => {
         if (wcState) {
           if (wcLink.role === 'player') {
             wcState.socketToPlayer.delete(socket.id);
+          }
+        }
+      }
+
+      const qaLink = qaSocketToPin.get(socket.id);
+      if (qaLink) {
+        qaSocketToPin.delete(socket.id);
+        const qaState = qaStates.get(qaLink.pin);
+        if (qaState) {
+          if (qaLink.role === 'participant') {
+            qaState.socketToParticipant.delete(socket.id);
+          } else if (qaLink.role === 'display') {
+            qaState.displaySocketIds.delete(socket.id);
+          } else if (qaState.hostSocketId === socket.id) {
+            // Only clear if this socket still owns the slot: an HMR/dev
+            // reconnect attaches the new socket first, then the orphaned old
+            // socket disconnects — it must not unbind the new host.
+            qaState.hostSocketId = undefined;
           }
         }
       }
