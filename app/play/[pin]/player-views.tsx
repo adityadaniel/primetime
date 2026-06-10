@@ -20,6 +20,9 @@ export interface PersonalLike {
 export interface PlayerViewProps {
   state: PublicGameState | null;
   personal: PersonalLike | null;
+  /** True while the lock shown is optimistic (tap registered, server
+   * confirmation still in flight): the stamp reads LOCKING… not LOCKED. */
+  lockPending?: boolean;
   nickname: string;
   pin: string;
   submitting?: boolean;
@@ -33,6 +36,7 @@ export interface PlayerViewProps {
 export function PlayerView({
   state,
   personal,
+  lockPending = false,
   nickname,
   pin,
   submitting = false,
@@ -98,6 +102,7 @@ export function PlayerView({
           <PlayerQuestion
             state={state}
             personal={personal}
+            lockPending={lockPending}
             onSubmit={onAnswer}
             submitting={submitting}
             error={error}
@@ -181,12 +186,14 @@ export function PlayerLobby({
 export function PlayerQuestion({
   state,
   personal,
+  lockPending = false,
   onSubmit,
   submitting,
   error,
 }: {
   state: PublicGameState;
   personal: PersonalLike | null;
+  lockPending?: boolean;
   onSubmit: (i: AnswerIndex) => void;
   submitting: boolean;
   error: string | null;
@@ -250,7 +257,7 @@ export function PlayerQuestion({
                   className="absolute -top-3 -right-3 ticker text-[11px] tracking-widest px-2 py-1 stamp stamp-in"
                   style={{ background: 'var(--ink)', color: 'var(--bone)' }}
                 >
-                  LOCKED
+                  {lockPending ? 'LOCKING…' : 'LOCKED'}
                 </span>
               )}
             </button>
@@ -265,7 +272,9 @@ export function PlayerQuestion({
           </p>
         )}
         {answered && (
-          <p className="font-editorial italic text-lg">Answer locked. Hold for the reveal.</p>
+          <p className="font-editorial italic text-lg">
+            {lockPending ? 'Locking it in…' : 'Answer locked. Hold for the reveal.'}
+          </p>
         )}
       </div>
     </div>

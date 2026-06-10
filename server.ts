@@ -6,6 +6,15 @@ import next from 'next';
 import { Server, type Socket } from 'socket.io';
 import { ensureAuthSecret } from './lib/auth-secret';
 import { config as appConfig } from './lib/config';
+import {
+  type BroadcastReason,
+  fanoutMetricsEnabled,
+  nowMs,
+  recordAnswerAck,
+  recordBroadcast,
+  recordTargetedPersonal,
+  snapshotFanoutMetrics,
+} from './lib/fanout-metrics';
 import type { Tier } from './lib/game';
 import {
   advance,
@@ -19,6 +28,7 @@ import {
   getGame,
   joinPlayer,
   kickPlayer,
+  leaderboard,
   pauseForHostDisconnect,
   personalState,
   publicState,
@@ -145,6 +155,16 @@ function validateQuiz(input: unknown): Quiz {
 
 void app.prepare().then(() => {
   const httpServer = createServer((req, res) => {
+    // Load-test instrumentation readout; only mounted when the operator
+    // opted in via FANOUT_METRICS=1 (never in normal serving).
+    if (fanoutMetricsEnabled && req.url?.startsWith('/__fanout-metrics')) {
+      const reset = req.url.includes('reset=1');
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      res.end(JSON.stringify(snapshotFanoutMetrics(reset)));
+      return;
+    }
     const csv = matchResultsCsv(req.url);
     if (csv) {
       handleResultsCsv(csv, res);
@@ -297,14 +317,46 @@ void app.prepare().then(() => {
     return userId !== null && userId === state.hostUserId;
   }
 
-  function broadcast(pin: string) {
+  // Answer bursts must not trigger a full room broadcast per answer: at N
+  // players that is N state emits × N answers plus N personal recomputes per
+  // answer (~O(N²) deliveries, ~29k at 120 players), which backs up the event
+  // loop and delays the acks/personal confirmations late answerers are
+  // waiting on. Nothing public changes per answer mid-question except
+  // creeping standings scores, so those broadcasts coalesce into one tick.
+  const pendingBroadcasts = new Map<string, NodeJS.Timeout>();
+  const BROADCAST_COALESCE_MS = 250;
+
+  function broadcast(pin: string, reason: BroadcastReason = 'other') {
+    const pending = pendingBroadcasts.get(pin);
+    if (pending) {
+      clearTimeout(pending);
+      pendingBroadcasts.delete(pin);
+    }
     const game = getGame(pin);
     if (!game) return;
     const state = publicState(game);
-    io.to(`pin:${pin}`).emit('state', state);
+    // Personal goes out before the room state: per-socket delivery is ordered,
+    // so each player sees a phase flip only after their own fresh personal
+    // (reveal SFX/banners read personal at the moment state changes phase).
+    const board = leaderboard(game);
     for (const [socketId, playerId] of game.socketToPlayer.entries()) {
-      io.to(socketId).emit('personal', personalState(game, playerId));
+      io.to(socketId).emit('personal', personalState(game, playerId, board));
     }
+    io.to(`pin:${pin}`).emit('state', state);
+    recordBroadcast(
+      reason,
+      io.sockets.adapter.rooms.get(`pin:${pin}`)?.size ?? 0,
+      game.socketToPlayer.size,
+    );
+  }
+
+  function scheduleBroadcast(pin: string, reason: BroadcastReason) {
+    if (pendingBroadcasts.has(pin)) return;
+    const t = setTimeout(() => {
+      pendingBroadcasts.delete(pin);
+      broadcast(pin, reason);
+    }, BROADCAST_COALESCE_MS);
+    pendingBroadcasts.set(pin, t);
   }
 
   io.on('connection', (socket: Socket) => {
@@ -326,7 +378,7 @@ void app.prepare().then(() => {
         attachHost(game.pin, socket.id);
         socket.join(`pin:${game.pin}`);
         ack({ ok: true, pin: game.pin });
-        broadcast(game.pin);
+        broadcast(game.pin, 'membership');
       } catch (err) {
         const message = err instanceof Error ? err.message : 'invalid';
         console.warn('[host:create] rejected:', message);
@@ -349,14 +401,14 @@ void app.prepare().then(() => {
         resumeFromPause(game);
         if (wasInQuestion) scheduleAutoLock(pin);
       }
-      broadcast(pin);
+      broadcast(pin, 'membership');
     });
 
     socket.on('host:start', (pin: string) => {
       const game = getGame(pin);
       if (!game || game.hostSocketId !== socket.id) return;
       startGame(game);
-      broadcast(pin);
+      broadcast(pin, 'phase');
       if (game.phase === 'question') {
         scheduleAutoLock(pin);
       }
@@ -366,7 +418,7 @@ void app.prepare().then(() => {
       const game = getGame(pin);
       if (!game || game.hostSocketId !== socket.id) return;
       const phase = advance(game);
-      broadcast(pin);
+      broadcast(pin, 'phase');
       if (phase === 'question') {
         scheduleAutoLock(pin);
       }
@@ -376,14 +428,14 @@ void app.prepare().then(() => {
       const game = getGame(pin);
       if (!game || game.hostSocketId !== socket.id) return;
       kickPlayer(pin, playerId);
-      broadcast(pin);
+      broadcast(pin, 'membership');
     });
 
     socket.on('display:attach', (pin: string) => {
       const game = attachDisplay(pin, socket.id);
       if (!game) return;
       socket.join(`pin:${pin}`);
-      broadcast(pin);
+      broadcast(pin, 'membership');
     });
 
     socket.on('player:join', (pin: unknown, nickname: unknown, ack: unknown) => {
@@ -420,19 +472,24 @@ void app.prepare().then(() => {
           nickname: result.player.nickname,
         });
       }
-      broadcast(pin);
+      broadcast(pin, 'membership');
     });
 
     socket.on('player:answer', (pin: unknown, optionIndex: unknown, ack: unknown) => {
+      const handlerStart = nowMs();
       if (typeof ack !== 'function') {
         console.warn('[player:answer] missing ack — ignoring');
         return;
       }
-      const cb = ack as (res: {
+      const rawCb = ack as (res: {
         ok: boolean;
         error?: string;
         reason?: 'paused' | 'expired' | 'invalid-pin' | 'invalid-answer';
       }) => void;
+      const cb: typeof rawCb = (res) => {
+        recordAnswerAck(nowMs() - handlerStart, res.ok ? undefined : (res.reason ?? 'error'));
+        rawCb(res);
+      };
       if (!isPin(pin)) {
         cb({ ok: false, reason: 'invalid-pin', error: 'Invalid pin' });
         return;
@@ -454,11 +511,24 @@ void app.prepare().then(() => {
       const r = submitAnswer(game, playerId, optionIndex);
       if (!r.ok) {
         cb({ ok: false, error: r.error, reason: r.reason });
-        if (r.reason === 'expired') broadcast(pin);
+        if (r.reason === 'expired') broadcast(pin, 'phase');
         return;
       }
       cb({ ok: true });
-      broadcast(pin);
+      if (game.phase === 'question') {
+        // The answering player gets their confirmation immediately; everyone
+        // else can wait for the coalesced tick.
+        const personal = personalState(game, playerId);
+        if (personal) {
+          socket.emit('personal', personal);
+          recordTargetedPersonal();
+        }
+        scheduleBroadcast(pin, 'answer');
+      } else {
+        // Last answer locked the question: the immediate broadcast already
+        // delivers this player's personal ahead of the phase-flip state.
+        broadcast(pin, 'phase');
+      }
     });
 
     socket.on('wordcloud:host:create', async (payload: unknown, ack: unknown) => {
@@ -814,12 +884,12 @@ void app.prepare().then(() => {
             if (!g) return;
             if (g.hostSocketId) return;
             endByHostLeft(g);
-            broadcast(event.pin);
+            broadcast(event.pin, 'phase');
           }, HOST_GRACE_MS + 50);
           hostGraceTimers.set(event.pin, t);
         }
       }
-      for (const pin of pins) broadcast(pin);
+      for (const pin of pins) broadcast(pin, 'membership');
     });
   });
 
@@ -833,7 +903,7 @@ void app.prepare().then(() => {
       if (!g) return;
       if (g.phase === 'question') {
         advance(g);
-        broadcast(pin);
+        broadcast(pin, 'phase');
       }
       lockTimers.delete(pin);
     }, ms + 50);

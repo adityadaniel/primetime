@@ -854,6 +854,19 @@ describe('misc surfaces (coverage)', () => {
     expect(personalState(setupGame(), 'ghost')).toBeNull();
   });
 
+  it('personalState with a precomputed board matches the self-computed result', () => {
+    const game = setupGame();
+    const a = mustJoin(game.pin, 's1', 'Alice');
+    const b = mustJoin(game.pin, 's2', 'Bob');
+    startGame(game);
+    submitAnswer(game, a.player.id, 0);
+    submitAnswer(game, b.player.id, 1);
+    const board = leaderboard(game);
+    for (const id of [a.player.id, b.player.id]) {
+      expect(personalState(game, id, board)).toEqual(personalState(game, id));
+    }
+  });
+
   it('exportResultsCsv produces a header plus one row per player', () => {
     const game = setupGame();
     const r = mustJoin(game.pin, 's1', 'Alice');
