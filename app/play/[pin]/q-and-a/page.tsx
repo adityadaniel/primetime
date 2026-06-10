@@ -5,6 +5,10 @@
 // and manage your own questions (status badges, withdraw, edit). Public board
 // state arrives over `qa:state`; personal state only ever arrives in acks
 // targeted at this socket (never broadcast to the room).
+//
+// Labels (MID-340): participants only ever see participant-selectable labels
+// — host-only labels stay off this surface entirely (selector, chips, and
+// filter all filter on the flag).
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -28,8 +32,15 @@ type PublicQuestion = {
   score: number;
   upvotes: number;
   downvotes: number;
+  labelIds: string[];
   highlighted: boolean;
   submittedAt: number;
+};
+
+type PublicLabel = {
+  id: string;
+  name: string;
+  participantSelectable: boolean;
 };
 
 type PublicSnapshot = {
@@ -44,6 +55,7 @@ type PublicSnapshot = {
   questionCharLimit: number;
   questionCount: number;
   participantCount: number;
+  labels: PublicLabel[];
   questions: PublicQuestion[];
 };
 
@@ -100,6 +112,9 @@ function ackErrorMessage(error: string | undefined, charLimit: number): string {
       return "That question isn't on the board anymore.";
     case 'downvotes_disabled':
       return 'Downvotes are off in this room.';
+    case 'unknown_label':
+    case 'label_not_selectable':
+      return "That label isn't available — refresh and pick again.";
     default:
       return "Couldn't send — try again.";
   }
@@ -132,6 +147,10 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
   const [personal, setPersonal] = useState<QAPersonalState | null>(null);
   const [draft, setDraft] = useState('');
   const [anonymous, setAnonymous] = useState(true);
+  // Labels (MID-340): chips picked for the next submission, and the board
+  // filter. Both only ever hold participant-selectable label ids.
+  const [draftLabelIds, setDraftLabelIds] = useState<string[]>([]);
+  const [labelFilter, setLabelFilter] = useState<string>('');
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [cooldownUntil, setCooldownUntil] = useState(0);
@@ -180,6 +199,18 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
     if (!pub || anonymousInitRef.current) return;
     anonymousInitRef.current = true;
     setAnonymous(pub.privacyMode !== 'NAMED_BY_DEFAULT' && pub.privacyMode !== 'NAME_REQUIRED');
+  }, [pub]);
+
+  // Drop stale label picks/filters if a label vanished or stopped being
+  // participant-selectable while we were composing.
+  useEffect(() => {
+    if (!pub) return;
+    const selectable = new Set(pub.labels.filter((l) => l.participantSelectable).map((l) => l.id));
+    setDraftLabelIds((prev) => {
+      const next = prev.filter((id) => selectable.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+    setLabelFilter((prev) => (prev && !selectable.has(prev) ? '' : prev));
   }, [pub]);
 
   const join = useCallback(
@@ -291,7 +322,12 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
     const isAnonymous = pub?.privacyMode === 'NAME_REQUIRED' ? false : forced || anonymous;
     socket.emit(
       'qa:participant:submit',
-      { pin, text: result.value, isAnonymous },
+      {
+        pin,
+        text: result.value,
+        isAnonymous,
+        ...(draftLabelIds.length > 0 ? { labelIds: draftLabelIds } : {}),
+      },
       (res: ActionAck) => {
         if ('error' in res) {
           showToast(ackErrorMessage(res.error, charLimit));
@@ -299,6 +335,7 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
         }
         setPersonal(res.personal);
         setDraft('');
+        setDraftLabelIds([]);
         showToast(res.status === 'IN_REVIEW' ? 'Sent — waiting for review.' : "It's live.");
       },
     );
@@ -490,7 +527,15 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
 
   const ended = pub.status === 'ENDED';
   const myQuestions = [...personal.questions].sort((a, b) => b.submittedAt - a.submittedAt);
-  const boardQuestions = [...pub.questions].sort(byPopular);
+  // Participants only ever see participant-selectable labels — host-only
+  // labels never render on this surface (PRD §4.1 / §4.7).
+  const selectableLabels = pub.labels.filter((l) => l.participantSelectable);
+  const labelNames = new Map(selectableLabels.map((l) => [l.id, l.name]));
+  const boardQuestions = (
+    labelFilter ? pub.questions.filter((q) => q.labelIds.includes(labelFilter)) : pub.questions
+  )
+    .slice()
+    .sort(byPopular);
   const votingEnabled = pub.votingOpen && !ended;
   const canToggleIdentity =
     !!personal.displayName &&
@@ -610,6 +655,42 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
               onToggle={() => setAnonymous((a) => !a)}
             />
 
+            {/* Label selector (MID-340): participant-selectable labels only.
+                Multi-select chips; shape (filled/hollow) marks selection, not
+                color alone. */}
+            {selectableLabels.length > 0 && (
+              <div>
+                <span className="ticker text-[11px] tracking-widest opacity-60">
+                  TAG IT · OPTIONAL
+                </span>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {selectableLabels.map((label) => {
+                    const active = draftLabelIds.includes(label.id);
+                    return (
+                      <button
+                        key={label.id}
+                        type="button"
+                        onClick={() =>
+                          setDraftLabelIds((prev) =>
+                            active ? prev.filter((id) => id !== label.id) : [...prev, label.id],
+                          )
+                        }
+                        aria-pressed={active}
+                        className="ink-border ticker text-[11px] tracking-widest px-3"
+                        style={{
+                          minHeight: 44,
+                          background: active ? 'var(--ink)' : 'var(--bone)',
+                          color: active ? 'var(--bone)' : 'var(--ink)',
+                        }}
+                      >
+                        {active ? '◼' : '◻'} {label.name.toUpperCase()}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={!canSubmit}
@@ -639,9 +720,48 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
               {votingEnabled ? 'MOST VOTED FIRST' : 'VOTING CLOSED'}
             </span>
           </div>
+          {/* Label filter (PRD §4.7): participant-selectable labels only. */}
+          {selectableLabels.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => setLabelFilter('')}
+                aria-pressed={labelFilter === ''}
+                className="ink-border ticker text-[11px] tracking-widest px-3"
+                style={{
+                  minHeight: 44,
+                  background: labelFilter === '' ? 'var(--ink)' : 'var(--bone)',
+                  color: labelFilter === '' ? 'var(--bone)' : 'var(--ink)',
+                }}
+              >
+                ALL
+              </button>
+              {selectableLabels.map((label) => {
+                const active = labelFilter === label.id;
+                return (
+                  <button
+                    key={label.id}
+                    type="button"
+                    onClick={() => setLabelFilter(active ? '' : label.id)}
+                    aria-pressed={active}
+                    className="ink-border ticker text-[11px] tracking-widest px-3"
+                    style={{
+                      minHeight: 44,
+                      background: active ? 'var(--ink)' : 'var(--bone)',
+                      color: active ? 'var(--bone)' : 'var(--ink)',
+                    }}
+                  >
+                    {label.name.toUpperCase()}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {boardQuestions.length === 0 ? (
             <p className="font-editorial italic text-[15px] mt-3 opacity-70">
-              The board is empty — questions land here once they're live.
+              {labelFilter
+                ? 'Nothing on the board with that label — tap ALL to see everything.'
+                : "The board is empty — questions land here once they're live."}
             </p>
           ) : (
             <ul className="mt-3 space-y-3">
@@ -649,6 +769,7 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
                 <BoardQuestionCard
                   key={q.id}
                   question={q}
+                  labelNames={labelNames}
                   myVote={personal.votes[q.id] ?? null}
                   votingEnabled={votingEnabled}
                   downvotesEnabled={pub.downvotesEnabled}
@@ -740,12 +861,16 @@ function IdentityRow({
 // color alone) and exposed via aria-pressed.
 function BoardQuestionCard({
   question,
+  labelNames,
   myVote,
   votingEnabled,
   downvotesEnabled,
   onVote,
 }: {
   question: PublicQuestion;
+  // Participant-selectable labels only — host-only label ids miss the map
+  // and render nothing, so they never leak onto this surface.
+  labelNames: ReadonlyMap<string, string>;
   myVote: QAVoteType | null;
   votingEnabled: boolean;
   downvotesEnabled: boolean;
@@ -755,6 +880,7 @@ function BoardQuestionCard({
     question.isAnonymous || !question.authorDisplayName
       ? 'ANONYMOUS'
       : question.authorDisplayName.toUpperCase();
+  const visibleLabels = question.labelIds.filter((id) => labelNames.has(id));
   return (
     <li
       className="ink-border px-4 py-3 flex items-stretch gap-3"
@@ -764,7 +890,7 @@ function BoardQuestionCard({
       }}
     >
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {question.highlighted && (
             <span
               className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border"
@@ -773,6 +899,14 @@ function BoardQuestionCard({
               ON AIR
             </span>
           )}
+          {visibleLabels.map((id) => (
+            <span
+              key={id}
+              className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border opacity-80"
+            >
+              {labelNames.get(id)?.toUpperCase()}
+            </span>
+          ))}
           <span className="ticker text-[10px] tracking-widest opacity-50">{author}</span>
         </div>
         <p className="font-editorial text-[17px] leading-snug mt-2">{question.text}</p>

@@ -143,6 +143,7 @@ describe('POST /api/q-and-a', () => {
       downvotesEnabled: false,
       questionCharLimit: 500,
       hostUserId: 'host-1',
+      labels: [],
     });
   });
 
@@ -164,7 +165,62 @@ describe('POST /api/q-and-a', () => {
       downvotesEnabled: false,
       questionCharLimit: 280,
       hostUserId: 'host-1',
+      labels: [],
     });
+  });
+
+  it('passes trimmed labels with per-label participant visibility (MID-340)', async () => {
+    authMock.mockResolvedValue(hostSession);
+    allocatePinMock.mockResolvedValue('111222');
+    createSessionMock.mockResolvedValue({ id: 'qas_3', pin: '111222' });
+
+    const res = await POST(
+      postReq({
+        title: 'Town hall',
+        labels: [{ name: '  Logistics  ' }, { name: 'Open mic', participantSelectable: true }],
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(createSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        labels: [
+          { name: 'Logistics', participantSelectable: false },
+          { name: 'Open mic', participantSelectable: true },
+        ],
+      }),
+    );
+  });
+
+  it('rejects malformed, over-long, and duplicate labels', async () => {
+    authMock.mockResolvedValue(hostSession);
+
+    const notArray = await POST(postReq({ title: 't', labels: 'nope' }));
+    expect(notArray.status).toBe(400);
+    await expect(notArray.json()).resolves.toEqual({ error: 'invalid_labels' });
+
+    const badEntry = await POST(postReq({ title: 't', labels: [{ name: 42 }] }));
+    expect(badEntry.status).toBe(400);
+    await expect(badEntry.json()).resolves.toEqual({ error: 'invalid_labels' });
+
+    const empty = await POST(postReq({ title: 't', labels: [{ name: '   ' }] }));
+    expect(empty.status).toBe(400);
+    await expect(empty.json()).resolves.toEqual({ error: 'invalid_label_empty_label' });
+
+    const long = await POST(postReq({ title: 't', labels: [{ name: 'x'.repeat(51) }] }));
+    expect(long.status).toBe(400);
+    await expect(long.json()).resolves.toEqual({ error: 'invalid_label_label_too_long' });
+
+    const dup = await POST(postReq({ title: 't', labels: [{ name: 'Same' }, { name: ' Same ' }] }));
+    expect(dup.status).toBe(400);
+    await expect(dup.json()).resolves.toEqual({ error: 'duplicate_label' });
+
+    const badFlag = await POST(
+      postReq({ title: 't', labels: [{ name: 'ok', participantSelectable: 'yes' }] }),
+    );
+    expect(badFlag.status).toBe(400);
+    await expect(badFlag.json()).resolves.toEqual({ error: 'invalid_labels' });
+
+    expect(createSessionMock).not.toHaveBeenCalled();
   });
 
   it('returns 503 when no PIN can be allocated', async () => {

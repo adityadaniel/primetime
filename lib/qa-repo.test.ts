@@ -199,6 +199,53 @@ describe('createSession', () => {
       createSession({ pin: '123456', title: 't', questionCharLimit: 501, hostUserId: null }),
     ).rejects.toThrow('questionCharLimit');
   });
+
+  it('creates labels atomically via nested create, trimmed, with defaults (MID-340)', async () => {
+    sessionCreate.mockResolvedValueOnce({ id: 'qa_1' });
+    await createSession({
+      pin: '123456',
+      title: 't',
+      hostUserId: null,
+      labels: [{ name: '  Logistics  ' }, { name: 'Open mic', participantSelectable: true }],
+    });
+    const call = sessionCreate.mock.calls[0][0] as { data: Record<string, unknown> };
+    expect(call.data.labels).toEqual({
+      create: [
+        { name: 'Logistics', participantSelectable: false },
+        { name: 'Open mic', participantSelectable: true },
+      ],
+    });
+  });
+
+  it('omits the labels key when no labels are provided', async () => {
+    sessionCreate.mockResolvedValueOnce({ id: 'qa_1' });
+    await createSession({ pin: '123456', title: 't', hostUserId: null, labels: [] });
+    const call = sessionCreate.mock.calls[0][0] as { data: Record<string, unknown> };
+    expect('labels' in call.data).toBe(false);
+  });
+
+  it('rejects invalid and duplicate label names before touching the DB', async () => {
+    await expect(
+      createSession({ pin: '123456', title: 't', hostUserId: null, labels: [{ name: '   ' }] }),
+    ).rejects.toThrow('Label name required');
+    await expect(
+      createSession({
+        pin: '123456',
+        title: 't',
+        hostUserId: null,
+        labels: [{ name: 'x'.repeat(51) }],
+      }),
+    ).rejects.toThrow('Label name too long');
+    await expect(
+      createSession({
+        pin: '123456',
+        title: 't',
+        hostUserId: null,
+        labels: [{ name: 'Same' }, { name: ' Same ' }],
+      }),
+    ).rejects.toBeInstanceOf(DuplicateLabelError);
+    expect(sessionCreate).not.toHaveBeenCalled();
+  });
 });
 
 describe('setSessionStatus', () => {
@@ -350,6 +397,25 @@ describe('addQuestion', () => {
     await expect(
       addQuestion({ sessionId: 'qa_1', participantId: 'pt_1', text: 'x'.repeat(501) }),
     ).rejects.toThrow('Question text too long');
+  });
+
+  it('attaches participant-selected labels via nested create, deduplicated (MID-340)', async () => {
+    questionCreate.mockResolvedValueOnce({ id: 'q_1' });
+    await addQuestion({
+      sessionId: 'qa_1',
+      participantId: 'pt_1',
+      text: 'q',
+      labelIds: ['l_1', 'l_2', 'l_1'],
+    });
+    const call = questionCreate.mock.calls[0][0] as { data: Record<string, unknown> };
+    expect(call.data.labels).toEqual({ create: [{ labelId: 'l_1' }, { labelId: 'l_2' }] });
+  });
+
+  it('omits the labels key when no labelIds are provided', async () => {
+    questionCreate.mockResolvedValueOnce({ id: 'q_1' });
+    await addQuestion({ sessionId: 'qa_1', participantId: 'pt_1', text: 'q', labelIds: [] });
+    const call = questionCreate.mock.calls[0][0] as { data: Record<string, unknown> };
+    expect('labels' in call.data).toBe(false);
   });
 });
 

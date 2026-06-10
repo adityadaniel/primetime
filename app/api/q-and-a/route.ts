@@ -4,6 +4,7 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { validateLabelName } from '@/lib/qa-input';
 import { allocatePin, createSession, QA_DESCRIPTION_MAX, QA_TITLE_MAX } from '@/lib/qa-repo';
 
 const PRIVACY_MODES = [
@@ -16,6 +17,9 @@ type PrivacyMode = (typeof PRIVACY_MODES)[number];
 
 const QUESTION_CHAR_LIMITS = [140, 280, 500] as const;
 const QUESTION_CHAR_LIMIT_DEFAULT = 280;
+// Session-scoped labels at creation (MID-340). Generous sanity cap — a real
+// session uses a handful.
+const LABELS_MAX = 20;
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -41,6 +45,7 @@ export async function POST(req: NextRequest) {
     participantRepliesEnabled,
     downvotesEnabled,
     questionCharLimit,
+    labels,
   } = body as {
     title?: unknown;
     description?: unknown;
@@ -49,6 +54,7 @@ export async function POST(req: NextRequest) {
     participantRepliesEnabled?: unknown;
     downvotesEnabled?: unknown;
     questionCharLimit?: unknown;
+    labels?: unknown;
   };
 
   if (typeof title !== 'string') {
@@ -99,6 +105,41 @@ export async function POST(req: NextRequest) {
     charLimit = questionCharLimit;
   }
 
+  const sessionLabels: { name: string; participantSelectable: boolean }[] = [];
+  if (labels !== undefined) {
+    if (!Array.isArray(labels) || labels.length > LABELS_MAX) {
+      return NextResponse.json({ error: 'invalid_labels' }, { status: 400 });
+    }
+    const seen = new Set<string>();
+    for (const label of labels) {
+      if (!label || typeof label !== 'object') {
+        return NextResponse.json({ error: 'invalid_labels' }, { status: 400 });
+      }
+      const { name, participantSelectable } = label as {
+        name?: unknown;
+        participantSelectable?: unknown;
+      };
+      if (typeof name !== 'string') {
+        return NextResponse.json({ error: 'invalid_labels' }, { status: 400 });
+      }
+      const validated = validateLabelName(name);
+      if (!validated.ok) {
+        return NextResponse.json({ error: `invalid_label_${validated.reason}` }, { status: 400 });
+      }
+      if (participantSelectable !== undefined && typeof participantSelectable !== 'boolean') {
+        return NextResponse.json({ error: 'invalid_labels' }, { status: 400 });
+      }
+      if (seen.has(validated.value)) {
+        return NextResponse.json({ error: 'duplicate_label' }, { status: 400 });
+      }
+      seen.add(validated.value);
+      sessionLabels.push({
+        name: validated.value,
+        participantSelectable: participantSelectable ?? false,
+      });
+    }
+  }
+
   let pin: string;
   try {
     pin = await allocatePin();
@@ -117,6 +158,7 @@ export async function POST(req: NextRequest) {
       downvotesEnabled: downvotesEnabled ?? false,
       questionCharLimit: charLimit,
       hostUserId: userId,
+      labels: sessionLabels,
     });
     return NextResponse.json({ pin: created.pin, sessionId: created.id });
   } catch (err) {

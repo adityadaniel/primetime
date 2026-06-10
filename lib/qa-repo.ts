@@ -72,6 +72,9 @@ export async function createSession(args: {
   downvotesEnabled?: boolean;
   questionCharLimit?: number;
   hostUserId: string | null;
+  // Session-scoped labels defined at creation (MID-340). Nested create keeps
+  // the session and its labels atomic — no session row without its labels.
+  labels?: { name: string; participantSelectable?: boolean }[];
 }): Promise<QASession> {
   if (!args.pin.trim()) throw new Error('PIN required');
   const title = args.title.trim();
@@ -85,6 +88,17 @@ export async function createSession(args: {
   if (questionCharLimit < 1 || questionCharLimit > QA_QUESTION_TEXT_MAX) {
     throw new Error(`questionCharLimit must be between 1 and ${QA_QUESTION_TEXT_MAX}`);
   }
+  const labels = (args.labels ?? []).map((label) => {
+    const name = label.name.trim();
+    if (!name) throw new Error('Label name required');
+    if (name.length > QA_LABEL_NAME_MAX) throw new Error('Label name too long');
+    return { name, participantSelectable: label.participantSelectable ?? false };
+  });
+  const seen = new Set<string>();
+  for (const label of labels) {
+    if (seen.has(label.name)) throw new DuplicateLabelError(label.name);
+    seen.add(label.name);
+  }
   return prisma.qASession.create({
     data: {
       pin: args.pin,
@@ -96,6 +110,7 @@ export async function createSession(args: {
       downvotesEnabled: args.downvotesEnabled ?? false,
       questionCharLimit,
       hostUserId: args.hostUserId,
+      ...(labels.length > 0 ? { labels: { create: labels } } : {}),
     },
   });
 }
@@ -173,6 +188,9 @@ export async function addQuestion(args: {
   isAnonymous?: boolean;
   authorDisplayName?: string | null;
   status?: QAQuestionStatus;
+  // Participant-selected labels (MID-340). Nested create keeps the question
+  // and its label assignments atomic — never a labelless half-write.
+  labelIds?: string[];
 }): Promise<QAQuestion> {
   const text = args.text.trim();
   if (!text) throw new Error('Question text required');
@@ -184,6 +202,7 @@ export async function addQuestion(args: {
   const isAnonymous = args.isAnonymous ?? true;
   // Never persist an author identity for anonymous questions.
   const authorDisplayName = isAnonymous ? null : args.authorDisplayName?.trim() || null;
+  const labelIds = [...new Set(args.labelIds ?? [])];
   return prisma.qAQuestion.create({
     data: {
       sessionId: args.sessionId,
@@ -192,6 +211,9 @@ export async function addQuestion(args: {
       isAnonymous,
       authorDisplayName,
       status,
+      ...(labelIds.length > 0
+        ? { labels: { create: labelIds.map((labelId) => ({ labelId })) } }
+        : {}),
     },
   });
 }

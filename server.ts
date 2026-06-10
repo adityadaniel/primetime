@@ -43,7 +43,9 @@ import {
   applyVote as qaApplyVote,
   approveQuestion as qaApproveQuestion,
   archiveQuestion as qaArchiveQuestion,
+  assignLabel as qaAssignLabel,
   bindParticipantSocket as qaBindParticipantSocket,
+  createLabel as qaCreateLabel,
   dismissQuestion as qaDismissQuestion,
   editQuestion as qaEditQuestion,
   highlightQuestion as qaHighlightQuestion,
@@ -56,24 +58,30 @@ import {
   resolveJoinIdentity as qaResolveJoinIdentity,
   restoreQuestion as qaRestoreQuestion,
   submitQuestion as qaSubmitQuestion,
+  unassignLabel as qaUnassignLabel,
   withdrawQuestion as qaWithdrawQuestion,
 } from './lib/qa';
 import { loadOrCreateState as loadOrCreateQaState } from './lib/qa-hydrate';
 import {
+  DuplicateLabelError,
   addParticipant as qaRepoAddParticipant,
   addQuestion as qaRepoAddQuestion,
+  assignLabel as qaRepoAssignLabel,
+  createLabel as qaRepoCreateLabel,
   editQuestionText as qaRepoEditQuestionText,
   recordVote as qaRepoRecordVote,
   removeVote as qaRepoRemoveVote,
   setHighlightedQuestion as qaRepoSetHighlightedQuestion,
   setQuestionStatus as qaRepoSetQuestionStatus,
   setQuestionStatusWithModerationEvent as qaRepoSetQuestionStatusWithModerationEvent,
+  unassignLabel as qaRepoUnassignLabel,
 } from './lib/qa-repo';
 import { matchUploadsPath, resolveUploadFilePath, uploadContentType } from './lib/serve-upload';
 import type {
   AnswerIndex,
   QAHostState,
   QAPersonalState,
+  QAPublicLabel,
   QAPublicState,
   QAQuestionScore,
   QAQuestionStatus,
@@ -306,6 +314,9 @@ void app.prepare().then(() => {
   // submissions arm the window so a typo'd empty submit doesn't burn it.
   const qaLastSubmitAt = new Map<string, number>();
   const QA_SUBMIT_RATE_LIMIT_MS = 1_000;
+  // Sanity cap on labels per submission (MID-340): a session never has more
+  // than a handful of labels, so anything past this is a hostile payload.
+  const QA_LABELS_PER_QUESTION_CAP = 20;
 
   // Vote-burst fanout guard (MID-336, PRD §9): nothing public changes per
   // vote except the affected questions' counts, so per-room dirty question
@@ -1236,6 +1247,20 @@ void app.prepare().then(() => {
         cb({ error: 'invalid' });
         return;
       }
+      // Optional participant-selected labels (MID-340). Shape-validated here;
+      // lib/qa.ts enforces that each id exists and is participant-selectable.
+      let labelIds: string[] | undefined;
+      if (p.labelIds !== undefined) {
+        if (
+          !Array.isArray(p.labelIds) ||
+          p.labelIds.length > QA_LABELS_PER_QUESTION_CAP ||
+          !p.labelIds.every((id) => typeof id === 'string' && id.length > 0)
+        ) {
+          cb({ error: 'invalid' });
+          return;
+        }
+        labelIds = p.labelIds as string[];
+      }
       const now = Date.now();
       const last = qaLastSubmitAt.get(participantId) ?? 0;
       if (now - last < QA_SUBMIT_RATE_LIMIT_MS) {
@@ -1249,6 +1274,7 @@ void app.prepare().then(() => {
         participantId,
         text: p.text,
         isAnonymous: typeof p.isAnonymous === 'boolean' ? p.isAnonymous : undefined,
+        labelIds,
       });
       if (!result.ok) {
         cb({ error: result.reason });
@@ -1264,6 +1290,7 @@ void app.prepare().then(() => {
           isAnonymous: question.isAnonymous,
           authorDisplayName: question.authorDisplayName,
           status: question.status === 'IN_REVIEW' ? 'IN_REVIEW' : 'LIVE',
+          labelIds: [...question.labelIds],
         });
         // Re-key the in-memory entry to the DB id so ownership, votes, and
         // personal projections line up across restarts (lib/qa-hydrate.ts
@@ -1850,6 +1877,135 @@ void app.prepare().then(() => {
       else qaEmitHostState(state);
       if (edited.participantId) qaEmitPersonalState(state, edited.participantId);
     });
+
+    // --- Q&A labels (MID-340, PRD §4.1 / §4.3) ---
+
+    // Mid-session label creation. Same strict host gate as moderation: only
+    // the attached host control socket may create labels. In-memory create
+    // first (validates name + per-session uniqueness), persist BEFORE
+    // broadcasting, re-key to the DB id, roll back on failure.
+    socket.on('qa:host:label:create', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:host:label:create] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: { ok: true; label: QAPublicLabel } | { error: string }) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      if (typeof p.name !== 'string') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      if (p.participantSelectable !== undefined && typeof p.participantSelectable !== 'boolean') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const result = qaCreateLabel(state, {
+        name: p.name,
+        participantSelectable: p.participantSelectable,
+      });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      let labelId = result.labelId;
+      try {
+        const row = await qaRepoCreateLabel({
+          sessionId: state.sessionId,
+          name: result.label.name,
+          participantSelectable: result.label.participantSelectable,
+        });
+        // Re-key to the DB id so assignments and hydration line up.
+        state.labels.delete(labelId);
+        state.labels.set(row.id, result.label);
+        labelId = row.id;
+      } catch (err) {
+        console.error('[qa-repo] createLabel', err);
+        state.labels.delete(labelId);
+        // A racing duplicate (e.g. a second control tab) surfaces as the
+        // same duplicate_label the in-memory check would have produced.
+        cb({
+          error: err instanceof DuplicateLabelError ? 'duplicate_label' : 'persistence_failed',
+        });
+        return;
+      }
+      cb({
+        ok: true,
+        label: {
+          id: labelId,
+          name: result.label.name,
+          participantSelectable: result.label.participantSelectable,
+        },
+      });
+      // The label list rides in the public projection (participants need new
+      // selectable labels for submission/filtering), so everyone refreshes.
+      qaEmitPublicState(state);
+    });
+
+    // Assign/unassign a label on a question. Idempotent both ways. Broadcast
+    // policy: chips on a LIVE question are public; label changes on private
+    // questions (IN_REVIEW/DISMISSED/…) refresh the host board only.
+    function qaHostLabelAssignmentHandler(action: 'assign' | 'unassign') {
+      return async (payload: unknown, ack: unknown) => {
+        if (typeof ack !== 'function') {
+          console.warn(`[qa:host:label:${action}] missing ack — ignoring`);
+          return;
+        }
+        const cb = ack as (
+          res: { ok: true; questionId: string; labelIds: string[] } | { error: string },
+        ) => void;
+        const resolved = qaResolveHostAction(payload);
+        if ('error' in resolved) {
+          cb(resolved);
+          return;
+        }
+        const { state, p } = resolved;
+        if (
+          typeof p.questionId !== 'string' ||
+          p.questionId.length === 0 ||
+          typeof p.labelId !== 'string' ||
+          p.labelId.length === 0
+        ) {
+          cb({ error: 'invalid' });
+          return;
+        }
+        const args = { questionId: p.questionId, labelId: p.labelId };
+        const result =
+          action === 'assign' ? qaAssignLabel(state, args) : qaUnassignLabel(state, args);
+        if (!result.ok) {
+          cb({ error: result.reason });
+          return;
+        }
+        const question = state.questions.get(p.questionId);
+        const changed =
+          ('assigned' in result && result.assigned) || ('removed' in result && result.removed);
+        if (changed) {
+          try {
+            if (action === 'assign') await qaRepoAssignLabel(args);
+            else await qaRepoUnassignLabel(args);
+          } catch (err) {
+            console.error(`[qa-repo] ${action}Label`, err);
+            if (question) {
+              if (action === 'assign') question.labelIds.delete(p.labelId);
+              else question.labelIds.add(p.labelId);
+            }
+            cb({ error: 'persistence_failed' });
+            return;
+          }
+        }
+        cb({ ok: true, questionId: p.questionId, labelIds: [...(question?.labelIds ?? [])] });
+        if (!changed) return;
+        if (question?.status === 'LIVE') qaEmitPublicState(state);
+        else qaEmitHostState(state);
+      };
+    }
+
+    socket.on('qa:host:label:assign', qaHostLabelAssignmentHandler('assign'));
+    socket.on('qa:host:label:unassign', qaHostLabelAssignmentHandler('unassign'));
 
     socket.on('disconnect', () => {
       const wcLink = wcSocketToPin.get(socket.id);

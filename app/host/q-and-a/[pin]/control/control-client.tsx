@@ -11,8 +11,10 @@
 // host-only spike pile with restore. Live-board actions (MID-339): live rows
 // get highlight (one on air at a time), edit (original text preserved
 // server-side), mark answered, and archive with undo; answered/archived
-// questions land in a filed pile with restore. Labels CRUD and session
-// controls ship with MID-340+.
+// questions land in a filed pile with restore. Labels (MID-340): the host
+// can mint session-scoped labels mid-broadcast (with a per-label audience
+// toggle), pin them on questions from a per-row picker, and filter the board
+// by label. Session controls ship with a later issue.
 
 import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
@@ -20,10 +22,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AccountMenu from '@/components/AccountMenu';
 import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
 import { publicUrl } from '@/lib/public-origin';
+import { QA_LABEL_NAME_LIMIT, validateLabelName } from '@/lib/qa-input';
 import { useSocket } from '@/lib/socket';
 import type {
   QAHostQuestion,
   QAHostState,
+  QAPublicLabel,
   QAQuestionScore,
   QAQuestionStatus,
   QASessionStatus,
@@ -39,6 +43,10 @@ type ModerationAck =
 type HighlightAck = { ok: true; highlightedQuestionId: string | null } | { error: string };
 
 type EditAck = { ok: true; questionId: string; text: string } | { error: string };
+
+type LabelCreateAck = { ok: true; label: QAPublicLabel } | { error: string };
+
+type LabelAssignAck = { ok: true; questionId: string; labelIds: string[] } | { error: string };
 
 type SortMode = 'popular' | 'recent' | 'oldest';
 
@@ -104,6 +112,23 @@ function editErrorMessage(error: string): string {
   }
 }
 
+function labelErrorMessage(error: string): string {
+  switch (error) {
+    case 'empty_label':
+      return 'A label needs a name.';
+    case 'label_too_long':
+      return `Keep labels under ${QA_LABEL_NAME_LIMIT} characters.`;
+    case 'duplicate_label':
+      return 'That label already exists.';
+    case 'unknown_label':
+      return "That label isn't in this session.";
+    case 'session_ended':
+      return 'The session has ended.';
+    default:
+      return moderationErrorMessage(error);
+  }
+}
+
 export default function QAndAControlClient({ pin, sessionId }: { pin: string; sessionId: string }) {
   const socket = useSocket();
   const [host, setHost] = useState<QAHostState | null>(null);
@@ -123,6 +148,12 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
   // Inline host edit (MID-339): one question at a time, draft kept locally
   // until SAVE so live re-sorts never clobber the host's typing.
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  // Mid-session label minting (MID-340): inline form with a per-label
+  // audience toggle, plus a per-row picker for assigning/unassigning.
+  const [labelFormOpen, setLabelFormOpen] = useState(false);
+  const [labelDraft, setLabelDraft] = useState('');
+  const [labelSelectable, setLabelSelectable] = useState(false);
+  const [labelPickerId, setLabelPickerId] = useState<string | null>(null);
   const toastTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -334,6 +365,46 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
       setEditing(null);
       showToast('Rewritten — original kept on file.');
     });
+  }
+
+  function createLabel() {
+    if (!socket) return;
+    const validated = validateLabelName(labelDraft);
+    if (!validated.ok) {
+      showToast(labelErrorMessage(validated.reason));
+      return;
+    }
+    socket.emit(
+      'qa:host:label:create',
+      { pin, name: validated.value, participantSelectable: labelSelectable },
+      (res: LabelCreateAck) => {
+        if ('error' in res) {
+          showToast(labelErrorMessage(res.error));
+          return;
+        }
+        setLabelDraft('');
+        setLabelSelectable(false);
+        showToast(
+          res.label.participantSelectable
+            ? `Label "${res.label.name}" on the rack — audience can pick it.`
+            : `Label "${res.label.name}" on the rack.`,
+        );
+      },
+    );
+  }
+
+  // Chip toggle: assigned -> unassign, unassigned -> assign. The fresh
+  // qa:host:state broadcast re-renders the chips, so no local patching.
+  function toggleLabelAssignment(q: QAHostQuestion, labelId: string) {
+    if (!socket) return;
+    const action = q.labelIds.includes(labelId) ? 'unassign' : 'assign';
+    socket.emit(
+      `qa:host:label:${action}`,
+      { pin, questionId: q.id, labelId },
+      (res: LabelAssignAck) => {
+        if ('error' in res) showToast(labelErrorMessage(res.error));
+      },
+    );
   }
 
   function moderateBulk(action: 'approve' | 'dismiss') {
@@ -598,7 +669,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
                 </button>
               ))}
             </fieldset>
-            {(host?.labels.length ?? 0) > 0 ? (
+            {(host?.labels.length ?? 0) > 0 && (
               <select
                 value={labelFilter}
                 onChange={(e) => setLabelFilter(e.target.value)}
@@ -613,15 +684,20 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
                   </option>
                 ))}
               </select>
-            ) : (
-              <span
-                className="ink-border ticker text-[11px] tracking-widest px-3 inline-flex items-center opacity-50"
-                style={{ minHeight: 44 }}
-                title="Labels arrive with a later broadcast upgrade (MID-340)"
-              >
-                LABELS · SOON
-              </span>
             )}
+            <button
+              type="button"
+              onClick={() => setLabelFormOpen((v) => !v)}
+              aria-expanded={labelFormOpen}
+              className="ink-border ticker text-[11px] tracking-widest px-3"
+              style={{
+                minHeight: 44,
+                background: labelFormOpen ? 'var(--ink)' : 'var(--bone)',
+                color: labelFormOpen ? 'var(--bone)' : 'var(--ink)',
+              }}
+            >
+              {labelFormOpen ? '✕ LABELS' : '+ LABEL'}
+            </button>
             <input
               type="search"
               value={query}
@@ -632,6 +708,54 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
               style={{ minHeight: 44, background: 'var(--bone)' }}
             />
           </div>
+
+          {/* Label rack (MID-340): mint a session-scoped label mid-broadcast.
+              The audience toggle decides whether participants can pick it at
+              submission (and see it in their filter). */}
+          {labelFormOpen && (
+            <div
+              className="mt-3 ink-border px-3 py-2 flex flex-wrap items-center gap-2"
+              style={{ background: 'var(--bone)' }}
+            >
+              <input
+                value={labelDraft}
+                maxLength={QA_LABEL_NAME_LIMIT}
+                onChange={(e) => setLabelDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    createLabel();
+                  }
+                }}
+                placeholder="NEW LABEL · LOGISTICS, KEYNOTE…"
+                aria-label="New label name"
+                className="ink-border ticker text-[12px] tracking-wide px-3 flex-1 min-w-[160px] bg-transparent outline-none"
+                style={{ minHeight: 44, background: 'var(--bone)' }}
+              />
+              <button
+                type="button"
+                onClick={() => setLabelSelectable((v) => !v)}
+                aria-pressed={labelSelectable}
+                aria-label="Toggle whether the audience can pick this label"
+                className="ink-border ticker text-[10px] tracking-widest px-3"
+                style={{
+                  minHeight: 44,
+                  background: labelSelectable ? 'var(--ivy)' : 'var(--bone)',
+                  color: labelSelectable ? 'var(--bone)' : 'var(--ink)',
+                }}
+              >
+                {labelSelectable ? '● AUDIENCE PICKS' : '○ HOST ONLY'}
+              </button>
+              <button
+                type="button"
+                onClick={createLabel}
+                className="ink-border stamp ticker text-[10px] tracking-widest px-3"
+                style={{ minHeight: 44, background: 'var(--ink)', color: 'var(--bone)' }}
+              >
+                + MINT LABEL
+              </button>
+            </div>
+          )}
 
           {/* Review desk (MID-338): bulk approve/dismiss for selected
               in-review questions. Only rendered when moderation is on. */}
@@ -740,14 +864,57 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
                         </span>
                       )}
                       {q.labelIds.map((id) => (
-                        <span
+                        <button
                           key={id}
-                          className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border opacity-80"
+                          type="button"
+                          onClick={() => toggleLabelAssignment(q, id)}
+                          aria-label={`Remove label ${labelNames.get(id) ?? 'label'} from question`}
+                          title="Tap to remove this label"
+                          className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border opacity-80 hover:opacity-100"
                         >
-                          {(labelNames.get(id) ?? 'LABEL').toUpperCase()}
-                        </span>
+                          {(labelNames.get(id) ?? 'LABEL').toUpperCase()} ✕
+                        </button>
                       ))}
+                      {(host?.labels.length ?? 0) > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setLabelPickerId((id) => (id === q.id ? null : q.id))}
+                          aria-expanded={labelPickerId === q.id}
+                          aria-label={`Pick labels for question: ${q.text}`}
+                          className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border opacity-60 hover:opacity-100"
+                        >
+                          {labelPickerId === q.id ? '✕' : '⊕ LABEL'}
+                        </button>
+                      )}
                     </div>
+                    {/* Label picker (MID-340): every session label as a chip
+                        toggle — filled = assigned, hollow = tap to assign. */}
+                    {labelPickerId === q.id && (
+                      <div
+                        className="mt-2 ink-border px-2 py-2 flex flex-wrap gap-1"
+                        style={{ background: 'var(--bone)' }}
+                      >
+                        {(host?.labels ?? []).map((label) => {
+                          const assigned = q.labelIds.includes(label.id);
+                          return (
+                            <button
+                              key={label.id}
+                              type="button"
+                              onClick={() => toggleLabelAssignment(q, label.id)}
+                              aria-pressed={assigned}
+                              className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border"
+                              style={{
+                                minHeight: 32,
+                                background: assigned ? 'var(--ink)' : 'var(--bone)',
+                                color: assigned ? 'var(--bone)' : 'var(--ink)',
+                              }}
+                            >
+                              {assigned ? '◼' : '◻'} {label.name.toUpperCase()}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                     {editing?.id === q.id ? (
                       <div className="mt-1">
                         <textarea

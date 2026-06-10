@@ -7,7 +7,7 @@
 // public projection never includes participant linkage. Personal projections
 // are targeted at one participant and must never be broadcast.
 
-import { validateQuestionInput } from './qa-input';
+import { validateLabelName, validateQuestionInput } from './qa-input';
 import type {
   QAHostQuestion,
   QAHostState,
@@ -97,7 +97,12 @@ export type QAErrorReason =
   | 'invalid_transition'
   | 'invalid_status'
   | 'downvotes_disabled'
-  | 'session_ended';
+  | 'session_ended'
+  | 'empty_label'
+  | 'label_too_long'
+  | 'duplicate_label'
+  | 'unknown_label'
+  | 'label_not_selectable';
 
 export type QAError = { ok: false; reason: QAErrorReason };
 
@@ -248,7 +253,13 @@ export type SubmitQuestionResult = { ok: true; question: QAQuestionEntry } | QAE
 
 export function submitQuestion(
   state: QAState,
-  args: { participantId: string; text: string; isAnonymous?: boolean; questionId?: string },
+  args: {
+    participantId: string;
+    text: string;
+    isAnonymous?: boolean;
+    questionId?: string;
+    labelIds?: string[];
+  },
 ): SubmitQuestionResult {
   if (!state.submissionsOpen) return { ok: false, reason: 'submissions_closed' };
   const participant = state.participants.get(args.participantId);
@@ -256,6 +267,16 @@ export function submitQuestion(
 
   const validated = validateText(state, args.text);
   if (!validated.ok) return validated;
+
+  // Participants may only attach labels the host marked selectable (PRD
+  // §4.1): unknown or host-only label ids are rejected, never silently
+  // dropped, so the client can surface the mistake.
+  const labelIds = new Set(args.labelIds ?? []);
+  for (const labelId of labelIds) {
+    const label = state.labels.get(labelId);
+    if (!label) return { ok: false, reason: 'unknown_label' };
+    if (!label.participantSelectable) return { ok: false, reason: 'label_not_selectable' };
+  }
 
   const isAnonymous = resolveAnonymity(state.settings.privacyMode, args.isAnonymous);
   if (!isAnonymous && !participant.displayName) {
@@ -276,12 +297,65 @@ export function submitQuestion(
     archivedAt: null,
     dismissedAt: null,
     withdrawnAt: null,
-    labelIds: new Set(),
+    labelIds,
     votes: new Map(),
     replies: [],
   };
   state.questions.set(question.id, question);
   return { ok: true, question };
+}
+
+// --- Labels (MID-340, PRD §4.1 / §4.3) ---
+
+export type CreateLabelResult = { ok: true; labelId: string; label: QALabelEntry } | QAError;
+
+// Session-scoped label creation, usable at session creation and mid-session.
+// Names are unique per session (mirrors the QALabel @@unique([sessionId,
+// name]) constraint) so the in-memory check fails the same way the DB would.
+export function createLabel(
+  state: QAState,
+  args: { name: string; participantSelectable?: boolean; labelId?: string },
+): CreateLabelResult {
+  if (state.status === 'ENDED') return { ok: false, reason: 'session_ended' };
+  const validated = validateLabelName(args.name);
+  if (!validated.ok) return { ok: false, reason: validated.reason };
+  for (const label of state.labels.values()) {
+    if (label.name === validated.value) return { ok: false, reason: 'duplicate_label' };
+  }
+  const labelId = args.labelId ?? genId('qal');
+  const label: QALabelEntry = {
+    name: validated.value,
+    participantSelectable: args.participantSelectable ?? false,
+  };
+  state.labels.set(labelId, label);
+  return { ok: true, labelId, label };
+}
+
+export type AssignLabelResult = { ok: true; assigned: boolean } | QAError;
+
+// Idempotent: the labelIds set makes a repeat assign a no-op (`assigned:
+// false`), matching the repo's upsert on the compound key.
+export function assignLabel(
+  state: QAState,
+  args: { questionId: string; labelId: string },
+): AssignLabelResult {
+  if (!state.labels.has(args.labelId)) return { ok: false, reason: 'unknown_label' };
+  const question = state.questions.get(args.questionId);
+  if (!question) return { ok: false, reason: 'unknown_question' };
+  if (question.labelIds.has(args.labelId)) return { ok: true, assigned: false };
+  question.labelIds.add(args.labelId);
+  return { ok: true, assigned: true };
+}
+
+export type UnassignLabelResult = { ok: true; removed: boolean } | QAError;
+
+export function unassignLabel(
+  state: QAState,
+  args: { questionId: string; labelId: string },
+): UnassignLabelResult {
+  const question = state.questions.get(args.questionId);
+  if (!question) return { ok: false, reason: 'unknown_question' };
+  return { ok: true, removed: question.labelIds.delete(args.labelId) };
 }
 
 export type QuestionTransitionResult =

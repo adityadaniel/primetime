@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { QA_QUESTION_DEFAULT_CHAR_LIMIT, validateQuestionInput } from './qa-input';
+import {
+  QA_LABEL_NAME_LIMIT,
+  QA_QUESTION_DEFAULT_CHAR_LIMIT,
+  validateLabelName,
+  validateQuestionInput,
+} from './qa-input';
 
 describe('validateQuestionInput', () => {
   it('trims surrounding whitespace and accepts the trimmed text', () => {
@@ -52,5 +57,26 @@ describe('validateQuestionInput', () => {
     expect(validateQuestionInput(spicy)).toEqual({ ok: true, value: spicy });
     const multiline = 'Two part question:\n1) why?\n2) how?';
     expect(validateQuestionInput(multiline)).toEqual({ ok: true, value: multiline });
+  });
+});
+
+describe('validateLabelName', () => {
+  it('trims surrounding whitespace and accepts the trimmed name', () => {
+    expect(validateLabelName('  Logistics  ')).toEqual({ ok: true, value: 'Logistics' });
+  });
+
+  it('rejects empty, whitespace-only, and non-string input', () => {
+    expect(validateLabelName('')).toEqual({ ok: false, reason: 'empty_label' });
+    expect(validateLabelName('   ')).toEqual({ ok: false, reason: 'empty_label' });
+    expect(validateLabelName(undefined as unknown as string)).toEqual({
+      ok: false,
+      reason: 'empty_label',
+    });
+  });
+
+  it('enforces the 50-character limit (QALabel.name VarChar(50))', () => {
+    expect(QA_LABEL_NAME_LIMIT).toBe(50);
+    expect(validateLabelName('a'.repeat(50)).ok).toBe(true);
+    expect(validateLabelName('a'.repeat(51))).toEqual({ ok: false, reason: 'label_too_long' });
   });
 });

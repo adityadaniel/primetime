@@ -9,9 +9,11 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import AccountMenu from '@/components/AccountMenu';
 import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { QA_LABEL_NAME_LIMIT, validateLabelName } from '@/lib/qa-input';
 
 const TITLE_MAX = 100;
 const DESCRIPTION_MAX = 200;
+const LABELS_MAX = 20;
 
 const TITLE_PLACEHOLDERS = [
   'Ask us anything',
@@ -56,6 +58,11 @@ export default function QAndANew() {
   const [participantRepliesEnabled, setParticipantRepliesEnabled] = useState(false);
   const [downvotesEnabled, setDownvotesEnabled] = useState(false);
   const [questionCharLimit, setQuestionCharLimit] = useState<(typeof CHAR_LIMITS)[number]>(280);
+  // Optional session-scoped labels (MID-340) with a per-label toggle deciding
+  // whether participants may pick it at submission.
+  const [labels, setLabels] = useState<{ name: string; participantSelectable: boolean }[]>([]);
+  const [labelDraft, setLabelDraft] = useState('');
+  const [labelError, setLabelError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
@@ -71,6 +78,29 @@ export default function QAndANew() {
   const titleCharsLeft = TITLE_MAX - title.length;
   const trimmedTitle = title.trim();
   const valid = trimmedTitle.length >= 1 && trimmedTitle.length <= TITLE_MAX;
+
+  function addLabel() {
+    setLabelError(null);
+    const validated = validateLabelName(labelDraft);
+    if (!validated.ok) {
+      setLabelError(
+        validated.reason === 'label_too_long'
+          ? `Keep labels under ${QA_LABEL_NAME_LIMIT} characters.`
+          : 'Type a label name first.',
+      );
+      return;
+    }
+    if (labels.some((l) => l.name === validated.value)) {
+      setLabelError('That label is already on the list.');
+      return;
+    }
+    if (labels.length >= LABELS_MAX) {
+      setLabelError(`Up to ${LABELS_MAX} labels per session.`);
+      return;
+    }
+    setLabels((prev) => [...prev, { name: validated.value, participantSelectable: false }]);
+    setLabelDraft('');
+  }
 
   async function start() {
     if (!valid || submitting) return;
@@ -88,6 +118,7 @@ export default function QAndANew() {
           participantRepliesEnabled,
           downvotesEnabled,
           questionCharLimit,
+          labels,
         }),
       });
       if (!res.ok) {
@@ -277,6 +308,94 @@ export default function QAndANew() {
                 );
               })}
             </div>
+          </fieldset>
+
+          <fieldset className="mt-10">
+            <legend className="chyron">LABELS · OPTIONAL · SORT THE WIRE</legend>
+            <p className="font-editorial italic text-[13px] mt-1 opacity-70">
+              Tag questions by topic or segment. Flip a label to AUDIENCE to let senders pick it
+              when they ask. You can add more mid-broadcast.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <input
+                value={labelDraft}
+                maxLength={QA_LABEL_NAME_LIMIT}
+                onChange={(e) => setLabelDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addLabel();
+                  }
+                }}
+                placeholder="Logistics, Keynote, Spicy…"
+                aria-label="New label name"
+                className="ink-border flex-1 min-w-0 font-editorial text-lg bg-transparent outline-none px-3"
+                style={{ minHeight: 56, background: 'var(--bone)' }}
+              />
+              <button
+                type="button"
+                onClick={addLabel}
+                className="ink-border stamp ticker text-[12px] tracking-widest px-4"
+                style={{ minHeight: 56, background: 'var(--ink)', color: 'var(--bone)' }}
+              >
+                + ADD
+              </button>
+            </div>
+            {labelError && (
+              <p
+                role="alert"
+                className="ticker text-[11px] tracking-widest mt-2"
+                style={{ color: 'var(--vermilion)' }}
+              >
+                ⚠ {labelError}
+              </p>
+            )}
+            {labels.length > 0 && (
+              <ul className="mt-3 space-y-2">
+                {labels.map((label) => (
+                  <li
+                    key={label.name}
+                    className="ink-border flex items-center gap-3 px-3 py-2"
+                    style={{ background: 'var(--bone)' }}
+                  >
+                    <span className="font-editorial text-lg flex-1 min-w-0 break-words">
+                      {label.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLabels((prev) =>
+                          prev.map((l) =>
+                            l.name === label.name
+                              ? { ...l, participantSelectable: !l.participantSelectable }
+                              : l,
+                          ),
+                        )
+                      }
+                      aria-pressed={label.participantSelectable}
+                      aria-label={`Toggle audience selection for label ${label.name}`}
+                      className="ink-border ticker text-[10px] tracking-widest px-3"
+                      style={{
+                        minHeight: 44,
+                        background: label.participantSelectable ? 'var(--ivy)' : 'var(--bone)',
+                        color: label.participantSelectable ? 'var(--bone)' : 'var(--ink)',
+                      }}
+                    >
+                      {label.participantSelectable ? '● AUDIENCE PICKS' : '○ HOST ONLY'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLabels((prev) => prev.filter((l) => l.name !== label.name))}
+                      aria-label={`Remove label ${label.name}`}
+                      className="ink-border ticker text-[10px] tracking-widest px-3"
+                      style={{ minHeight: 44, background: 'var(--bone)', color: 'var(--ink)' }}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </fieldset>
 
           {error && (

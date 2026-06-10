@@ -4,7 +4,9 @@ import {
   applyVote,
   approveQuestion,
   archiveQuestion,
+  assignLabel,
   bindParticipantSocket,
+  createLabel,
   createQAState,
   dismissQuestion,
   editQuestion,
@@ -24,6 +26,7 @@ import {
   setSubmissionsOpen,
   setVotingOpen,
   submitQuestion,
+  unassignLabel,
   withdrawQuestion,
 } from './qa';
 import type { QAQuestionStatus, QASessionStatus } from './types';
@@ -1219,5 +1222,168 @@ describe('moderation queue privacy (MID-338)', () => {
       reason: 'invalid_transition',
     });
     expect(state.questions.get(qid)?.status).toBe('LIVE');
+  });
+});
+
+describe('labels (MID-340)', () => {
+  function makeLabel(state: QAState, name = 'Logistics', participantSelectable = false): string {
+    const r = createLabel(state, { name, participantSelectable });
+    if (!r.ok) throw new Error(`createLabel failed: ${r.reason}`);
+    return r.labelId;
+  }
+
+  describe('createLabel', () => {
+    it('creates a session-scoped label, trimmed, defaulting to host-only', () => {
+      const state = makeState();
+      const r = createLabel(state, { name: '  Logistics  ' });
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(r.label).toEqual({ name: 'Logistics', participantSelectable: false });
+      expect(state.labels.get(r.labelId)).toEqual(r.label);
+    });
+
+    it('honors participantSelectable and an explicit labelId (hydration/rekey path)', () => {
+      const state = makeState();
+      const r = createLabel(state, { name: 'Venue', participantSelectable: true, labelId: 'l_db' });
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(r.labelId).toBe('l_db');
+      expect(state.labels.get('l_db')?.participantSelectable).toBe(true);
+    });
+
+    it('rejects empty, over-long, and duplicate names', () => {
+      const state = makeState();
+      expect(createLabel(state, { name: '   ' })).toEqual({ ok: false, reason: 'empty_label' });
+      expect(createLabel(state, { name: 'x'.repeat(51) })).toEqual({
+        ok: false,
+        reason: 'label_too_long',
+      });
+      makeLabel(state, 'Logistics');
+      expect(createLabel(state, { name: ' Logistics ' })).toEqual({
+        ok: false,
+        reason: 'duplicate_label',
+      });
+      expect(state.labels.size).toBe(1);
+    });
+
+    it('rejects label creation after the session ended', () => {
+      const state = makeState();
+      setSessionStatus(state, 'ENDED');
+      expect(createLabel(state, { name: 'Late' })).toEqual({
+        ok: false,
+        reason: 'session_ended',
+      });
+    });
+  });
+
+  describe('assignLabel / unassignLabel', () => {
+    it('assigns and unassigns a label on a question, idempotently', () => {
+      const state = makeState();
+      const pid = join(state);
+      const qid = submitLive(state, pid);
+      const labelId = makeLabel(state);
+
+      expect(assignLabel(state, { questionId: qid, labelId })).toEqual({
+        ok: true,
+        assigned: true,
+      });
+      expect(assignLabel(state, { questionId: qid, labelId })).toEqual({
+        ok: true,
+        assigned: false,
+      });
+      expect([...(state.questions.get(qid)?.labelIds ?? [])]).toEqual([labelId]);
+
+      expect(unassignLabel(state, { questionId: qid, labelId })).toEqual({
+        ok: true,
+        removed: true,
+      });
+      expect(unassignLabel(state, { questionId: qid, labelId })).toEqual({
+        ok: true,
+        removed: false,
+      });
+      expect(state.questions.get(qid)?.labelIds.size).toBe(0);
+    });
+
+    it('supports multiple labels per question', () => {
+      const state = makeState();
+      const pid = join(state);
+      const qid = submitLive(state, pid);
+      const a = makeLabel(state, 'A');
+      const b = makeLabel(state, 'B');
+      assignLabel(state, { questionId: qid, labelId: a });
+      assignLabel(state, { questionId: qid, labelId: b });
+      expect([...(state.questions.get(qid)?.labelIds ?? [])].sort()).toEqual([a, b].sort());
+    });
+
+    it('rejects unknown questions and unknown labels', () => {
+      const state = makeState();
+      const pid = join(state);
+      const qid = submitLive(state, pid);
+      const labelId = makeLabel(state);
+      expect(assignLabel(state, { questionId: 'nope', labelId })).toEqual({
+        ok: false,
+        reason: 'unknown_question',
+      });
+      expect(assignLabel(state, { questionId: qid, labelId: 'nope' })).toEqual({
+        ok: false,
+        reason: 'unknown_label',
+      });
+      expect(unassignLabel(state, { questionId: 'nope', labelId })).toEqual({
+        ok: false,
+        reason: 'unknown_question',
+      });
+    });
+  });
+
+  describe('participant label selection at submission', () => {
+    it('attaches participant-selectable labels, deduplicated', () => {
+      const state = makeState();
+      const pid = join(state);
+      const labelId = makeLabel(state, 'Open mic', true);
+      const r = submitQuestion(state, {
+        participantId: pid,
+        text: 'q',
+        labelIds: [labelId, labelId],
+      });
+      expect(r.ok).toBe(true);
+      if (r.ok) expect([...r.question.labelIds]).toEqual([labelId]);
+    });
+
+    it('rejects unknown and host-only labels instead of silently dropping them', () => {
+      const state = makeState();
+      const pid = join(state);
+      const hostOnly = makeLabel(state, 'Host only', false);
+      expect(submitQuestion(state, { participantId: pid, text: 'q', labelIds: ['nope'] })).toEqual({
+        ok: false,
+        reason: 'unknown_label',
+      });
+      expect(
+        submitQuestion(state, { participantId: pid, text: 'q', labelIds: [hostOnly] }),
+      ).toEqual({ ok: false, reason: 'label_not_selectable' });
+      expect(state.questions.size).toBe(0);
+    });
+  });
+
+  describe('projections', () => {
+    it('public and host projections carry labels and per-question labelIds', () => {
+      const state = makeState();
+      const pid = join(state);
+      const qid = submitLive(state, pid);
+      const visible = makeLabel(state, 'Audience pick', true);
+      const hostOnly = makeLabel(state, 'Follow up', false);
+      assignLabel(state, { questionId: qid, labelId: visible });
+      assignLabel(state, { questionId: qid, labelId: hostOnly });
+
+      const pub = publicState(state);
+      expect(pub.labels).toEqual([
+        { id: visible, name: 'Audience pick', participantSelectable: true },
+        { id: hostOnly, name: 'Follow up', participantSelectable: false },
+      ]);
+      expect(pub.questions[0].labelIds.sort()).toEqual([visible, hostOnly].sort());
+
+      const host = hostState(state);
+      expect(host.labels).toEqual(pub.labels);
+      expect(host.questions[0].labelIds.sort()).toEqual([visible, hostOnly].sort());
+    });
   });
 });
