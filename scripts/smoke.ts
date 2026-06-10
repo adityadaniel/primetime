@@ -159,6 +159,7 @@ async function main() {
   await assertQaSocketFoundation();
   await assertQaParticipantFlow();
   await assertQaVoting();
+  await assertQaModerationQueue();
 
   await assertPersistenceRowsWritten();
 }
@@ -224,6 +225,20 @@ async function assertCapEnforcement() {
 
 function connectSock() {
   const s = io(URL, { transports: ['websocket'], forceNew: true });
+  return new Promise<ReturnType<typeof io>>((resolve) => {
+    s.on('connect', () => resolve(s));
+  });
+}
+
+// Socket carrying an Auth.js session cookie so server.ts authenticates it as
+// a logged-in user (socket.data.userId). Used to prove host-user auth alone
+// is not enough to moderate — the socket must be the attached host control.
+function connectAuthedSock(sessionToken: string) {
+  const s = io(URL, {
+    transports: ['websocket'],
+    forceNew: true,
+    extraHeaders: { cookie: `authjs.session-token=${sessionToken}` },
+  });
   return new Promise<ReturnType<typeof io>>((resolve) => {
     s.on('connect', () => resolve(s));
   });
@@ -1978,6 +1993,404 @@ async function assertQaVoting() {
     bob.disconnect();
     bob2?.disconnect();
     for (const sock of burstVoters) sock.disconnect();
+    await prisma.$disconnect();
+  }
+}
+
+// --- scenario 21 (MID-338): Q&A moderation queue ---
+
+type QaHostSnapshot = {
+  pin: string;
+  counts: {
+    live: number;
+    inReview: number;
+    answered: number;
+    archived: number;
+    dismissed: number;
+  };
+  questions: { id: string; text: string; status: string }[];
+};
+
+type QaModerationAck =
+  | { ok: true; questionId: string; status: string }
+  | { ok: true; questionIds: string[]; failed: { questionId: string; error: string }[] }
+  | { error: string };
+
+function qaWaitForHostState(
+  sock: ReturnType<typeof io>,
+  predicate: (s: QaHostSnapshot) => boolean,
+) {
+  return new Promise<QaHostSnapshot>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('no matching qa:host:state emit')), 3000);
+    sock.on('qa:host:state', function onState(s: QaHostSnapshot) {
+      if (predicate(s)) {
+        sock.off('qa:host:state', onState);
+        clearTimeout(t);
+        resolve(s);
+      }
+    });
+  });
+}
+
+function qaWaitForPersonal(
+  sock: ReturnType<typeof io>,
+  predicate: (p: QaPersonalSnapshot) => boolean,
+) {
+  return new Promise<QaPersonalSnapshot>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('no matching qa:personal emit')), 3000);
+    sock.on('qa:personal', function onPersonal(p: QaPersonalSnapshot) {
+      if (predicate(p)) {
+        sock.off('qa:personal', onPersonal);
+        clearTimeout(t);
+        resolve(p);
+      }
+    });
+  });
+}
+
+async function assertQaModerationQueue() {
+  console.log('\n--- scenario 21 (MID-338): Q&A moderation queue ---');
+  const prisma = new PrismaClient();
+  const host = await connectSock();
+  const display = await connectSock();
+  const alice = await connectSock();
+  const bob = await connectSock();
+  try {
+    const { pin, sessionId } = await qaCreateSession({ moderationEnabled: true });
+    console.log('qa moderation pin:', pin);
+    qaOk(await qaEmit(host, 'qa:host:attach', { pin, sessionId }), 'qa:host:attach');
+    const dispAck = qaOk<{ state: QaPublicSnapshot }>(
+      (await qaEmit(display, 'qa:display:attach', { pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'qa:display:attach',
+    );
+    if (dispAck.state.questionCount !== 0) {
+      throw new Error(`expected empty board, got ${dispAck.state.questionCount}`);
+    }
+    qaOk(
+      (await qaEmit(alice, 'qa:participant:join', { pin, displayName: 'Alice' })) as QaJoinAck,
+      'alice join',
+    );
+    qaOk(
+      (await qaEmit(bob, 'qa:participant:join', { pin, displayName: 'Bob' })) as QaJoinAck,
+      'bob join',
+    );
+
+    // moderated submit lands IN_REVIEW: the host board updates (targeted
+    // emit), the public room stays silent
+    const hostSawQ1 = qaWaitForHostState(host, (s) => s.counts.inReview === 1);
+    const sub1 = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:submit', {
+        pin,
+        text: 'Moderate me first?',
+      })) as QaActionAck,
+      'moderated submit q1',
+    );
+    if (sub1.status !== 'IN_REVIEW') throw new Error(`expected IN_REVIEW, got ${sub1.status}`);
+    await hostSawQ1;
+    const boardBeforeApprove = qaOk<{ state: QaPublicSnapshot }>(
+      (await qaEmit(display, 'qa:display:attach', { pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'pre-approve display attach',
+    );
+    if (boardBeforeApprove.state.questionCount !== 0) {
+      throw new Error(
+        `in-review question leaked publicly: ${JSON.stringify(boardBeforeApprove.state)}`,
+      );
+    }
+
+    // a non-host socket cannot moderate
+    qaExpectError(
+      await qaEmit(alice, 'qa:host:approve', { pin, questionId: sub1.questionId }),
+      'forbidden',
+      'non-host approve',
+    );
+
+    // approve: question goes public without refresh, owner gets a personal
+    // push, DB has the status + moderation event
+    const displaySawApprove = qaWaitForState(display, (s) => s.questionCount === 1);
+    const aliceSawApprove = qaWaitForPersonal(alice, (p) =>
+      p.questions.some((q) => q.id === sub1.questionId && q.status === 'LIVE'),
+    );
+    const approveAck = (await qaEmit(host, 'qa:host:approve', {
+      pin,
+      questionId: sub1.questionId,
+    })) as QaModerationAck;
+    if (!('ok' in approveAck) || !('status' in approveAck) || approveAck.status !== 'LIVE') {
+      throw new Error(`bad approve ack: ${JSON.stringify(approveAck)}`);
+    }
+    const approveSnap = await displaySawApprove;
+    if (!approveSnap.questions.some((q) => q.id === sub1.questionId)) {
+      throw new Error(
+        `approved question missing from public board: ${JSON.stringify(approveSnap)}`,
+      );
+    }
+    await aliceSawApprove;
+    const approvedRow = await prisma.qAQuestion.findUnique({ where: { id: sub1.questionId } });
+    if (approvedRow?.status !== 'LIVE' || approvedRow.approvedAt === null) {
+      throw new Error(`DB row not LIVE after approve: ${JSON.stringify(approvedRow)}`);
+    }
+
+    // approving a LIVE question is rejected
+    qaExpectError(
+      await qaEmit(host, 'qa:host:approve', { pin, questionId: sub1.questionId }),
+      'invalid_transition',
+      'double approve',
+    );
+
+    // dismiss: never public, owner sees DISMISSED, host board moves it to the
+    // spike pile
+    await sleep(1100); // submit rate-limit window
+    const sub2 = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:submit', {
+        pin,
+        text: 'Dismiss me quietly?',
+      })) as QaActionAck,
+      'moderated submit q2',
+    );
+    const aliceSawDismiss = qaWaitForPersonal(alice, (p) =>
+      p.questions.some((q) => q.id === sub2.questionId && q.status === 'DISMISSED'),
+    );
+    const hostSawDismiss = qaWaitForHostState(host, (s) => s.counts.dismissed === 1);
+    const dismissAck = (await qaEmit(host, 'qa:host:dismiss', {
+      pin,
+      questionId: sub2.questionId,
+    })) as QaModerationAck;
+    if (!('ok' in dismissAck) || !('status' in dismissAck) || dismissAck.status !== 'DISMISSED') {
+      throw new Error(`bad dismiss ack: ${JSON.stringify(dismissAck)}`);
+    }
+    await aliceSawDismiss;
+    const hostDismissSnap = await hostSawDismiss;
+    if (!hostDismissSnap.questions.some((q) => q.id === sub2.questionId)) {
+      throw new Error('dismissed question missing from host board (not restorable)');
+    }
+    const boardAfterDismiss = qaOk<{ state: QaPublicSnapshot }>(
+      (await qaEmit(display, 'qa:display:attach', { pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'post-dismiss display attach',
+    );
+    if (
+      boardAfterDismiss.state.questionCount !== 1 ||
+      JSON.stringify(boardAfterDismiss.state).includes('Dismiss me quietly?')
+    ) {
+      throw new Error(`dismissed question leaked: ${JSON.stringify(boardAfterDismiss.state)}`);
+    }
+    const dismissedRow = await prisma.qAQuestion.findUnique({ where: { id: sub2.questionId } });
+    if (dismissedRow?.status !== 'DISMISSED' || dismissedRow.dismissedAt === null) {
+      throw new Error(`DB row not DISMISSED: ${JSON.stringify(dismissedRow)}`);
+    }
+
+    // restore: dismissed question returns to IN_REVIEW (still private)
+    const aliceSawRestore = qaWaitForPersonal(alice, (p) =>
+      p.questions.some((q) => q.id === sub2.questionId && q.status === 'IN_REVIEW'),
+    );
+    const restoreAck = (await qaEmit(host, 'qa:host:restore', {
+      pin,
+      questionId: sub2.questionId,
+    })) as QaModerationAck;
+    if (!('ok' in restoreAck) || !('status' in restoreAck) || restoreAck.status !== 'IN_REVIEW') {
+      throw new Error(`bad restore ack: ${JSON.stringify(restoreAck)}`);
+    }
+    await aliceSawRestore;
+    const boardAfterRestore = qaOk<{ state: QaPublicSnapshot }>(
+      (await qaEmit(display, 'qa:display:attach', { pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'post-restore display attach',
+    );
+    if (boardAfterRestore.state.questionCount !== 1) {
+      throw new Error(
+        `restored question leaked publicly: ${JSON.stringify(boardAfterRestore.state)}`,
+      );
+    }
+
+    // restore is dismissed-only (MID-338): LIVE and IN_REVIEW questions are
+    // rejected. ANSWERED/ARCHIVED -> LIVE restores belong to MID-339 and are
+    // covered as unit negatives in lib/qa.test.ts.
+    qaExpectError(
+      await qaEmit(host, 'qa:host:restore', { pin, questionId: sub1.questionId }),
+      'invalid_transition',
+      'restore LIVE question',
+    );
+    qaExpectError(
+      await qaEmit(host, 'qa:host:restore', { pin, questionId: sub2.questionId }),
+      'invalid_transition',
+      'restore IN_REVIEW question',
+    );
+
+    // bulk approve: q2 (restored) + a fresh bob question + one bogus id —
+    // good ids go live together, the bogus one is reported, not fatal
+    const sub3 = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(bob, 'qa:participant:submit', {
+        pin,
+        text: 'Bulk approve me too?',
+      })) as QaActionAck,
+      'moderated submit q3',
+    );
+    const displaySawBulkApprove = qaWaitForState(display, (s) => s.questionCount === 3);
+    const bulkApproveAck = (await qaEmit(host, 'qa:host:approve', {
+      pin,
+      questionIds: [sub2.questionId, sub3.questionId, 'qaq_bogus'],
+    })) as QaModerationAck;
+    if (
+      !('ok' in bulkApproveAck) ||
+      !('questionIds' in bulkApproveAck) ||
+      bulkApproveAck.questionIds.length !== 2 ||
+      bulkApproveAck.failed.length !== 1 ||
+      bulkApproveAck.failed[0].error !== 'unknown_question'
+    ) {
+      throw new Error(`bad bulk approve ack: ${JSON.stringify(bulkApproveAck)}`);
+    }
+    await displaySawBulkApprove;
+
+    // bulk dismiss: two fresh in-review questions never become public
+    await sleep(1100);
+    const sub4 = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:submit', {
+        pin,
+        text: 'Bulk spike one?',
+      })) as QaActionAck,
+      'moderated submit q4',
+    );
+    const sub5 = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(bob, 'qa:participant:submit', {
+        pin,
+        text: 'Bulk spike two?',
+      })) as QaActionAck,
+      'moderated submit q5',
+    );
+    const hostSawBulkDismiss = qaWaitForHostState(host, (s) => s.counts.dismissed === 2);
+    const bulkDismissAck = (await qaEmit(host, 'qa:host:dismiss', {
+      pin,
+      questionIds: [sub4.questionId, sub5.questionId],
+    })) as QaModerationAck;
+    if (
+      !('ok' in bulkDismissAck) ||
+      !('questionIds' in bulkDismissAck) ||
+      bulkDismissAck.questionIds.length !== 2 ||
+      bulkDismissAck.failed.length !== 0
+    ) {
+      throw new Error(`bad bulk dismiss ack: ${JSON.stringify(bulkDismissAck)}`);
+    }
+    await hostSawBulkDismiss;
+    const finalBoard = qaOk<{ state: QaPublicSnapshot }>(
+      (await qaEmit(display, 'qa:display:attach', { pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'final display attach',
+    );
+    const finalSerialized = JSON.stringify(finalBoard.state);
+    if (
+      finalBoard.state.questionCount !== 3 ||
+      finalSerialized.includes('Bulk spike one?') ||
+      finalSerialized.includes('Bulk spike two?')
+    ) {
+      throw new Error(`bulk-dismissed question leaked: ${finalSerialized}`);
+    }
+
+    // moderation events persisted with enough history to explain every move
+    const events = await prisma.qAModerationEvent.findMany({
+      where: { sessionId },
+      orderBy: { createdAt: 'asc' },
+    });
+    const byAction = (action: string) => events.filter((e) => e.action === action);
+    if (byAction('approve').length !== 3) {
+      throw new Error(`expected 3 approve events, got ${byAction('approve').length}`);
+    }
+    if (byAction('dismiss').length !== 3) {
+      throw new Error(`expected 3 dismiss events, got ${byAction('dismiss').length}`);
+    }
+    if (byAction('restore').length !== 1) {
+      throw new Error(`expected 1 restore event, got ${byAction('restore').length}`);
+    }
+    const bulkEvents = events.filter((e) => e.reason === 'bulk');
+    if (bulkEvents.length !== 4) {
+      throw new Error(`expected 4 bulk-flagged events, got ${bulkEvents.length}`);
+    }
+    const q2History = events.filter((e) => e.questionId === sub2.questionId).map((e) => e.action);
+    if (JSON.stringify(q2History) !== JSON.stringify(['dismiss', 'restore', 'approve'])) {
+      throw new Error(`q2 history cannot explain its disappearance: ${JSON.stringify(q2History)}`);
+    }
+
+    // same-auth non-host socket: a second socket authenticated as the SAME
+    // host user (e.g. that host's participant tab) must NOT be able to
+    // moderate — only the attached host control socket may. Needs the
+    // server's AUTH_SECRET to forge a session cookie; skip when unset (the
+    // server would have generated a random dev secret we cannot match).
+    const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+    if (!authSecret) {
+      console.warn('⚠ AUTH_SECRET not set — skipping same-auth non-host moderation check');
+    } else {
+      const owner = await prisma.user.upsert({
+        where: { email: 'qa-smoke@example.com' },
+        update: {},
+        create: { email: 'qa-smoke@example.com' },
+      });
+      const { encode: encodeAuthJwt } = await import('@auth/core/jwt');
+      const sessionToken = await encodeAuthJwt({
+        token: { id: owner.id },
+        secret: authSecret,
+        salt: 'authjs.session-token',
+        maxAge: 60 * 60,
+      });
+      const owned = await qaCreateSession({ moderationEnabled: true, hostUserId: owner.id });
+      const hostCtl = await connectAuthedSock(sessionToken);
+      const sameUser = await connectAuthedSock(sessionToken);
+      try {
+        qaOk(
+          await qaEmit(hostCtl, 'qa:host:attach', { pin: owned.pin, sessionId: owned.sessionId }),
+          'owned qa:host:attach',
+        );
+        qaOk(
+          (await qaEmit(sameUser, 'qa:participant:join', {
+            pin: owned.pin,
+            displayName: 'HostTab',
+          })) as QaJoinAck,
+          'same-user participant join',
+        );
+        const subOwned = qaOk<Exclude<QaActionAck, { error: string }>>(
+          (await qaEmit(sameUser, 'qa:participant:submit', {
+            pin: owned.pin,
+            text: 'Same-user, different socket?',
+          })) as QaActionAck,
+          'same-user submit',
+        );
+        qaExpectError(
+          await qaEmit(sameUser, 'qa:host:approve', {
+            pin: owned.pin,
+            questionId: subOwned.questionId,
+          }),
+          'forbidden',
+          'same-auth non-host approve',
+        );
+        // sanity: the attached host control socket CAN moderate with this
+        // auth — proves the forged cookie works and the check above is real
+        const ownedApprove = (await qaEmit(hostCtl, 'qa:host:approve', {
+          pin: owned.pin,
+          questionId: subOwned.questionId,
+        })) as QaModerationAck;
+        if (
+          !('ok' in ownedApprove) ||
+          !('status' in ownedApprove) ||
+          ownedApprove.status !== 'LIVE'
+        ) {
+          throw new Error(`owned host approve failed: ${JSON.stringify(ownedApprove)}`);
+        }
+      } finally {
+        hostCtl.disconnect();
+        sameUser.disconnect();
+      }
+    }
+
+    console.log('✓ Q&A moderation queue (MID-338)');
+  } finally {
+    host.disconnect();
+    display.disconnect();
+    alice.disconnect();
+    bob.disconnect();
     await prisma.$disconnect();
   }
 }

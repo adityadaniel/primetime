@@ -226,12 +226,13 @@ export interface QAHostCounts {
   inReview: number;
   answered: number;
   archived: number;
+  dismissed: number;
 }
 
 /**
  * Projection targeted at the host socket only (`qa:host:state`). Never
- * broadcast to the mixed qa:${pin} room: it includes IN_REVIEW questions,
- * which must stay invisible to displays and other participants.
+ * broadcast to the mixed qa:${pin} room: it includes IN_REVIEW and DISMISSED
+ * questions, which must stay invisible to displays and other participants.
  */
 export interface QAHostState {
   pin: string;
@@ -249,7 +250,11 @@ export interface QAHostState {
   counts: QAHostCounts;
   highlightedQuestionId: string | null;
   labels: QAPublicLabel[];
-  /** LIVE and IN_REVIEW questions, popular order (score desc, oldest first). */
+  /**
+   * LIVE, IN_REVIEW, and DISMISSED questions, popular order (score desc,
+   * oldest first). DISMISSED rows exist so the host can restore them
+   * (MID-338) — they are host-only and never reach public projections.
+   */
   questions: QAHostQuestion[];
 }
 

@@ -243,14 +243,22 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
         };
       });
     };
+    // Targeted personal push (MID-338): host moderation (approve/dismiss/
+    // restore) refreshes this participant's own-questions panel without a
+    // round-trip. Only ever emitted at this socket — never the room.
+    const onPersonal = (p: QAPersonalState) => {
+      if (p.participantId === participantIdRef.current) setPersonal(p);
+    };
     const onConnect = () => join();
     socket.on('qa:state', onState);
     socket.on('qa:scores', onScores);
+    socket.on('qa:personal', onPersonal);
     socket.on('connect', onConnect);
     if (socket.connected) join();
     return () => {
       socket.off('qa:state', onState);
       socket.off('qa:scores', onScores);
+      socket.off('qa:personal', onPersonal);
       socket.off('connect', onConnect);
     };
   }, [socket, pin, join]);

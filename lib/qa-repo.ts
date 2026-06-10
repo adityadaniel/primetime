@@ -8,6 +8,7 @@
 // toHostVisibleQuestion() before handing questions to host/export surfaces.
 
 import type {
+  Prisma,
   QALabel,
   QAModerationEvent,
   QAParticipant,
@@ -179,10 +180,10 @@ export async function addQuestion(args: {
   });
 }
 
-export async function setQuestionStatus(args: {
-  questionId: string;
-  status: QAQuestionStatus;
-}): Promise<QAQuestion> {
+async function applyQuestionStatus(
+  tx: Prisma.TransactionClient,
+  args: { questionId: string; status: QAQuestionStatus },
+): Promise<QAQuestion> {
   const data: {
     status: QAQuestionStatus;
     approvedAt?: Date;
@@ -192,7 +193,7 @@ export async function setQuestionStatus(args: {
     withdrawnAt?: Date;
   } = { status: args.status };
   if (args.status === 'LIVE') {
-    const existing = await prisma.qAQuestion.findUnique({
+    const existing = await tx.qAQuestion.findUnique({
       where: { id: args.questionId },
       select: { approvedAt: true },
     });
@@ -202,9 +203,48 @@ export async function setQuestionStatus(args: {
   if (args.status === 'ARCHIVED') data.archivedAt = new Date();
   if (args.status === 'DISMISSED') data.dismissedAt = new Date();
   if (args.status === 'WITHDRAWN') data.withdrawnAt = new Date();
-  return prisma.qAQuestion.update({
+  return tx.qAQuestion.update({
     where: { id: args.questionId },
     data,
+  });
+}
+
+export async function setQuestionStatus(args: {
+  questionId: string;
+  status: QAQuestionStatus;
+}): Promise<QAQuestion> {
+  return applyQuestionStatus(prisma, args);
+}
+
+// Moderation actions (MID-338) require an audit trail: the status update and
+// its QAModerationEvent commit in ONE transaction so a moderation action can
+// never persist without the event that explains it (and vice versa). Callers
+// treat any failure as persistence_failed and roll back in-memory state.
+export async function setQuestionStatusWithModerationEvent(args: {
+  questionId: string;
+  status: QAQuestionStatus;
+  sessionId: string;
+  hostUserId?: string | null;
+  action: string;
+  reason?: string | null;
+}): Promise<{ question: QAQuestion; event: QAModerationEvent }> {
+  const action = args.action.trim();
+  if (!action) throw new Error('Action required');
+  return prisma.$transaction(async (tx) => {
+    const question = await applyQuestionStatus(tx, {
+      questionId: args.questionId,
+      status: args.status,
+    });
+    const event = await tx.qAModerationEvent.create({
+      data: {
+        sessionId: args.sessionId,
+        questionId: args.questionId,
+        hostUserId: args.hostUserId ?? null,
+        action,
+        reason: args.reason ?? null,
+      },
+    });
+    return { question, event };
   });
 }
 

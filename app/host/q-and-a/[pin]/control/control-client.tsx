@@ -2,12 +2,14 @@
 
 // Q&A host control room (MID-337): session header (PIN, join link, QR,
 // counts), live question board, and sort/filter/search. The board renders the
-// host projection (`qa:host:state` — LIVE + IN_REVIEW questions plus counts),
-// which only ever arrives on this socket, never the mixed qa:${pin} room.
-// Vote bursts arrive as coalesced `qa:scores` deltas and are patched in
-// place; sort/search run client-side so live updates never block on the
-// server. Moderation actions, highlight/answered/archive, labels CRUD, and
-// session controls ship with MID-338+.
+// host projection (`qa:host:state` — LIVE + IN_REVIEW + DISMISSED questions
+// plus counts), which only ever arrives on this socket, never the mixed
+// qa:${pin} room. Vote bursts arrive as coalesced `qa:scores` deltas and are
+// patched in place; sort/search run client-side so live updates never block
+// on the server. Moderation queue (MID-338): in-review rows get approve/
+// dismiss plus multi-select bulk actions, and dismissed questions live in a
+// host-only spike pile with restore. Highlight/answered/archive, labels CRUD,
+// and session controls ship with MID-339+.
 
 import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
@@ -16,9 +18,20 @@ import AccountMenu from '@/components/AccountMenu';
 import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
 import { publicUrl } from '@/lib/public-origin';
 import { useSocket } from '@/lib/socket';
-import type { QAHostQuestion, QAHostState, QAQuestionScore, QASessionStatus } from '@/lib/types';
+import type {
+  QAHostQuestion,
+  QAHostState,
+  QAQuestionScore,
+  QAQuestionStatus,
+  QASessionStatus,
+} from '@/lib/types';
 
 type AttachAck = { pin: string; sessionId: string; hostState: QAHostState } | { error: string };
+
+type ModerationAck =
+  | { ok: true; questionId: string; status: QAQuestionStatus }
+  | { ok: true; questionIds: string[]; failed: { questionId: string; error: string }[] }
+  | { error: string };
 
 type SortMode = 'popular' | 'recent' | 'oldest';
 
@@ -50,6 +63,21 @@ function attachErrorMessage(error: string): string {
   }
 }
 
+function moderationErrorMessage(error: string): string {
+  switch (error) {
+    case 'invalid_transition':
+      return 'That question already moved on.';
+    case 'unknown_question':
+      return "That question isn't in this session.";
+    case 'persistence_failed':
+      return "Couldn't save — try again.";
+    case 'forbidden':
+      return 'This control room belongs to another host.';
+    default:
+      return "Couldn't update the question — try again.";
+  }
+}
+
 export default function QAndAControlClient({ pin, sessionId }: { pin: string; sessionId: string }) {
   const socket = useSocket();
   const [host, setHost] = useState<QAHostState | null>(null);
@@ -60,6 +88,9 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
   const [query, setQuery] = useState('');
   const [joinUrl, setJoinUrl] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+  // Multi-select for bulk approve/dismiss — in-review question ids only.
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [showDismissed, setShowDismissed] = useState(false);
   const toastTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -141,8 +172,9 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
 
   // Sort + filter + search are all client-side: no server round-trips, and
   // deterministic tie-breaks keep the order stable during live updates.
+  // DISMISSED rows stay off the live board — they live in the spike pile.
   const board = useMemo(() => {
-    let rows = host?.questions ?? [];
+    let rows = (host?.questions ?? []).filter((q) => q.status !== 'DISMISSED');
     if (labelFilter) rows = rows.filter((q) => q.labelIds.includes(labelFilter));
     const needle = query.trim().toLowerCase();
     if (needle) {
@@ -154,6 +186,70 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
     }
     return [...rows].sort(COMPARATORS[sort]);
   }, [host?.questions, labelFilter, query, sort]);
+
+  const dismissed = useMemo(
+    () =>
+      (host?.questions ?? [])
+        .filter((q) => q.status === 'DISMISSED')
+        .sort((a, b) => b.submittedAt - a.submittedAt || a.id.localeCompare(b.id)),
+    [host?.questions],
+  );
+
+  // Selection only ever holds in-review ids: approve/dismiss/withdraw from
+  // another surface prunes the row here too.
+  useEffect(() => {
+    setSelected((prev) => {
+      const inReview = new Set(
+        (host?.questions ?? []).filter((q) => q.status === 'IN_REVIEW').map((q) => q.id),
+      );
+      const next = new Set([...prev].filter((id) => inReview.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [host?.questions]);
+
+  function toggleSelected(questionId: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(questionId)) next.delete(questionId);
+      else next.add(questionId);
+      return next;
+    });
+  }
+
+  function moderate(action: 'approve' | 'dismiss' | 'restore', questionId: string) {
+    if (!socket) return;
+    socket.emit(`qa:host:${action}`, { pin, questionId }, (res: ModerationAck) => {
+      if ('error' in res) {
+        showToast(moderationErrorMessage(res.error));
+        return;
+      }
+      showToast(
+        action === 'approve'
+          ? 'Approved — on the wire.'
+          : action === 'dismiss'
+            ? 'Dismissed — spiked.'
+            : 'Restored to review.',
+      );
+    });
+  }
+
+  function moderateBulk(action: 'approve' | 'dismiss') {
+    if (!socket || selected.size === 0) return;
+    const questionIds = [...selected];
+    socket.emit(`qa:host:${action}`, { pin, questionIds }, (res: ModerationAck) => {
+      if ('error' in res) {
+        showToast(moderationErrorMessage(res.error));
+        return;
+      }
+      setSelected(new Set());
+      const okCount = 'questionIds' in res ? res.questionIds.length : 0;
+      const failedCount = 'failed' in res ? res.failed.length : 0;
+      const verb = action === 'approve' ? 'approved' : 'dismissed';
+      showToast(
+        failedCount === 0 ? `${okCount} ${verb}.` : `${okCount} ${verb} · ${failedCount} failed.`,
+      );
+    });
+  }
 
   function copyText(value: string, label: string) {
     if (!value || typeof navigator === 'undefined') return;
@@ -192,9 +288,14 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
   }
 
   const status: QASessionStatus = host?.status ?? 'OPEN';
-  const counts = host?.counts ?? { live: 0, inReview: 0, answered: 0, archived: 0 };
-  const hasQuestions = (host?.questions.length ?? 0) > 0;
+  const counts = host?.counts ?? { live: 0, inReview: 0, answered: 0, archived: 0, dismissed: 0 };
+  // The empty/filtered messages care about boardable rows (LIVE + IN_REVIEW)
+  // only — dismissed questions live in the spike pile below.
+  const hasQuestions = counts.live + counts.inReview > 0;
   const filtered = hasQuestions && board.length === 0;
+  const inReviewBoard = board.filter((q) => q.status === 'IN_REVIEW');
+  const allInReviewSelected =
+    inReviewBoard.length > 0 && inReviewBoard.every((q) => selected.has(q.id));
 
   return (
     <main className="relative min-h-screen pb-24">
@@ -416,6 +517,51 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
             />
           </div>
 
+          {/* Review desk (MID-338): bulk approve/dismiss for selected
+              in-review questions. Only rendered when moderation is on. */}
+          {host?.moderationEnabled && counts.inReview > 0 && (
+            <div
+              className="mt-3 ink-border px-3 py-2 flex flex-wrap items-center gap-2"
+              style={{ background: 'var(--marigold)' }}
+            >
+              <span className="ticker text-[11px] tracking-widest">
+                REVIEW DESK · {String(selected.size).padStart(2, '0')} SELECTED
+              </span>
+              <div className="flex flex-wrap items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelected(
+                      allInReviewSelected ? new Set() : new Set(inReviewBoard.map((q) => q.id)),
+                    )
+                  }
+                  className="ink-border ticker text-[10px] tracking-widest px-3"
+                  style={{ minHeight: 40, background: 'var(--bone)', color: 'var(--ink)' }}
+                >
+                  {allInReviewSelected ? 'CLEAR ALL' : 'SELECT ALL'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moderateBulk('approve')}
+                  disabled={selected.size === 0}
+                  className="ink-border stamp ticker text-[10px] tracking-widest px-3 disabled:opacity-40"
+                  style={{ minHeight: 40, background: 'var(--ivy)', color: 'var(--bone)' }}
+                >
+                  ✓ APPROVE ({selected.size})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moderateBulk('dismiss')}
+                  disabled={selected.size === 0}
+                  className="ink-border stamp ticker text-[10px] tracking-widest px-3 disabled:opacity-40"
+                  style={{ minHeight: 40, background: 'var(--ink)', color: 'var(--bone)' }}
+                >
+                  ✕ DISMISS ({selected.size})
+                </button>
+              </div>
+            </div>
+          )}
+
           <ol
             className="mt-3 overflow-y-auto pr-1 flex-1"
             style={{ maxHeight: 640 }}
@@ -443,9 +589,20 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
                 }}
               >
                 <div className="flex items-start gap-3">
-                  <span className="display-num text-2xl tabular-nums" style={{ minWidth: 36 }}>
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
+                  {q.status === 'IN_REVIEW' ? (
+                    <input
+                      type="checkbox"
+                      checked={selected.has(q.id)}
+                      onChange={() => toggleSelected(q.id)}
+                      aria-label={`Select question for bulk action: ${q.text}`}
+                      className="mt-1 size-5 shrink-0 accent-[var(--ink)]"
+                      style={{ minWidth: 36 }}
+                    />
+                  ) : (
+                    <span className="display-num text-2xl tabular-nums" style={{ minWidth: 36 }}>
+                      {String(i + 1).padStart(2, '0')}
+                    </span>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span
@@ -501,25 +658,99 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
                     >
                       ▲{q.score}
                     </span>
-                    <div className="flex gap-1">
-                      {['HIGHLIGHT', 'ANSWERED', 'ARCHIVE'].map((action) => (
+                    {q.status === 'IN_REVIEW' ? (
+                      <div className="flex gap-1">
                         <button
-                          key={action}
                           type="button"
-                          disabled
-                          className="ink-border ticker text-[9px] tracking-widest px-2 opacity-40"
-                          style={{ minHeight: 32, background: 'var(--ash)', color: 'var(--ink)' }}
-                          title="Arrives with a later broadcast upgrade (MID-338/339)"
+                          onClick={() => moderate('approve', q.id)}
+                          className="ink-border stamp ticker text-[9px] tracking-widest px-2"
+                          style={{ minHeight: 36, background: 'var(--ivy)', color: 'var(--bone)' }}
                         >
-                          {action}
+                          ✓ APPROVE
                         </button>
-                      ))}
-                    </div>
+                        <button
+                          type="button"
+                          onClick={() => moderate('dismiss', q.id)}
+                          className="ink-border stamp ticker text-[9px] tracking-widest px-2"
+                          style={{ minHeight: 36, background: 'var(--ink)', color: 'var(--bone)' }}
+                        >
+                          ✕ DISMISS
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-1">
+                        {['HIGHLIGHT', 'ANSWERED', 'ARCHIVE'].map((action) => (
+                          <button
+                            key={action}
+                            type="button"
+                            disabled
+                            className="ink-border ticker text-[9px] tracking-widest px-2 opacity-40"
+                            style={{ minHeight: 32, background: 'var(--ash)', color: 'var(--ink)' }}
+                            title="Arrives with a later broadcast upgrade (MID-339)"
+                          >
+                            {action}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </li>
             ))}
           </ol>
+
+          {/* Spike pile (MID-338): dismissed questions, host-only, restorable.
+              Never part of the public projection — this list only exists in
+              qa:host:state. */}
+          {dismissed.length > 0 && (
+            <div className="mt-4 pt-3 border-t-2" style={{ borderColor: 'var(--ink)' }}>
+              <button
+                type="button"
+                onClick={() => setShowDismissed((v) => !v)}
+                aria-expanded={showDismissed}
+                className="ticker text-[11px] tracking-widest flex items-center gap-2"
+                style={{ minHeight: 44 }}
+              >
+                <span aria-hidden>{showDismissed ? '▾' : '▸'}</span>
+                THE SPIKE · {String(dismissed.length).padStart(2, '0')} DISMISSED
+              </button>
+              {showDismissed && (
+                <ul className="mt-2">
+                  {dismissed.map((q) => (
+                    <li
+                      key={q.id}
+                      className="py-2 border-b last:border-b-0 flex items-start gap-3"
+                      style={{ borderColor: 'rgba(15,15,15,.18)', opacity: 0.75 }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className="font-editorial text-base leading-snug line-through"
+                          style={{ wordBreak: 'break-word' }}
+                        >
+                          {q.text}
+                        </p>
+                        <p className="ticker text-[10px] tracking-widest opacity-60 mt-1">
+                          {q.isAnonymous ? 'ANONYMOUS' : (q.authorDisplayName ?? 'ANONYMOUS')} ·{' '}
+                          {new Date(q.submittedAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => moderate('restore', q.id)}
+                        className="ink-border stamp ticker text-[9px] tracking-widest px-2 shrink-0"
+                        style={{ minHeight: 36, background: 'var(--bone)', color: 'var(--ink)' }}
+                      >
+                        ↩ RESTORE
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </aside>
       </section>
     </main>

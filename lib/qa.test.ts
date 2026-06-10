@@ -18,6 +18,7 @@ import {
   type QAState,
   removeVote,
   resolveJoinIdentity,
+  restoreDismissedQuestion,
   restoreQuestion,
   setSessionStatus,
   setSubmissionsOpen,
@@ -382,6 +383,47 @@ describe('question status transitions (PRD §4.3)', () => {
       reason: 'invalid_transition',
     });
     expect(markAnswered(state, { questionId: 'nope' })).toEqual({
+      ok: false,
+      reason: 'unknown_question',
+    });
+  });
+
+  // MID-338: the moderation-queue restore must be strictly DISMISSED ->
+  // IN_REVIEW — it must never expose the MID-339 ANSWERED/ARCHIVED -> LIVE
+  // restores that the generic restoreQuestion supports.
+  it('restoreDismissedQuestion only restores DISMISSED back to IN_REVIEW', () => {
+    const state = makeState({ moderationEnabled: true });
+    const pid = join(state);
+    const r = submitQuestion(state, { participantId: pid, text: 'q' });
+    if (!r.ok) throw new Error('submit failed');
+    const qid = r.question.id;
+
+    expect(dismissQuestion(state, { questionId: qid }).ok).toBe(true);
+    expect(restoreDismissedQuestion(state, { questionId: qid })).toMatchObject({
+      ok: true,
+      from: 'DISMISSED',
+      to: 'IN_REVIEW',
+    });
+    expect(state.questions.get(qid)?.status).toBe('IN_REVIEW');
+  });
+
+  it('restoreDismissedQuestion rejects every non-DISMISSED status', () => {
+    const statuses: QAQuestionStatus[] = ['IN_REVIEW', 'LIVE', 'ANSWERED', 'ARCHIVED', 'WITHDRAWN'];
+    for (const status of statuses) {
+      const state = makeState();
+      const pid = join(state);
+      const qid = submitLive(state, pid);
+      const q = state.questions.get(qid);
+      if (!q) throw new Error('question missing');
+      q.status = status;
+      expect(restoreDismissedQuestion(state, { questionId: qid }), status).toMatchObject({
+        ok: false,
+        reason: 'invalid_transition',
+      });
+      expect(state.questions.get(qid)?.status, status).toBe(status);
+    }
+    const state = makeState();
+    expect(restoreDismissedQuestion(state, { questionId: 'nope' })).toEqual({
       ok: false,
       reason: 'unknown_question',
     });
@@ -948,11 +990,26 @@ describe('hostState projection', () => {
     withdrawQuestion(state, { questionId: withdrawn, participantId: pid });
 
     const host = hostState(state);
-    expect(host.counts).toEqual({ live: 1, inReview: 0, answered: 1, archived: 1 });
+    expect(host.counts).toEqual({ live: 1, inReview: 0, answered: 1, archived: 1, dismissed: 0 });
     expect(host.questions.map((q) => q.id)).toEqual([live]);
     const serialized = JSON.stringify(host);
     expect(serialized).not.toContain('answered q');
     expect(serialized).not.toContain('withdrawn q');
+  });
+
+  it('boards DISMISSED questions with status markers so the host can restore them (MID-338)', () => {
+    const state = makeState({ moderationEnabled: true });
+    const pid = join(state);
+    const r = submitQuestion(state, { participantId: pid, text: 'spiked q' });
+    if (!r.ok) throw new Error('submit failed');
+    dismissQuestion(state, { questionId: r.question.id });
+
+    const host = hostState(state);
+    expect(host.counts).toEqual({ live: 0, inReview: 0, answered: 0, archived: 0, dismissed: 1 });
+    expect(host.questions.map((q) => q.id)).toEqual([r.question.id]);
+    expect(host.questions[0].status).toBe('DISMISSED');
+    // The host board sees it; the public board never does.
+    expect(JSON.stringify(publicState(state))).not.toContain('spiked q');
   });
 
   it('keeps anonymous questions anonymous to the host — no participant linkage', () => {
@@ -987,5 +1044,114 @@ describe('hostState projection', () => {
     expect(host.questions[1].highlighted).toBe(true);
     expect(host.highlightedQuestionId).toBe(qLow);
     expect(host.participantCount).toBe(3);
+  });
+});
+
+// MID-338: the moderation queue's whole point is private state separation —
+// walk a question through every moderation transition and assert the public
+// projection never carries IN_REVIEW or DISMISSED content at any step.
+describe('moderation queue privacy (MID-338)', () => {
+  function expectNotPublic(state: QAState, text: string) {
+    const pub = publicState(state);
+    expect(JSON.stringify(pub)).not.toContain(text);
+    for (const q of pub.questions) {
+      expect(['IN_REVIEW', 'DISMISSED']).not.toContain(
+        state.questions.get(q.id)?.status ?? 'missing',
+      );
+    }
+  }
+
+  it('keeps a question private through submit -> dismiss -> restore -> approve', () => {
+    const state = makeState({ moderationEnabled: true });
+    const pid = join(state, 'Cara');
+    const r = submitQuestion(state, { participantId: pid, text: 'lifecycle q' });
+    if (!r.ok) throw new Error('submit failed');
+    const qid = r.question.id;
+
+    // Submitted: in review, host + owner only.
+    expectNotPublic(state, 'lifecycle q');
+    expect(hostState(state).questions.find((q) => q.id === qid)?.status).toBe('IN_REVIEW');
+    expect(personalState(state, pid)?.questions[0]?.status).toBe('IN_REVIEW');
+
+    // Dismissed: still private everywhere public.
+    expect(dismissQuestion(state, { questionId: qid })).toMatchObject({ ok: true });
+    expectNotPublic(state, 'lifecycle q');
+    expect(personalState(state, pid)?.questions[0]?.status).toBe('DISMISSED');
+
+    // Restored: back to review, still private.
+    expect(restoreQuestion(state, { questionId: qid })).toMatchObject({
+      ok: true,
+      from: 'DISMISSED',
+      to: 'IN_REVIEW',
+    });
+    expectNotPublic(state, 'lifecycle q');
+    expect(personalState(state, pid)?.questions[0]?.status).toBe('IN_REVIEW');
+
+    // Approved: NOW it is public.
+    expect(approveQuestion(state, { questionId: qid })).toMatchObject({
+      ok: true,
+      from: 'IN_REVIEW',
+      to: 'LIVE',
+    });
+    expect(publicState(state).questions.map((q) => q.id)).toEqual([qid]);
+  });
+
+  it('pulls a moderated participant edit of a LIVE question back out of public view', () => {
+    const state = makeState({ moderationEnabled: true });
+    const pid = join(state);
+    const r = submitQuestion(state, { participantId: pid, text: 'approved q' });
+    if (!r.ok) throw new Error('submit failed');
+    approveQuestion(state, { questionId: r.question.id });
+    expect(publicState(state).questions).toHaveLength(1);
+
+    editQuestion(state, {
+      questionId: r.question.id,
+      text: 'edited back to review',
+      editor: { role: 'participant', participantId: pid },
+    });
+    expectNotPublic(state, 'edited back to review');
+    expect(publicState(state).questions).toHaveLength(0);
+  });
+
+  it('handles bulk approve and bulk dismiss with the same privacy guarantees', () => {
+    const state = makeState({ moderationEnabled: true });
+    const pid = join(state);
+    const submitted: string[] = [];
+    for (const text of ['bulk one', 'bulk two', 'bulk three', 'bulk four']) {
+      const r = submitQuestion(state, { participantId: pid, text });
+      if (!r.ok) throw new Error('submit failed');
+      submitted.push(r.question.id);
+    }
+    expect(publicState(state).questions).toHaveLength(0);
+
+    // Bulk approve the first two; bulk dismiss the last two — the helpers
+    // are per-question, so bulk is a loop at the socket layer.
+    for (const qid of submitted.slice(0, 2)) {
+      expect(approveQuestion(state, { questionId: qid })).toMatchObject({ ok: true, to: 'LIVE' });
+    }
+    for (const qid of submitted.slice(2)) {
+      expect(dismissQuestion(state, { questionId: qid })).toMatchObject({
+        ok: true,
+        to: 'DISMISSED',
+      });
+    }
+
+    const pub = publicState(state);
+    expect(pub.questions.map((q) => q.id).sort()).toEqual(submitted.slice(0, 2).sort());
+    expectNotPublic(state, 'bulk three');
+    expectNotPublic(state, 'bulk four');
+    const host = hostState(state);
+    expect(host.counts).toEqual({ live: 2, inReview: 0, answered: 0, archived: 0, dismissed: 2 });
+  });
+
+  it('dismiss is only reachable from IN_REVIEW, so a public question can never silently vanish into DISMISSED', () => {
+    const state = makeState();
+    const pid = join(state);
+    const qid = submitLive(state, pid, 'live q');
+    expect(dismissQuestion(state, { questionId: qid })).toMatchObject({
+      ok: false,
+      reason: 'invalid_transition',
+    });
+    expect(state.questions.get(qid)?.status).toBe('LIVE');
   });
 });

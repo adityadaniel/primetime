@@ -355,6 +355,20 @@ export function restoreQuestion(
   });
 }
 
+// Moderation-queue restore (MID-338): strictly DISMISSED -> IN_REVIEW. The
+// broader status-directed restoreQuestion (ANSWERED/ARCHIVED -> LIVE) is
+// reserved for the MID-339 host actions and must not be reachable from the
+// moderation socket events.
+export function restoreDismissedQuestion(
+  state: QAState,
+  args: { questionId: string },
+): QuestionTransitionResult {
+  return withQuestion(state, args.questionId, (q) => {
+    if (q.status !== 'DISMISSED') return { ok: false, reason: 'invalid_transition' };
+    return transitionQuestion(state, q, 'IN_REVIEW');
+  });
+}
+
 export function markAnswered(
   state: QAState,
   args: { questionId: string },
@@ -585,19 +599,22 @@ export function publicState(state: QAState): QAPublicState {
   };
 }
 
-// Host control projection (MID-337): the public board plus IN_REVIEW
-// questions and counts by state. Targeted at the host socket only — IN_REVIEW
-// questions must never reach the mixed qa:${pin} room. Anonymous means
-// anonymous to the host too: no participant linkage, null author.
+// Host control projection (MID-337): the public board plus IN_REVIEW and
+// DISMISSED questions and counts by state. Targeted at the host socket only —
+// IN_REVIEW and DISMISSED questions must never reach the mixed qa:${pin}
+// room. DISMISSED rows ride along so the host can restore them (MID-338).
+// Anonymous means anonymous to the host too: no participant linkage, null
+// author.
 export function hostState(state: QAState): QAHostState {
-  const counts = { live: 0, inReview: 0, answered: 0, archived: 0 };
+  const counts = { live: 0, inReview: 0, answered: 0, archived: 0, dismissed: 0 };
   const questions: QAHostQuestion[] = [];
   for (const q of state.questions.values()) {
     if (q.status === 'LIVE') counts.live += 1;
     else if (q.status === 'IN_REVIEW') counts.inReview += 1;
     else if (q.status === 'ANSWERED') counts.answered += 1;
     else if (q.status === 'ARCHIVED') counts.archived += 1;
-    if (q.status !== 'LIVE' && q.status !== 'IN_REVIEW') continue;
+    else if (q.status === 'DISMISSED') counts.dismissed += 1;
+    if (q.status !== 'LIVE' && q.status !== 'IN_REVIEW' && q.status !== 'DISMISSED') continue;
     questions.push({
       id: q.id,
       text: q.text,

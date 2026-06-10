@@ -37,10 +37,13 @@ import {
   submitAnswer,
 } from './lib/game';
 import {
+  type QAQuestionEntry,
   type QAState,
   addParticipant as qaAddParticipant,
   applyVote as qaApplyVote,
+  approveQuestion as qaApproveQuestion,
   bindParticipantSocket as qaBindParticipantSocket,
+  dismissQuestion as qaDismissQuestion,
   editQuestion as qaEditQuestion,
   hostState as qaHostState,
   personalState as qaPersonalState,
@@ -48,6 +51,7 @@ import {
   questionVoteCounts as qaQuestionVoteCounts,
   removeVote as qaRemoveVote,
   resolveJoinIdentity as qaResolveJoinIdentity,
+  restoreDismissedQuestion as qaRestoreDismissedQuestion,
   submitQuestion as qaSubmitQuestion,
   withdrawQuestion as qaWithdrawQuestion,
 } from './lib/qa';
@@ -59,6 +63,7 @@ import {
   recordVote as qaRepoRecordVote,
   removeVote as qaRepoRemoveVote,
   setQuestionStatus as qaRepoSetQuestionStatus,
+  setQuestionStatusWithModerationEvent as qaRepoSetQuestionStatusWithModerationEvent,
 } from './lib/qa-repo';
 import { matchUploadsPath, resolveUploadFilePath, uploadContentType } from './lib/serve-upload';
 import type {
@@ -67,6 +72,7 @@ import type {
   QAPersonalState,
   QAPublicState,
   QAQuestionScore,
+  QAQuestionStatus,
   QAVoteType,
   Quiz,
 } from './lib/types';
@@ -387,6 +393,18 @@ void app.prepare().then(() => {
     io.to(state.hostSocketId).emit('qa:host:state', qaHostState(state));
   }
 
+  // Personal projection push (MID-338): when a host moderation action changes
+  // a participant's own question (approve/dismiss/restore), the owner's
+  // currently-bound socket(s) get a fresh personal state. Targeted emits
+  // only — personal state never goes through the mixed qa:${pin} room.
+  function qaEmitPersonalState(state: QAState, participantId: string) {
+    const personal = qaPersonalState(state, participantId);
+    if (!personal) return;
+    for (const [socketId, pid] of state.socketToParticipant.entries()) {
+      if (pid === participantId) io.to(socketId).emit('qa:personal', personal);
+    }
+  }
+
   function qaFlushScores(pin: string) {
     const dirty = qaDirtyScores.get(pin);
     qaDirtyScores.delete(pin);
@@ -424,7 +442,11 @@ void app.prepare().then(() => {
   // session is anonymous (state.hostUserId === null) and any socket bound as
   // host can drive it. Trusting hostSocketId alone is insufficient because
   // sockets reconnect freely and another socket could race to claim the slot.
-  function isHostAuthorized(socket: Socket, state: WordCloudState): boolean {
+  // Structural param so word cloud and Q&A states share the same gate.
+  function isHostAuthorized(
+    socket: Socket,
+    state: { hostUserId: string | null; hostSocketId?: string },
+  ): boolean {
     const userId = (socket.data as { userId?: string | null }).userId ?? null;
     if (state.hostUserId === null) {
       return state.hostSocketId === socket.id;
@@ -1486,6 +1508,209 @@ void app.prepare().then(() => {
       });
       if (prevVote !== type) qaScheduleScoreBroadcast(state.pin, p.questionId);
     });
+
+    // --- Q&A host moderation queue (MID-338) ---
+
+    // Shared preamble for host moderation actions: the state must already be
+    // in memory (the host attached to get a control surface), and the acting
+    // socket must pass the same host gate as word cloud host actions. On top
+    // of that ownership gate, moderation requires the acting socket to BE the
+    // attached host control socket for this pin — a participant/display
+    // socket from the same logged-in host user must not be able to moderate.
+    function qaResolveHostAction(
+      payload: unknown,
+    ): { state: QAState; p: Record<string, unknown> } | { error: string } {
+      if (!payload || typeof payload !== 'object') return { error: 'invalid' };
+      const p = payload as Record<string, unknown>;
+      if (!isPin(p.pin)) return { error: 'invalid_pin' };
+      const state = qaStates.get(p.pin);
+      if (!state) return { error: 'not_found' };
+      if (!isHostAuthorized(socket, state)) return { error: 'forbidden' };
+      const link = qaSocketToPin.get(socket.id);
+      if (state.hostSocketId !== socket.id || link?.role !== 'host' || link.pin !== state.pin) {
+        return { error: 'forbidden' };
+      }
+      return { state, p };
+    }
+
+    // Single id or bulk (`questionIds`) — both normalize to a list. Bulk is
+    // capped to keep one event from holding the loop on a huge board.
+    const QA_BULK_MODERATION_CAP = 100;
+    function qaParseQuestionIds(p: Record<string, unknown>): string[] | null {
+      if (typeof p.questionId === 'string' && p.questionId.length > 0) return [p.questionId];
+      if (
+        Array.isArray(p.questionIds) &&
+        p.questionIds.length > 0 &&
+        p.questionIds.length <= QA_BULK_MODERATION_CAP &&
+        p.questionIds.every((id) => typeof id === 'string' && id.length > 0)
+      ) {
+        return [...new Set(p.questionIds as string[])];
+      }
+      return null;
+    }
+
+    type QaModerationOutcome = {
+      transitioned: { questionId: string; from: QAQuestionStatus; to: QAQuestionStatus }[];
+      failed: { questionId: string; error: string }[];
+    };
+
+    // Applies one moderation action across a list of questions with the
+    // persist-before-broadcast contract per question: in-memory transition,
+    // then ONE transactional DB write covering the status change AND its
+    // QAModerationEvent so the export/audit trail can always explain why a
+    // question disappeared (PRD §4.3). If the transaction fails, the
+    // in-memory transition rolls back and the id reports persistence_failed.
+    // Bulk is per-question best-effort: one bad id never blocks the rest.
+    async function qaModerateQuestions(
+      state: QAState,
+      action: 'approve' | 'dismiss' | 'restore',
+      questionIds: string[],
+      bulk: boolean,
+    ): Promise<QaModerationOutcome> {
+      const hostUserId = (socket.data as { userId?: string | null }).userId ?? null;
+      const outcome: QaModerationOutcome = { transitioned: [], failed: [] };
+      for (const questionId of questionIds) {
+        const question = state.questions.get(questionId);
+        if (!question) {
+          outcome.failed.push({ questionId, error: 'unknown_question' });
+          continue;
+        }
+        // Full rollback snapshot: transitionQuestion stamps status timestamps
+        // and may clear the highlight, so capture everything it can touch.
+        const snapshot = {
+          status: question.status,
+          approvedAt: question.approvedAt,
+          answeredAt: question.answeredAt,
+          archivedAt: question.archivedAt,
+          dismissedAt: question.dismissedAt,
+          withdrawnAt: question.withdrawnAt,
+          highlightedQuestionId: state.highlightedQuestionId,
+        };
+        const result =
+          action === 'approve'
+            ? qaApproveQuestion(state, { questionId })
+            : action === 'dismiss'
+              ? qaDismissQuestion(state, { questionId })
+              : qaRestoreDismissedQuestion(state, { questionId });
+        if (!result.ok) {
+          outcome.failed.push({ questionId, error: result.reason });
+          continue;
+        }
+        try {
+          await qaRepoSetQuestionStatusWithModerationEvent({
+            questionId,
+            status: result.to,
+            sessionId: state.sessionId,
+            hostUserId,
+            action,
+            reason: bulk ? 'bulk' : null,
+          });
+        } catch (err) {
+          console.error(`[qa-repo] setQuestionStatusWithModerationEvent (${action})`, err);
+          rollbackQaQuestion(state, question, snapshot);
+          outcome.failed.push({ questionId, error: 'persistence_failed' });
+          continue;
+        }
+        outcome.transitioned.push({ questionId, from: result.from, to: result.to });
+      }
+      return outcome;
+    }
+
+    function rollbackQaQuestion(
+      state: QAState,
+      question: QAQuestionEntry,
+      snapshot: {
+        status: QAQuestionStatus;
+        approvedAt: number | null;
+        answeredAt: number | null;
+        archivedAt: number | null;
+        dismissedAt: number | null;
+        withdrawnAt: number | null;
+        highlightedQuestionId: string | null;
+      },
+    ) {
+      question.status = snapshot.status;
+      question.approvedAt = snapshot.approvedAt;
+      question.answeredAt = snapshot.answeredAt;
+      question.archivedAt = snapshot.archivedAt;
+      question.dismissedAt = snapshot.dismissedAt;
+      question.withdrawnAt = snapshot.withdrawnAt;
+      state.highlightedQuestionId = snapshot.highlightedQuestionId;
+    }
+
+    // Broadcast policy after moderation: anything that entered or left LIVE
+    // changes the public board (one full snapshot — supersedes score deltas);
+    // moves between private states (IN_REVIEW <-> DISMISSED) only refresh the
+    // host board. Owners always get a targeted personal push so their "my
+    // questions" panel tracks approve/dismiss/restore without a refresh.
+    // IN_REVIEW and DISMISSED never reach the mixed qa:${pin} room.
+    function qaBroadcastAfterModeration(state: QAState, outcome: QaModerationOutcome) {
+      if (outcome.transitioned.length === 0) return;
+      const touchedLive = outcome.transitioned.some((t) => t.from === 'LIVE' || t.to === 'LIVE');
+      if (touchedLive) qaEmitPublicState(state);
+      else qaEmitHostState(state);
+      const owners = new Set<string>();
+      for (const t of outcome.transitioned) {
+        const owner = state.questions.get(t.questionId)?.participantId;
+        if (owner) owners.add(owner);
+      }
+      for (const owner of owners) qaEmitPersonalState(state, owner);
+    }
+
+    // Explicit ack shapes (MID-338): single actions ack { ok, questionId,
+    // status } or { error }; bulk acks { ok, questionIds, failed } so the
+    // host UI can report partial success.
+    type QaModerationAck =
+      | { ok: true; questionId: string; status: QAQuestionStatus }
+      | { ok: true; questionIds: string[]; failed: { questionId: string; error: string }[] }
+      | { error: string };
+
+    function qaHostModerationHandler(action: 'approve' | 'dismiss' | 'restore') {
+      return async (payload: unknown, ack: unknown) => {
+        if (typeof ack !== 'function') {
+          console.warn(`[qa:host:${action}] missing ack — ignoring`);
+          return;
+        }
+        const cb = ack as (res: QaModerationAck) => void;
+        const resolved = qaResolveHostAction(payload);
+        if ('error' in resolved) {
+          cb(resolved);
+          return;
+        }
+        const { state, p } = resolved;
+        // Restore is deliberately single-question: it is a corrective action,
+        // not a queue-clearing one (PRD §4.3).
+        const ids =
+          action === 'restore'
+            ? typeof p.questionId === 'string' && p.questionId.length > 0
+              ? [p.questionId]
+              : null
+            : qaParseQuestionIds(p);
+        if (!ids) {
+          cb({ error: 'invalid' });
+          return;
+        }
+        const bulk = !('questionId' in p && typeof p.questionId === 'string');
+        const outcome = await qaModerateQuestions(state, action, ids, bulk);
+        if (!bulk) {
+          const [only] = ids;
+          const t = outcome.transitioned.find((x) => x.questionId === only);
+          if (t) cb({ ok: true, questionId: only, status: t.to });
+          else cb({ error: outcome.failed[0]?.error ?? 'invalid' });
+        } else {
+          cb({
+            ok: true,
+            questionIds: outcome.transitioned.map((t) => t.questionId),
+            failed: outcome.failed,
+          });
+        }
+        qaBroadcastAfterModeration(state, outcome);
+      };
+    }
+
+    socket.on('qa:host:approve', qaHostModerationHandler('approve'));
+    socket.on('qa:host:dismiss', qaHostModerationHandler('dismiss'));
+    socket.on('qa:host:restore', qaHostModerationHandler('restore'));
 
     socket.on('disconnect', () => {
       const wcLink = wcSocketToPin.get(socket.id);
