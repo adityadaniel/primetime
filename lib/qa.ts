@@ -602,7 +602,9 @@ export function publicState(state: QAState): QAPublicState {
 // Host control projection (MID-337): the public board plus IN_REVIEW and
 // DISMISSED questions and counts by state. Targeted at the host socket only —
 // IN_REVIEW and DISMISSED questions must never reach the mixed qa:${pin}
-// room. DISMISSED rows ride along so the host can restore them (MID-338).
+// room. DISMISSED rows ride along so the host can restore them (MID-338);
+// ANSWERED/ARCHIVED rows ride along so the host can restore them to the live
+// board (MID-339). Only WITHDRAWN stays off — the participant took it back.
 // Anonymous means anonymous to the host too: no participant linkage, null
 // author.
 export function hostState(state: QAState): QAHostState {
@@ -614,7 +616,7 @@ export function hostState(state: QAState): QAHostState {
     else if (q.status === 'ANSWERED') counts.answered += 1;
     else if (q.status === 'ARCHIVED') counts.archived += 1;
     else if (q.status === 'DISMISSED') counts.dismissed += 1;
-    if (q.status !== 'LIVE' && q.status !== 'IN_REVIEW' && q.status !== 'DISMISSED') continue;
+    if (q.status === 'WITHDRAWN') continue;
     questions.push({
       id: q.id,
       text: q.text,

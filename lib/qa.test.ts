@@ -978,7 +978,7 @@ describe('hostState projection', () => {
     expect(host.questions.find((q) => q.id === live.question.id)?.status).toBe('LIVE');
   });
 
-  it('counts questions by state and keeps settled ones off the board', () => {
+  it('counts questions by state and keeps only WITHDRAWN off the board', () => {
     const state = makeState();
     const pid = join(state);
     const answered = submitLive(state, pid, 'answered q');
@@ -991,10 +991,27 @@ describe('hostState projection', () => {
 
     const host = hostState(state);
     expect(host.counts).toEqual({ live: 1, inReview: 0, answered: 1, archived: 1, dismissed: 0 });
-    expect(host.questions.map((q) => q.id)).toEqual([live]);
-    const serialized = JSON.stringify(host);
-    expect(serialized).not.toContain('answered q');
-    expect(serialized).not.toContain('withdrawn q');
+    // ANSWERED/ARCHIVED rows board so the host can restore them (MID-339);
+    // WITHDRAWN stays off — the participant took it back.
+    expect(host.questions.map((q) => q.id).sort()).toEqual([answered, archived, live].sort());
+    expect(JSON.stringify(host)).not.toContain('withdrawn q');
+  });
+
+  it('boards ANSWERED and ARCHIVED questions with status markers, host-only (MID-339)', () => {
+    const state = makeState();
+    const pid = join(state);
+    const answered = submitLive(state, pid, 'answered q');
+    const archived = submitLive(state, pid, 'archived q');
+    markAnswered(state, { questionId: answered });
+    archiveQuestion(state, { questionId: archived });
+
+    const host = hostState(state);
+    expect(host.questions.find((q) => q.id === answered)?.status).toBe('ANSWERED');
+    expect(host.questions.find((q) => q.id === archived)?.status).toBe('ARCHIVED');
+    // The host board sees them; the public board never does.
+    const pub = JSON.stringify(publicState(state));
+    expect(pub).not.toContain('answered q');
+    expect(pub).not.toContain('archived q');
   });
 
   it('boards DISMISSED questions with status markers so the host can restore them (MID-338)', () => {

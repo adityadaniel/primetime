@@ -2,14 +2,17 @@
 
 // Q&A host control room (MID-337): session header (PIN, join link, QR,
 // counts), live question board, and sort/filter/search. The board renders the
-// host projection (`qa:host:state` — LIVE + IN_REVIEW + DISMISSED questions
-// plus counts), which only ever arrives on this socket, never the mixed
+// host projection (`qa:host:state` — every non-WITHDRAWN question plus
+// counts), which only ever arrives on this socket, never the mixed
 // qa:${pin} room. Vote bursts arrive as coalesced `qa:scores` deltas and are
 // patched in place; sort/search run client-side so live updates never block
 // on the server. Moderation queue (MID-338): in-review rows get approve/
 // dismiss plus multi-select bulk actions, and dismissed questions live in a
-// host-only spike pile with restore. Highlight/answered/archive, labels CRUD,
-// and session controls ship with MID-339+.
+// host-only spike pile with restore. Live-board actions (MID-339): live rows
+// get highlight (one on air at a time), edit (original text preserved
+// server-side), mark answered, and archive with undo; answered/archived
+// questions land in a filed pile with restore. Labels CRUD and session
+// controls ship with MID-340+.
 
 import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
@@ -32,6 +35,10 @@ type ModerationAck =
   | { ok: true; questionId: string; status: QAQuestionStatus }
   | { ok: true; questionIds: string[]; failed: { questionId: string; error: string }[] }
   | { error: string };
+
+type HighlightAck = { ok: true; highlightedQuestionId: string | null } | { error: string };
+
+type EditAck = { ok: true; questionId: string; text: string } | { error: string };
 
 type SortMode = 'popular' | 'recent' | 'oldest';
 
@@ -78,6 +85,25 @@ function moderationErrorMessage(error: string): string {
   }
 }
 
+function highlightErrorMessage(error: string): string {
+  return error === 'not_live'
+    ? 'Only live questions can go on air.'
+    : moderationErrorMessage(error);
+}
+
+function editErrorMessage(error: string): string {
+  switch (error) {
+    case 'empty_text':
+      return 'A question needs some words.';
+    case 'text_too_long':
+      return 'Too long — trim the copy.';
+    case 'invalid_status':
+      return 'That question already settled.';
+    default:
+      return moderationErrorMessage(error);
+  }
+}
+
 export default function QAndAControlClient({ pin, sessionId }: { pin: string; sessionId: string }) {
   const socket = useSocket();
   const [host, setHost] = useState<QAHostState | null>(null);
@@ -87,10 +113,16 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
   const [labelFilter, setLabelFilter] = useState<string>('');
   const [query, setQuery] = useState('');
   const [joinUrl, setJoinUrl] = useState('');
-  const [toast, setToast] = useState<string | null>(null);
+  // Toasts can carry an undo callback (MID-339): archive-class actions are
+  // confirmed with easy undo instead of a blocking dialog (PRD §7).
+  const [toast, setToast] = useState<{ msg: string; undo?: () => void } | null>(null);
   // Multi-select for bulk approve/dismiss — in-review question ids only.
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [showDismissed, setShowDismissed] = useState(false);
+  const [showFiled, setShowFiled] = useState(false);
+  // Inline host edit (MID-339): one question at a time, draft kept locally
+  // until SAVE so live re-sorts never clobber the host's typing.
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const toastTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -98,10 +130,11 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
     setJoinUrl(publicUrl(`/join?pin=${pin}`, window.location.origin));
   }, [pin]);
 
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
+  const showToast = useCallback((msg: string, undo?: () => void) => {
+    setToast({ msg, undo });
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = window.setTimeout(() => setToast(null), 2400);
+    // Undo-able toasts linger longer so the host can actually catch them.
+    toastTimerRef.current = window.setTimeout(() => setToast(null), undo ? 6000 : 2400);
   }, []);
 
   useEffect(
@@ -172,9 +205,12 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
 
   // Sort + filter + search are all client-side: no server round-trips, and
   // deterministic tie-breaks keep the order stable during live updates.
-  // DISMISSED rows stay off the live board — they live in the spike pile.
+  // Only LIVE + IN_REVIEW rows board — DISMISSED live in the spike pile,
+  // ANSWERED/ARCHIVED in the filed pile.
   const board = useMemo(() => {
-    let rows = (host?.questions ?? []).filter((q) => q.status !== 'DISMISSED');
+    let rows = (host?.questions ?? []).filter(
+      (q) => q.status === 'LIVE' || q.status === 'IN_REVIEW',
+    );
     if (labelFilter) rows = rows.filter((q) => q.labelIds.includes(labelFilter));
     const needle = query.trim().toLowerCase();
     if (needle) {
@@ -194,6 +230,26 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
         .sort((a, b) => b.submittedAt - a.submittedAt || a.id.localeCompare(b.id)),
     [host?.questions],
   );
+
+  // Filed pile (MID-339): answered + archived questions, restorable to the
+  // live board. Host-only — these never reach public projections.
+  const filed = useMemo(
+    () =>
+      (host?.questions ?? [])
+        .filter((q) => q.status === 'ANSWERED' || q.status === 'ARCHIVED')
+        .sort((a, b) => b.submittedAt - a.submittedAt || a.id.localeCompare(b.id)),
+    [host?.questions],
+  );
+
+  // Drop a stale edit draft if the question settled or vanished while the
+  // host was typing (withdrawn, answered from another surface, …).
+  useEffect(() => {
+    setEditing((prev) => {
+      if (!prev) return prev;
+      const q = (host?.questions ?? []).find((row) => row.id === prev.id);
+      return q && (q.status === 'LIVE' || q.status === 'IN_REVIEW') ? prev : null;
+    });
+  }, [host?.questions]);
 
   // Selection only ever holds in-review ids: approve/dismiss/withdraw from
   // another surface prunes the row here too.
@@ -216,20 +272,67 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
     });
   }
 
-  function moderate(action: 'approve' | 'dismiss' | 'restore', questionId: string) {
+  function moderate(
+    action: 'approve' | 'dismiss' | 'restore' | 'answered' | 'archive',
+    questionId: string,
+  ) {
     if (!socket) return;
     socket.emit(`qa:host:${action}`, { pin, questionId }, (res: ModerationAck) => {
       if ('error' in res) {
         showToast(moderationErrorMessage(res.error));
         return;
       }
-      showToast(
-        action === 'approve'
-          ? 'Approved — on the wire.'
-          : action === 'dismiss'
-            ? 'Dismissed — spiked.'
-            : 'Restored to review.',
-      );
+      const status = 'status' in res ? res.status : undefined;
+      switch (action) {
+        case 'approve':
+          showToast('Approved — on the wire.');
+          break;
+        case 'dismiss':
+          showToast('Dismissed — spiked.');
+          break;
+        case 'restore':
+          // Status-directed restore: DISMISSED returns to review,
+          // ANSWERED/ARCHIVED return to the live board.
+          showToast(status === 'IN_REVIEW' ? 'Restored to review.' : 'Back on the wire.');
+          break;
+        case 'answered':
+          showToast('Answered — filed.', () => moderate('restore', questionId));
+          break;
+        case 'archive':
+          showToast('Archived — filed.', () => moderate('restore', questionId));
+          break;
+      }
+    });
+  }
+
+  // One question on air at a time: highlighting replaces the previous
+  // highlight server-side; clicking the on-air row's button un-highlights.
+  function toggleHighlight(q: QAHostQuestion) {
+    if (!socket) return;
+    const questionId = q.highlighted ? null : q.id;
+    socket.emit('qa:host:highlight', { pin, questionId }, (res: HighlightAck) => {
+      if ('error' in res) {
+        showToast(highlightErrorMessage(res.error));
+        return;
+      }
+      showToast(res.highlightedQuestionId ? 'On air — highlighted.' : 'Highlight cleared.');
+    });
+  }
+
+  function saveEdit() {
+    if (!socket || !editing) return;
+    const text = editing.text.trim();
+    if (!text) {
+      showToast(editErrorMessage('empty_text'));
+      return;
+    }
+    socket.emit('qa:host:edit', { pin, questionId: editing.id, text }, (res: EditAck) => {
+      if ('error' in res) {
+        showToast(editErrorMessage(res.error));
+        return;
+      }
+      setEditing(null);
+      showToast('Rewritten — original kept on file.');
     });
   }
 
@@ -302,12 +405,25 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
       <CornerMarks />
       {toast && (
         <div
-          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 ink-border stamp ticker text-[11px] tracking-widest px-3 py-2"
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 ink-border stamp ticker text-[11px] tracking-widest px-3 py-2 flex items-center gap-3"
           style={{ background: 'var(--ivy)', color: 'var(--bone)' }}
           role="status"
           aria-live="polite"
         >
-          ✓ {toast}
+          <span>✓ {toast.msg}</span>
+          {toast.undo && (
+            <button
+              type="button"
+              onClick={() => {
+                toast.undo?.();
+                setToast(null);
+              }}
+              className="ink-border ticker text-[10px] tracking-widest px-2 py-1"
+              style={{ background: 'var(--bone)', color: 'var(--ink)' }}
+            >
+              ↩ UNDO
+            </button>
+          )}
         </div>
       )}
 
@@ -632,12 +748,57 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
                         </span>
                       ))}
                     </div>
-                    <p
-                      className="font-editorial text-lg leading-snug mt-1"
-                      style={{ wordBreak: 'break-word' }}
-                    >
-                      {q.text}
-                    </p>
+                    {editing?.id === q.id ? (
+                      <div className="mt-1">
+                        <textarea
+                          value={editing.text}
+                          onChange={(e) =>
+                            setEditing((prev) => (prev ? { ...prev, text: e.target.value } : prev))
+                          }
+                          maxLength={host?.questionCharLimit ?? 280}
+                          rows={3}
+                          aria-label="Edit question text"
+                          className="w-full ink-border font-editorial text-lg leading-snug p-2 bg-transparent outline-none resize-y"
+                          style={{ background: 'var(--bone)' }}
+                        />
+                        <div className="mt-1 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={saveEdit}
+                            className="ink-border stamp ticker text-[9px] tracking-widest px-2"
+                            style={{
+                              minHeight: 36,
+                              background: 'var(--ivy)',
+                              color: 'var(--bone)',
+                            }}
+                          >
+                            ✓ SAVE REWRITE
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditing(null)}
+                            className="ink-border ticker text-[9px] tracking-widest px-2"
+                            style={{
+                              minHeight: 36,
+                              background: 'var(--bone)',
+                              color: 'var(--ink)',
+                            }}
+                          >
+                            ✕ CANCEL
+                          </button>
+                          <span className="ticker text-[10px] tracking-widest opacity-60 ml-auto tabular-nums">
+                            {editing.text.trim().length}/{host?.questionCharLimit ?? 280}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p
+                        className="font-editorial text-lg leading-snug mt-1"
+                        style={{ wordBreak: 'break-word' }}
+                      >
+                        {q.text}
+                      </p>
+                    )}
                     <p className="ticker text-[10px] tracking-widest opacity-60 mt-1">
                       {q.isAnonymous ? 'ANONYMOUS' : (q.authorDisplayName ?? 'ANONYMOUS')} ·{' '}
                       {new Date(q.submittedAt).toLocaleTimeString([], {
@@ -659,7 +820,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
                       ▲{q.score}
                     </span>
                     {q.status === 'IN_REVIEW' ? (
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 flex-wrap justify-end">
                         <button
                           type="button"
                           onClick={() => moderate('approve', q.id)}
@@ -676,21 +837,63 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
                         >
                           ✕ DISMISS
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditing({ id: q.id, text: q.text })}
+                          aria-label={`Edit question: ${q.text}`}
+                          className="ink-border ticker text-[9px] tracking-widest px-2"
+                          style={{ minHeight: 36, background: 'var(--bone)', color: 'var(--ink)' }}
+                        >
+                          ✎ EDIT
+                        </button>
                       </div>
                     ) : (
-                      <div className="flex gap-1">
-                        {['HIGHLIGHT', 'ANSWERED', 'ARCHIVE'].map((action) => (
-                          <button
-                            key={action}
-                            type="button"
-                            disabled
-                            className="ink-border ticker text-[9px] tracking-widest px-2 opacity-40"
-                            style={{ minHeight: 32, background: 'var(--ash)', color: 'var(--ink)' }}
-                            title="Arrives with a later broadcast upgrade (MID-339)"
-                          >
-                            {action}
-                          </button>
-                        ))}
+                      <div className="flex gap-1 flex-wrap justify-end">
+                        <button
+                          type="button"
+                          onClick={() => toggleHighlight(q)}
+                          aria-pressed={q.highlighted}
+                          aria-label={
+                            q.highlighted
+                              ? `Take question off air: ${q.text}`
+                              : `Put question on air: ${q.text}`
+                          }
+                          className="ink-border stamp ticker text-[9px] tracking-widest px-2"
+                          style={{
+                            minHeight: 36,
+                            background: q.highlighted ? 'var(--ink)' : 'var(--vermilion)',
+                            color: 'var(--bone)',
+                          }}
+                        >
+                          {q.highlighted ? '★ OFF AIR' : '★ ON AIR'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditing({ id: q.id, text: q.text })}
+                          aria-label={`Edit question: ${q.text}`}
+                          className="ink-border ticker text-[9px] tracking-widest px-2"
+                          style={{ minHeight: 36, background: 'var(--bone)', color: 'var(--ink)' }}
+                        >
+                          ✎ EDIT
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moderate('answered', q.id)}
+                          aria-label={`Mark question answered: ${q.text}`}
+                          className="ink-border stamp ticker text-[9px] tracking-widest px-2"
+                          style={{ minHeight: 36, background: 'var(--ivy)', color: 'var(--bone)' }}
+                        >
+                          ✓ ANSWERED
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moderate('archive', q.id)}
+                          aria-label={`Archive question: ${q.text}`}
+                          className="ink-border ticker text-[9px] tracking-widest px-2"
+                          style={{ minHeight: 36, background: 'var(--bone)', color: 'var(--ink)' }}
+                        >
+                          ▣ ARCHIVE
+                        </button>
                       </div>
                     )}
                   </div>
@@ -698,6 +901,71 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
               </li>
             ))}
           </ol>
+
+          {/* Filed pile (MID-339): answered + archived questions, host-only,
+              restorable to the live board. Never part of the public
+              projection — this list only exists in qa:host:state. */}
+          {filed.length > 0 && (
+            <div className="mt-4 pt-3 border-t-2" style={{ borderColor: 'var(--ink)' }}>
+              <button
+                type="button"
+                onClick={() => setShowFiled((v) => !v)}
+                aria-expanded={showFiled}
+                className="ticker text-[11px] tracking-widest flex items-center gap-2"
+                style={{ minHeight: 44 }}
+              >
+                <span aria-hidden>{showFiled ? '▾' : '▸'}</span>
+                THE ARCHIVE · {String(filed.length).padStart(2, '0')} FILED
+              </button>
+              {showFiled && (
+                <ul className="mt-2">
+                  {filed.map((q) => (
+                    <li
+                      key={q.id}
+                      className="py-2 border-b last:border-b-0 flex items-start gap-3"
+                      style={{ borderColor: 'rgba(15,15,15,.18)', opacity: 0.85 }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <span
+                          className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border"
+                          style={
+                            q.status === 'ANSWERED'
+                              ? { background: 'var(--ivy)', color: 'var(--bone)' }
+                              : { background: 'var(--ash)', color: 'var(--ink)' }
+                          }
+                        >
+                          {q.status === 'ANSWERED' ? '✓ ANSWERED' : '▣ ARCHIVED'}
+                        </span>
+                        <p
+                          className="font-editorial text-base leading-snug mt-1"
+                          style={{ wordBreak: 'break-word' }}
+                        >
+                          {q.text}
+                        </p>
+                        <p className="ticker text-[10px] tracking-widest opacity-60 mt-1">
+                          {q.isAnonymous ? 'ANONYMOUS' : (q.authorDisplayName ?? 'ANONYMOUS')} ·{' '}
+                          {new Date(q.submittedAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                          {' · '}▲ {q.score}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => moderate('restore', q.id)}
+                        aria-label={`Restore question to the live board: ${q.text}`}
+                        className="ink-border stamp ticker text-[9px] tracking-widest px-2 shrink-0"
+                        style={{ minHeight: 36, background: 'var(--bone)', color: 'var(--ink)' }}
+                      >
+                        ↩ RESTORE
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           {/* Spike pile (MID-338): dismissed questions, host-only, restorable.
               Never part of the public projection — this list only exists in

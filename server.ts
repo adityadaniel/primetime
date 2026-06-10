@@ -42,16 +42,19 @@ import {
   addParticipant as qaAddParticipant,
   applyVote as qaApplyVote,
   approveQuestion as qaApproveQuestion,
+  archiveQuestion as qaArchiveQuestion,
   bindParticipantSocket as qaBindParticipantSocket,
   dismissQuestion as qaDismissQuestion,
   editQuestion as qaEditQuestion,
+  highlightQuestion as qaHighlightQuestion,
   hostState as qaHostState,
+  markAnswered as qaMarkAnswered,
   personalState as qaPersonalState,
   publicState as qaPublicState,
   questionVoteCounts as qaQuestionVoteCounts,
   removeVote as qaRemoveVote,
   resolveJoinIdentity as qaResolveJoinIdentity,
-  restoreDismissedQuestion as qaRestoreDismissedQuestion,
+  restoreQuestion as qaRestoreQuestion,
   submitQuestion as qaSubmitQuestion,
   withdrawQuestion as qaWithdrawQuestion,
 } from './lib/qa';
@@ -62,6 +65,7 @@ import {
   editQuestionText as qaRepoEditQuestionText,
   recordVote as qaRepoRecordVote,
   removeVote as qaRepoRemoveVote,
+  setHighlightedQuestion as qaRepoSetHighlightedQuestion,
   setQuestionStatus as qaRepoSetQuestionStatus,
   setQuestionStatusWithModerationEvent as qaRepoSetQuestionStatusWithModerationEvent,
 } from './lib/qa-repo';
@@ -1554,7 +1558,7 @@ void app.prepare().then(() => {
       failed: { questionId: string; error: string }[];
     };
 
-    // Applies one moderation action across a list of questions with the
+    // Applies one host status action across a list of questions with the
     // persist-before-broadcast contract per question: in-memory transition,
     // then ONE transactional DB write covering the status change AND its
     // QAModerationEvent so the export/audit trail can always explain why a
@@ -1563,7 +1567,7 @@ void app.prepare().then(() => {
     // Bulk is per-question best-effort: one bad id never blocks the rest.
     async function qaModerateQuestions(
       state: QAState,
-      action: 'approve' | 'dismiss' | 'restore',
+      action: 'approve' | 'dismiss' | 'restore' | 'answered' | 'archive',
       questionIds: string[],
       bulk: boolean,
     ): Promise<QaModerationOutcome> {
@@ -1586,12 +1590,20 @@ void app.prepare().then(() => {
           withdrawnAt: question.withdrawnAt,
           highlightedQuestionId: state.highlightedQuestionId,
         };
+        // Restore is status-directed (PRD §4.3): DISMISSED -> IN_REVIEW keeps
+        // the MID-338 moderation-queue behavior; ANSWERED/ARCHIVED -> LIVE is
+        // the MID-339 host-board restore. LIVE/IN_REVIEW/WITHDRAWN restores
+        // are still rejected by the transition matrix in lib/qa.ts.
         const result =
           action === 'approve'
             ? qaApproveQuestion(state, { questionId })
             : action === 'dismiss'
               ? qaDismissQuestion(state, { questionId })
-              : qaRestoreDismissedQuestion(state, { questionId });
+              : action === 'restore'
+                ? qaRestoreQuestion(state, { questionId })
+                : action === 'answered'
+                  ? qaMarkAnswered(state, { questionId })
+                  : qaArchiveQuestion(state, { questionId });
         if (!result.ok) {
           outcome.failed.push({ questionId, error: result.reason });
           continue;
@@ -1611,6 +1623,10 @@ void app.prepare().then(() => {
           outcome.failed.push({ questionId, error: 'persistence_failed' });
           continue;
         }
+        // If the question left LIVE while highlighted, the in-memory
+        // transition already cleared the highlight; the persisted highlight
+        // column may go stale but hydration drops pointers at non-LIVE
+        // questions (lib/qa-hydrate.ts) — same contract as withdraw.
         outcome.transitioned.push({ questionId, from: result.from, to: result.to });
       }
       return outcome;
@@ -1665,7 +1681,9 @@ void app.prepare().then(() => {
       | { ok: true; questionIds: string[]; failed: { questionId: string; error: string }[] }
       | { error: string };
 
-    function qaHostModerationHandler(action: 'approve' | 'dismiss' | 'restore') {
+    function qaHostModerationHandler(
+      action: 'approve' | 'dismiss' | 'restore' | 'answered' | 'archive',
+    ) {
       return async (payload: unknown, ack: unknown) => {
         if (typeof ack !== 'function') {
           console.warn(`[qa:host:${action}] missing ack — ignoring`);
@@ -1678,14 +1696,15 @@ void app.prepare().then(() => {
           return;
         }
         const { state, p } = resolved;
-        // Restore is deliberately single-question: it is a corrective action,
-        // not a queue-clearing one (PRD §4.3).
+        // Restore, answered, and archive are deliberately single-question:
+        // they are presenting/corrective actions, not queue-clearing ones
+        // (PRD §4.3). Only approve/dismiss take bulk ids.
         const ids =
-          action === 'restore'
-            ? typeof p.questionId === 'string' && p.questionId.length > 0
+          action === 'approve' || action === 'dismiss'
+            ? qaParseQuestionIds(p)
+            : typeof p.questionId === 'string' && p.questionId.length > 0
               ? [p.questionId]
-              : null
-            : qaParseQuestionIds(p);
+              : null;
         if (!ids) {
           cb({ error: 'invalid' });
           return;
@@ -1711,6 +1730,125 @@ void app.prepare().then(() => {
     socket.on('qa:host:approve', qaHostModerationHandler('approve'));
     socket.on('qa:host:dismiss', qaHostModerationHandler('dismiss'));
     socket.on('qa:host:restore', qaHostModerationHandler('restore'));
+
+    // --- Q&A host live-board actions (MID-339) ---
+
+    socket.on('qa:host:answered', qaHostModerationHandler('answered'));
+    socket.on('qa:host:archive', qaHostModerationHandler('archive'));
+
+    // Highlight the question currently being answered (PRD §4.3). One
+    // highlighted question at a time: the single highlightedQuestionId field
+    // holds the invariant, so highlighting a new question implicitly replaces
+    // the previous one; `questionId: null` un-highlights. Persisted to the
+    // session row so restart hydration restores the on-air marker.
+    socket.on('qa:host:highlight', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:host:highlight] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (
+        res: { ok: true; highlightedQuestionId: string | null } | { error: string },
+      ) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      const questionId =
+        p.questionId === null
+          ? null
+          : typeof p.questionId === 'string' && p.questionId.length > 0
+            ? p.questionId
+            : undefined;
+      if (questionId === undefined) {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const previous = state.highlightedQuestionId;
+      const result = qaHighlightQuestion(state, { questionId });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      if (state.highlightedQuestionId !== previous) {
+        try {
+          await qaRepoSetHighlightedQuestion({
+            sessionId: state.sessionId,
+            questionId: state.highlightedQuestionId,
+          });
+        } catch (err) {
+          console.error('[qa-repo] setHighlightedQuestion', err);
+          state.highlightedQuestionId = previous;
+          cb({ error: 'persistence_failed' });
+          return;
+        }
+      }
+      cb({ ok: true, highlightedQuestionId: state.highlightedQuestionId });
+      // Highlight is part of the public projection — every connected client
+      // (host, displays, participants) re-renders the on-air marker.
+      if (state.highlightedQuestionId !== previous) qaEmitPublicState(state);
+    });
+
+    // Host edit of a question's text (PRD §4.3). The first edit preserves the
+    // submitted text in originalText (in memory and in the DB) so export/audit
+    // can show what the participant actually wrote. Host edits never demote a
+    // LIVE question back to review — that rule is participant-edit-only.
+    socket.on('qa:host:edit', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:host:edit] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (
+        res: { ok: true; questionId: string; text: string } | { error: string },
+      ) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      if (
+        typeof p.questionId !== 'string' ||
+        p.questionId.length === 0 ||
+        typeof p.text !== 'string'
+      ) {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const question = state.questions.get(p.questionId);
+      const snapshot = question
+        ? { text: question.text, originalText: question.originalText }
+        : null;
+      const result = qaEditQuestion(state, {
+        questionId: p.questionId,
+        text: p.text,
+        editor: { role: 'host' },
+      });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      const edited = result.question;
+      try {
+        await qaRepoEditQuestionText({ questionId: edited.id, text: edited.text });
+      } catch (err) {
+        console.error('[qa-repo] editQuestionText (host)', err);
+        if (question && snapshot) {
+          question.text = snapshot.text;
+          question.originalText = snapshot.originalText;
+        }
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      cb({ ok: true, questionId: edited.id, text: edited.text });
+      // A LIVE question's text is public — everyone re-renders. An IN_REVIEW
+      // edit stays host-only. The owner always gets a personal push so their
+      // "my questions" panel shows the edited text without a refresh.
+      if (edited.status === 'LIVE') qaEmitPublicState(state);
+      else qaEmitHostState(state);
+      if (edited.participantId) qaEmitPersonalState(state, edited.participantId);
+    });
 
     socket.on('disconnect', () => {
       const wcLink = wcSocketToPin.get(socket.id);

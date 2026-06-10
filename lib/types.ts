@@ -251,9 +251,10 @@ export interface QAHostState {
   highlightedQuestionId: string | null;
   labels: QAPublicLabel[];
   /**
-   * LIVE, IN_REVIEW, and DISMISSED questions, popular order (score desc,
-   * oldest first). DISMISSED rows exist so the host can restore them
-   * (MID-338) — they are host-only and never reach public projections.
+   * Every non-WITHDRAWN question, popular order (score desc, oldest first).
+   * DISMISSED rows exist so the host can restore them to review (MID-338);
+   * ANSWERED/ARCHIVED rows exist so the host can restore them to the live
+   * board (MID-339). All host-only — never reach public projections.
    */
   questions: QAHostQuestion[];
 }
