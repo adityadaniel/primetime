@@ -212,6 +212,48 @@ export interface QAPublicState {
 }
 
 /**
+ * Board row for the host control surface (MID-337): the public projection
+ * plus the question status, so the host can see LIVE and IN_REVIEW questions
+ * side by side. Anonymous stays anonymous — no participant linkage here.
+ */
+export interface QAHostQuestion extends QAPublicQuestion {
+  status: QAQuestionStatus;
+}
+
+/** Question counts by state for the host session header. */
+export interface QAHostCounts {
+  live: number;
+  inReview: number;
+  answered: number;
+  archived: number;
+}
+
+/**
+ * Projection targeted at the host socket only (`qa:host:state`). Never
+ * broadcast to the mixed qa:${pin} room: it includes IN_REVIEW questions,
+ * which must stay invisible to displays and other participants.
+ */
+export interface QAHostState {
+  pin: string;
+  title: string;
+  description: string | null;
+  privacyMode: QAPrivacyMode;
+  moderationEnabled: boolean;
+  status: QASessionStatus;
+  submissionsOpen: boolean;
+  votingOpen: boolean;
+  downvotesEnabled: boolean;
+  participantRepliesEnabled: boolean;
+  questionCharLimit: number;
+  participantCount: number;
+  counts: QAHostCounts;
+  highlightedQuestionId: string | null;
+  labels: QAPublicLabel[];
+  /** LIVE and IN_REVIEW questions, popular order (score desc, oldest first). */
+  questions: QAHostQuestion[];
+}
+
+/**
  * The participant's own question in any status, including pending review and
  * withdrawn, with all replies (private host replies included — they are only
  * ever sent to the owner).

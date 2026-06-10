@@ -9,6 +9,8 @@
 
 import { validateQuestionInput } from './qa-input';
 import type {
+  QAHostQuestion,
+  QAHostState,
   QAPersonalQuestion,
   QAPersonalState,
   QAPrivacyMode,
@@ -573,6 +575,61 @@ export function publicState(state: QAState): QAPublicState {
     questionCharLimit: state.settings.questionCharLimit,
     participantCount: state.participants.size,
     questionCount: questions.length,
+    highlightedQuestionId: state.highlightedQuestionId,
+    labels: [...state.labels.entries()].map(([id, l]) => ({
+      id,
+      name: l.name,
+      participantSelectable: l.participantSelectable,
+    })),
+    questions,
+  };
+}
+
+// Host control projection (MID-337): the public board plus IN_REVIEW
+// questions and counts by state. Targeted at the host socket only — IN_REVIEW
+// questions must never reach the mixed qa:${pin} room. Anonymous means
+// anonymous to the host too: no participant linkage, null author.
+export function hostState(state: QAState): QAHostState {
+  const counts = { live: 0, inReview: 0, answered: 0, archived: 0 };
+  const questions: QAHostQuestion[] = [];
+  for (const q of state.questions.values()) {
+    if (q.status === 'LIVE') counts.live += 1;
+    else if (q.status === 'IN_REVIEW') counts.inReview += 1;
+    else if (q.status === 'ANSWERED') counts.answered += 1;
+    else if (q.status === 'ARCHIVED') counts.archived += 1;
+    if (q.status !== 'LIVE' && q.status !== 'IN_REVIEW') continue;
+    questions.push({
+      id: q.id,
+      text: q.text,
+      isAnonymous: q.isAnonymous,
+      authorDisplayName: q.isAnonymous ? null : q.authorDisplayName,
+      status: q.status,
+      ...questionVoteCounts(q),
+      labelIds: [...q.labelIds],
+      replyCount: q.replies.length,
+      replies: q.replies.map(toPublicReply),
+      highlighted: state.highlightedQuestionId === q.id,
+      submittedAt: q.submittedAt,
+    });
+  }
+  questions.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.submittedAt - b.submittedAt;
+  });
+  return {
+    pin: state.pin,
+    title: state.settings.title,
+    description: state.settings.description,
+    privacyMode: state.settings.privacyMode,
+    moderationEnabled: state.settings.moderationEnabled,
+    status: state.status,
+    submissionsOpen: state.submissionsOpen,
+    votingOpen: state.votingOpen,
+    downvotesEnabled: state.settings.downvotesEnabled,
+    participantRepliesEnabled: state.settings.participantRepliesEnabled,
+    questionCharLimit: state.settings.questionCharLimit,
+    participantCount: state.participants.size,
+    counts,
     highlightedQuestionId: state.highlightedQuestionId,
     labels: [...state.labels.entries()].map(([id, l]) => ({
       id,

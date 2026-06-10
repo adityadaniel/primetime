@@ -9,6 +9,7 @@ import {
   dismissQuestion,
   editQuestion,
   highlightQuestion,
+  hostState,
   isValidQuestionTransition,
   isValidSessionTransition,
   markAnswered,
@@ -914,5 +915,77 @@ describe('personalState projection', () => {
   it('returns null for unknown participants', () => {
     const state = makeState();
     expect(personalState(state, 'ghost')).toBeNull();
+  });
+});
+
+describe('hostState projection', () => {
+  it('boards LIVE and IN_REVIEW questions with status markers', () => {
+    const state = makeState({ moderationEnabled: true });
+    const pid = join(state);
+    const pending = submitQuestion(state, { participantId: pid, text: 'pending one' });
+    const live = submitQuestion(state, { participantId: pid, text: 'live one' });
+    if (!pending.ok || !live.ok) throw new Error('submit failed');
+    approveQuestion(state, { questionId: live.question.id });
+
+    const host = hostState(state);
+    expect(host.moderationEnabled).toBe(true);
+    expect(host.questions.map((q) => q.id).sort()).toEqual(
+      [pending.question.id, live.question.id].sort(),
+    );
+    expect(host.questions.find((q) => q.id === pending.question.id)?.status).toBe('IN_REVIEW');
+    expect(host.questions.find((q) => q.id === live.question.id)?.status).toBe('LIVE');
+  });
+
+  it('counts questions by state and keeps settled ones off the board', () => {
+    const state = makeState();
+    const pid = join(state);
+    const answered = submitLive(state, pid, 'answered q');
+    const archived = submitLive(state, pid, 'archived q');
+    const withdrawn = submitLive(state, pid, 'withdrawn q');
+    const live = submitLive(state, pid, 'live q');
+    markAnswered(state, { questionId: answered });
+    archiveQuestion(state, { questionId: archived });
+    withdrawQuestion(state, { questionId: withdrawn, participantId: pid });
+
+    const host = hostState(state);
+    expect(host.counts).toEqual({ live: 1, inReview: 0, answered: 1, archived: 1 });
+    expect(host.questions.map((q) => q.id)).toEqual([live]);
+    const serialized = JSON.stringify(host);
+    expect(serialized).not.toContain('answered q');
+    expect(serialized).not.toContain('withdrawn q');
+  });
+
+  it('keeps anonymous questions anonymous to the host — no participant linkage', () => {
+    const state = makeState({ privacyMode: 'ANONYMOUS_BY_DEFAULT', moderationEnabled: true });
+    const pid = join(state, 'Secret Name');
+    const r = submitQuestion(state, { participantId: pid, text: 'anon pending q' });
+    if (!r.ok) throw new Error('submit failed');
+
+    const host = hostState(state);
+    expect(host.questions[0].isAnonymous).toBe(true);
+    expect(host.questions[0].authorDisplayName).toBeNull();
+    const serialized = JSON.stringify(host);
+    expect(serialized).not.toContain(pid);
+    expect(serialized).not.toContain('Secret Name');
+  });
+
+  it('sorts by score descending then oldest first across statuses', () => {
+    const state = makeState();
+    const author = join(state);
+    const v1 = join(state);
+    const v2 = join(state);
+    const qLow = submitLive(state, author, 'low');
+    const qHigh = submitLive(state, author, 'high');
+    applyVote(state, { questionId: qHigh, participantId: v1 });
+    applyVote(state, { questionId: qHigh, participantId: v2 });
+    applyVote(state, { questionId: qLow, participantId: v1 });
+    highlightQuestion(state, { questionId: qLow });
+
+    const host = hostState(state);
+    expect(host.questions.map((q) => q.id)).toEqual([qHigh, qLow]);
+    expect(host.questions[0].score).toBe(2);
+    expect(host.questions[1].highlighted).toBe(true);
+    expect(host.highlightedQuestionId).toBe(qLow);
+    expect(host.participantCount).toBe(3);
   });
 });

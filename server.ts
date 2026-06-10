@@ -42,6 +42,7 @@ import {
   applyVote as qaApplyVote,
   bindParticipantSocket as qaBindParticipantSocket,
   editQuestion as qaEditQuestion,
+  hostState as qaHostState,
   personalState as qaPersonalState,
   publicState as qaPublicState,
   questionVoteCounts as qaQuestionVoteCounts,
@@ -62,6 +63,7 @@ import {
 import { matchUploadsPath, resolveUploadFilePath, uploadContentType } from './lib/serve-upload';
 import type {
   AnswerIndex,
+  QAHostState,
   QAPersonalState,
   QAPublicState,
   QAQuestionScore,
@@ -373,6 +375,16 @@ void app.prepare().then(() => {
     }
     qaDirtyScores.delete(state.pin);
     io.to(`qa:${state.pin}`).emit('qa:state', qaPublicState(state));
+    // Anything that changes the public board also changes the host board.
+    qaEmitHostState(state);
+  }
+
+  // Host control projection (MID-337): includes IN_REVIEW questions and
+  // counts by state, so it is targeted at the host socket and never the
+  // mixed qa:${pin} room.
+  function qaEmitHostState(state: QAState) {
+    if (!state.hostSocketId) return;
+    io.to(state.hostSocketId).emit('qa:host:state', qaHostState(state));
   }
 
   function qaFlushScores(pin: string) {
@@ -967,7 +979,9 @@ void app.prepare().then(() => {
         return;
       }
       const cb = ack as (
-        res: { pin: string; sessionId: string; state: QAPublicState } | { error: string },
+        res:
+          | { pin: string; sessionId: string; state: QAPublicState; hostState: QAHostState }
+          | { error: string },
       ) => void;
       if (!payload || typeof payload !== 'object') {
         cb({ error: 'invalid' });
@@ -1009,7 +1023,12 @@ void app.prepare().then(() => {
       state.hostSocketId = socket.id;
       qaSocketToPin.set(socket.id, { pin: state.pin, role: 'host' });
       socket.join(`qa:${state.pin}`);
-      cb({ pin: state.pin, sessionId: state.sessionId, state: qaPublicState(state) });
+      cb({
+        pin: state.pin,
+        sessionId: state.sessionId,
+        state: qaPublicState(state),
+        hostState: qaHostState(state),
+      });
     });
 
     socket.on('qa:display:attach', async (payload: unknown, ack: unknown) => {
@@ -1240,7 +1259,9 @@ void app.prepare().then(() => {
       cb({ questionId: question.id, status: question.status, personal });
       // Moderated submissions are IN_REVIEW: nothing public changed, so the
       // room gets no broadcast and the question stays invisible to displays.
+      // The host board still updates — targeted at the host socket only.
       if (question.status === 'LIVE') qaEmitPublicState(state);
+      else qaEmitHostState(state);
     });
 
     socket.on('qa:participant:withdraw', async (payload: unknown, ack: unknown) => {
@@ -1287,8 +1308,10 @@ void app.prepare().then(() => {
         return;
       }
       cb({ questionId: p.questionId, status: 'WITHDRAWN', personal });
-      // Only a withdrawal out of LIVE changes the public board.
+      // Only a withdrawal out of LIVE changes the public board; one out of
+      // IN_REVIEW still changes the host board (review count, search pool).
       if (result.from === 'LIVE') qaEmitPublicState(state);
+      else if (result.from === 'IN_REVIEW') qaEmitHostState(state);
     });
 
     // Participant edit window (PRD §4.5): allowed while the question is
@@ -1356,8 +1379,10 @@ void app.prepare().then(() => {
       }
       cb({ questionId: edited.id, status: edited.status, personal });
       // Public board changed if the question was LIVE before the edit
-      // (text update, or moderated edit pulling it back to review).
+      // (text update, or moderated edit pulling it back to review). An
+      // IN_REVIEW-only edit still refreshes the host board text.
       if (snapshot?.status === 'LIVE' || edited.status === 'LIVE') qaEmitPublicState(state);
+      else qaEmitHostState(state);
     });
 
     // Participant voting (MID-336). One vote per participant per question is
