@@ -363,6 +363,9 @@ describe('question status transitions (PRD §4.3)', () => {
     expect(q?.status).toBe('ANSWERED');
     expect(q?.answeredAt).not.toBeNull();
     expect(restoreQuestion(state, { questionId: qid })).toMatchObject({ ok: true, to: 'LIVE' });
+    // MID-339 review fix: a restored question is no longer answered — the
+    // stale timestamp must not survive into exports.
+    expect(q?.answeredAt).toBeNull();
   });
 
   it('archive and restore round-trips a LIVE question', () => {
@@ -371,7 +374,35 @@ describe('question status transitions (PRD §4.3)', () => {
     const qid = submitLive(state, pid);
     expect(archiveQuestion(state, { questionId: qid }).ok).toBe(true);
     expect(state.questions.get(qid)?.status).toBe('ARCHIVED');
+    expect(state.questions.get(qid)?.archivedAt).not.toBeNull();
     expect(restoreQuestion(state, { questionId: qid })).toMatchObject({ ok: true, to: 'LIVE' });
+    expect(state.questions.get(qid)?.archivedAt).toBeNull();
+  });
+
+  it('restore to LIVE keeps the original approvedAt and dismissedAt semantics', () => {
+    const state = makeState();
+    const pid = join(state);
+    const qid = submitLive(state, pid);
+    const q = state.questions.get(qid);
+    if (!q) throw new Error('question missing');
+    // Force a known approvedAt to prove restore does not re-stamp it.
+    q.approvedAt = 1111;
+    expect(markAnswered(state, { questionId: qid }).ok).toBe(true);
+    expect(restoreQuestion(state, { questionId: qid })).toMatchObject({ ok: true, to: 'LIVE' });
+    expect(q.approvedAt).toBe(1111);
+
+    // DISMISSED -> IN_REVIEW (MID-338) keeps dismissedAt untouched.
+    const modState = makeState({ moderationEnabled: true });
+    const modPid = join(modState);
+    const r = submitQuestion(modState, { participantId: modPid, text: 'q' });
+    if (!r.ok) throw new Error('submit failed');
+    expect(dismissQuestion(modState, { questionId: r.question.id }).ok).toBe(true);
+    expect(r.question.dismissedAt).not.toBeNull();
+    expect(restoreQuestion(modState, { questionId: r.question.id })).toMatchObject({
+      ok: true,
+      to: 'IN_REVIEW',
+    });
+    expect(r.question.dismissedAt).not.toBeNull();
   });
 
   it('rejects restoring a LIVE question and unknown questions', () => {
@@ -650,6 +681,24 @@ describe('highlightQuestion', () => {
     highlightQuestion(state, { questionId: q3 });
     withdrawQuestion(state, { questionId: q3, participantId: pid });
     expect(state.highlightedQuestionId).toBeNull();
+  });
+
+  // MID-339 review fix: restoring an answered/archived question to LIVE must
+  // not resurrect its old highlight — the host re-highlights explicitly.
+  it('restore to LIVE does not re-highlight a previously highlighted question', () => {
+    const state = makeState();
+    const pid = join(state);
+    const qid = submitLive(state, pid);
+    highlightQuestion(state, { questionId: qid });
+    markAnswered(state, { questionId: qid });
+    expect(state.highlightedQuestionId).toBeNull();
+    expect(restoreQuestion(state, { questionId: qid })).toMatchObject({ ok: true, to: 'LIVE' });
+    expect(state.highlightedQuestionId).toBeNull();
+    // Once LIVE again it can be highlighted explicitly.
+    expect(highlightQuestion(state, { questionId: qid })).toEqual({
+      ok: true,
+      previousQuestionId: null,
+    });
   });
 });
 

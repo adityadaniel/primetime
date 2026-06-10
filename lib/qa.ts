@@ -302,7 +302,14 @@ function transitionQuestion(
   }
   question.status = to;
   const now = Date.now();
-  if (to === 'LIVE' && question.approvedAt === null) question.approvedAt = now;
+  if (to === 'LIVE') {
+    if (question.approvedAt === null) question.approvedAt = now;
+    // Returning to the live board (restore from ANSWERED/ARCHIVED) clears the
+    // settled timestamps so exports never show a LIVE question that still
+    // looks answered or archived (MID-339).
+    question.answeredAt = null;
+    question.archivedAt = null;
+  }
   if (to === 'ANSWERED') question.answeredAt = now;
   if (to === 'ARCHIVED') question.archivedAt = now;
   if (to === 'DISMISSED') question.dismissedAt = now;

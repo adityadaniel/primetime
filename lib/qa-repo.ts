@@ -134,10 +134,26 @@ export async function setHighlightedQuestion(args: {
   sessionId: string;
   questionId: string | null;
 }): Promise<QASession> {
-  return prisma.qASession.update({
-    where: { id: args.sessionId },
+  if (args.questionId === null) {
+    return prisma.qASession.update({
+      where: { id: args.sessionId },
+      data: { highlightedQuestionId: null },
+    });
+  }
+
+  const result = await prisma.qASession.updateMany({
+    where: {
+      id: args.sessionId,
+      questions: { some: { id: args.questionId, status: 'LIVE' } },
+    },
     data: { highlightedQuestionId: args.questionId },
   });
+  if (result.count !== 1) {
+    throw new Error('Highlighted question must be LIVE in this session');
+  }
+  const session = await prisma.qASession.findUnique({ where: { id: args.sessionId } });
+  if (!session) throw new Error('Q&A session not found');
+  return session;
 }
 
 export async function addParticipant(args: {
@@ -187,8 +203,8 @@ async function applyQuestionStatus(
   const data: {
     status: QAQuestionStatus;
     approvedAt?: Date;
-    answeredAt?: Date;
-    archivedAt?: Date;
+    answeredAt?: Date | null;
+    archivedAt?: Date | null;
     dismissedAt?: Date;
     withdrawnAt?: Date;
   } = { status: args.status };
@@ -198,22 +214,47 @@ async function applyQuestionStatus(
       select: { approvedAt: true },
     });
     if (existing && existing.approvedAt === null) data.approvedAt = new Date();
+    // Returning to the live board clears the settled timestamps (MID-339):
+    // exports must never show a LIVE question with answeredAt/archivedAt.
+    data.answeredAt = null;
+    data.archivedAt = null;
   }
   if (args.status === 'ANSWERED') data.answeredAt = new Date();
   if (args.status === 'ARCHIVED') data.archivedAt = new Date();
   if (args.status === 'DISMISSED') data.dismissedAt = new Date();
   if (args.status === 'WITHDRAWN') data.withdrawnAt = new Date();
-  return tx.qAQuestion.update({
+  const question = await tx.qAQuestion.update({
     where: { id: args.questionId },
     data,
   });
+  // Keep the persisted highlight pointer in lockstep with memory. Any status
+  // write for this question also clears a stale session pointer targeting it:
+  // - leaving LIVE clears the active highlight;
+  // - restoring to LIVE clears legacy/racy stale pointers so hydration cannot
+  //   resurrect an old highlight after the host intentionally restored only.
+  // Conditional updateMany makes this a no-op when another question is on air.
+  const txWithQASession = tx as unknown as {
+    qASession: {
+      updateMany(args: {
+        where: { id: string; highlightedQuestionId: string };
+        data: { highlightedQuestionId: null };
+      }): Promise<unknown>;
+    };
+  };
+  await txWithQASession.qASession.updateMany({
+    where: { id: question.sessionId, highlightedQuestionId: args.questionId },
+    data: { highlightedQuestionId: null },
+  });
+  return question;
 }
 
 export async function setQuestionStatus(args: {
   questionId: string;
   status: QAQuestionStatus;
 }): Promise<QAQuestion> {
-  return applyQuestionStatus(prisma, args);
+  // Transactional so the status write and the highlight-pointer clear can
+  // never persist independently.
+  return prisma.$transaction((tx) => applyQuestionStatus(tx, args));
 }
 
 // Moderation actions (MID-338) require an audit trail: the status update and

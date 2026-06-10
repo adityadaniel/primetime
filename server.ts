@@ -1326,8 +1326,8 @@ void app.prepare().then(() => {
         return;
       }
       // If the withdrawn question was highlighted, the in-memory transition
-      // already cleared it; the persisted highlight column may go stale but
-      // hydration drops pointers at non-LIVE questions (lib/qa-hydrate.ts).
+      // already cleared it and the repo write cleared the persisted pointer
+      // in the same transaction (lib/qa-repo.ts applyQuestionStatus).
       const personal = qaPersonalState(state, participantId);
       if (!personal) {
         cb({ error: 'unknown_participant' });
@@ -1624,9 +1624,10 @@ void app.prepare().then(() => {
           continue;
         }
         // If the question left LIVE while highlighted, the in-memory
-        // transition already cleared the highlight; the persisted highlight
-        // column may go stale but hydration drops pointers at non-LIVE
-        // questions (lib/qa-hydrate.ts) — same contract as withdraw.
+        // transition already cleared the highlight and the transactional
+        // repo write cleared the persisted QASession.highlightedQuestionId
+        // pointer alongside the status + moderation event, so a later
+        // restore + hydration can never resurrect the highlight.
         outcome.transitioned.push({ questionId, from: result.from, to: result.to });
       }
       return outcome;

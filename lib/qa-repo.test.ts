@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const sessionCreate = vi.fn();
 const sessionFindUnique = vi.fn();
 const sessionUpdate = vi.fn();
+const sessionUpdateMany = vi.fn();
 const sessionFindMany = vi.fn();
 const participantCreate = vi.fn();
 const questionCreate = vi.fn();
@@ -19,12 +20,13 @@ const questionLabelDeleteMany = vi.fn();
 const replyCreate = vi.fn();
 const moderationEventCreate = vi.fn();
 
-vi.mock('./db', () => ({
-  prisma: {
+vi.mock('./db', () => {
+  const prisma: Record<string, unknown> = {
     qASession: {
       create: (args: unknown) => sessionCreate(args),
       findUnique: (args: unknown) => sessionFindUnique(args),
       update: (args: unknown) => sessionUpdate(args),
+      updateMany: (args: unknown) => sessionUpdateMany(args),
       findMany: (args: unknown) => sessionFindMany(args),
     },
     qAParticipant: {
@@ -55,8 +57,12 @@ vi.mock('./db', () => ({
     qAModerationEvent: {
       create: (args: unknown) => moderationEventCreate(args),
     },
-  },
-}));
+  };
+  // Interactive-transaction mock: run the callback against the same mocked
+  // client so per-model spies observe the writes made inside transactions.
+  prisma.$transaction = (fn: (tx: unknown) => unknown) => fn(prisma);
+  return { prisma };
+});
 
 import {
   addParticipant,
@@ -74,7 +80,9 @@ import {
   logModerationEvent,
   recordVote,
   removeVote,
+  setHighlightedQuestion,
   setQuestionStatus,
+  setQuestionStatusWithModerationEvent,
   setSessionStatus,
   toHostVisibleQuestion,
   unassignLabel,
@@ -85,6 +93,7 @@ beforeEach(() => {
   sessionCreate.mockReset();
   sessionFindUnique.mockReset();
   sessionUpdate.mockReset();
+  sessionUpdateMany.mockReset();
   sessionFindMany.mockReset();
   participantCreate.mockReset();
   questionCreate.mockReset();
@@ -213,6 +222,37 @@ describe('setSessionStatus', () => {
   });
 });
 
+describe('setHighlightedQuestion', () => {
+  it('clears the highlight pointer when passed null', async () => {
+    sessionUpdate.mockResolvedValueOnce({ id: 'qa_1', highlightedQuestionId: null });
+    const out = await setHighlightedQuestion({ sessionId: 'qa_1', questionId: null });
+    expect(out).toEqual({ id: 'qa_1', highlightedQuestionId: null });
+    expect(sessionUpdate).toHaveBeenCalledWith({
+      where: { id: 'qa_1' },
+      data: { highlightedQuestionId: null },
+    });
+  });
+
+  it('only persists highlights for LIVE questions in the same session', async () => {
+    sessionUpdateMany.mockResolvedValueOnce({ count: 1 });
+    sessionFindUnique.mockResolvedValueOnce({ id: 'qa_1', highlightedQuestionId: 'q_1' });
+    const out = await setHighlightedQuestion({ sessionId: 'qa_1', questionId: 'q_1' });
+    expect(out).toEqual({ id: 'qa_1', highlightedQuestionId: 'q_1' });
+    expect(sessionUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'qa_1', questions: { some: { id: 'q_1', status: 'LIVE' } } },
+      data: { highlightedQuestionId: 'q_1' },
+    });
+  });
+
+  it('rejects stale highlights for non-LIVE/missing questions', async () => {
+    sessionUpdateMany.mockResolvedValueOnce({ count: 0 });
+    await expect(setHighlightedQuestion({ sessionId: 'qa_1', questionId: 'q_1' })).rejects.toThrow(
+      'Highlighted question must be LIVE',
+    );
+    expect(sessionFindUnique).not.toHaveBeenCalled();
+  });
+});
+
 describe('addParticipant', () => {
   it('creates a participant with trimmed display name', async () => {
     participantCreate.mockResolvedValueOnce({ id: 'pt_1', displayName: 'Alice' });
@@ -316,7 +356,7 @@ describe('addQuestion', () => {
 describe('setQuestionStatus', () => {
   it('sets approvedAt on first LIVE transition', async () => {
     questionFindUnique.mockResolvedValueOnce({ approvedAt: null });
-    questionUpdate.mockResolvedValueOnce({ id: 'q_1', status: 'LIVE' });
+    questionUpdate.mockResolvedValueOnce({ id: 'q_1', sessionId: 'qa_1', status: 'LIVE' });
     await setQuestionStatus({ questionId: 'q_1', status: 'LIVE' });
     const call = questionUpdate.mock.calls[0][0] as {
       where: { id: string };
@@ -329,10 +369,26 @@ describe('setQuestionStatus', () => {
 
   it('does not overwrite approvedAt on subsequent LIVE transitions', async () => {
     questionFindUnique.mockResolvedValueOnce({ approvedAt: new Date('2026-06-01T00:00:00Z') });
-    questionUpdate.mockResolvedValueOnce({ id: 'q_1', status: 'LIVE' });
+    questionUpdate.mockResolvedValueOnce({ id: 'q_1', sessionId: 'qa_1', status: 'LIVE' });
     await setQuestionStatus({ questionId: 'q_1', status: 'LIVE' });
     const call = questionUpdate.mock.calls[0][0] as { data: { approvedAt?: Date } };
     expect(call.data.approvedAt).toBeUndefined();
+  });
+
+  // MID-339 review fix: restoring to LIVE must clear the settled timestamps
+  // and any stale persisted highlight pointer to itself.
+  it('LIVE clears answeredAt/archivedAt and stale highlight pointer to itself', async () => {
+    questionFindUnique.mockResolvedValueOnce({ approvedAt: new Date('2026-06-01T00:00:00Z') });
+    questionUpdate.mockResolvedValueOnce({ id: 'q_1', sessionId: 'qa_1', status: 'LIVE' });
+    sessionUpdateMany.mockResolvedValueOnce({ count: 1 });
+    await setQuestionStatus({ questionId: 'q_1', status: 'LIVE' });
+    const call = questionUpdate.mock.calls[0][0] as { data: Record<string, unknown> };
+    expect(call.data.answeredAt).toBeNull();
+    expect(call.data.archivedAt).toBeNull();
+    expect(sessionUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'qa_1', highlightedQuestionId: 'q_1' },
+      data: { highlightedQuestionId: null },
+    });
   });
 
   it.each([
@@ -341,18 +397,105 @@ describe('setQuestionStatus', () => {
     ['DISMISSED', 'dismissedAt'],
     ['WITHDRAWN', 'withdrawnAt'],
   ] as const)('sets %s timestamp', async (status, field) => {
-    questionUpdate.mockResolvedValueOnce({ id: 'q_1', status });
+    questionUpdate.mockResolvedValueOnce({ id: 'q_1', sessionId: 'qa_1', status });
+    sessionUpdateMany.mockResolvedValueOnce({ count: 0 });
     await setQuestionStatus({ questionId: 'q_1', status });
     const call = questionUpdate.mock.calls[0][0] as { data: Record<string, unknown> };
     expect(call.data.status).toBe(status);
     expect(call.data[field]).toBeInstanceOf(Date);
   });
 
+  // MID-339 review fix: any persisted transition out of LIVE conditionally
+  // clears QASession.highlightedQuestionId so a stale pointer can never
+  // re-highlight the question after a restore + hydration.
+  it.each([
+    'ANSWERED',
+    'ARCHIVED',
+    'WITHDRAWN',
+    'IN_REVIEW',
+  ] as const)('%s clears the session highlight pointer when it targets this question', async (status) => {
+    questionUpdate.mockResolvedValueOnce({ id: 'q_1', sessionId: 'qa_1', status });
+    sessionUpdateMany.mockResolvedValueOnce({ count: 1 });
+    await setQuestionStatus({ questionId: 'q_1', status });
+    expect(sessionUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'qa_1', highlightedQuestionId: 'q_1' },
+      data: { highlightedQuestionId: null },
+    });
+  });
+
   it('IN_REVIEW only updates status', async () => {
-    questionUpdate.mockResolvedValueOnce({ id: 'q_1', status: 'IN_REVIEW' });
+    questionUpdate.mockResolvedValueOnce({ id: 'q_1', sessionId: 'qa_1', status: 'IN_REVIEW' });
+    sessionUpdateMany.mockResolvedValueOnce({ count: 0 });
     await setQuestionStatus({ questionId: 'q_1', status: 'IN_REVIEW' });
     const call = questionUpdate.mock.calls[0][0] as { data: Record<string, unknown> };
     expect(call.data).toEqual({ status: 'IN_REVIEW' });
+  });
+});
+
+// MID-339 review fix: the host moderation write commits the status change,
+// the audit event, and the highlight-pointer clear in ONE transaction so the
+// DB can never keep a highlight on a question that left LIVE.
+describe('setQuestionStatusWithModerationEvent', () => {
+  it('persists status + moderation event + highlight clear together', async () => {
+    questionUpdate.mockResolvedValueOnce({ id: 'q_1', sessionId: 'qa_1', status: 'ANSWERED' });
+    sessionUpdateMany.mockResolvedValueOnce({ count: 1 });
+    moderationEventCreate.mockResolvedValueOnce({ id: 'me_1' });
+    const out = await setQuestionStatusWithModerationEvent({
+      questionId: 'q_1',
+      status: 'ANSWERED',
+      sessionId: 'qa_1',
+      hostUserId: 'u_1',
+      action: 'answered',
+    });
+    expect(out.question.status).toBe('ANSWERED');
+    expect(out.event.id).toBe('me_1');
+    expect(sessionUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'qa_1', highlightedQuestionId: 'q_1' },
+      data: { highlightedQuestionId: null },
+    });
+    expect(moderationEventCreate).toHaveBeenCalledWith({
+      data: {
+        sessionId: 'qa_1',
+        questionId: 'q_1',
+        hostUserId: 'u_1',
+        action: 'answered',
+        reason: null,
+      },
+    });
+  });
+
+  it('restore to LIVE clears settled timestamps and stale highlight pointer to itself', async () => {
+    questionFindUnique.mockResolvedValueOnce({ approvedAt: new Date('2026-06-01T00:00:00Z') });
+    questionUpdate.mockResolvedValueOnce({ id: 'q_1', sessionId: 'qa_1', status: 'LIVE' });
+    sessionUpdateMany.mockResolvedValueOnce({ count: 1 });
+    moderationEventCreate.mockResolvedValueOnce({ id: 'me_1' });
+    await setQuestionStatusWithModerationEvent({
+      questionId: 'q_1',
+      status: 'LIVE',
+      sessionId: 'qa_1',
+      action: 'restore',
+    });
+    const call = questionUpdate.mock.calls[0][0] as { data: Record<string, unknown> };
+    expect(call.data.answeredAt).toBeNull();
+    expect(call.data.archivedAt).toBeNull();
+    expect(sessionUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'qa_1', highlightedQuestionId: 'q_1' },
+      data: { highlightedQuestionId: null },
+    });
+  });
+
+  it('a failing transaction never writes a moderation event alone', async () => {
+    questionUpdate.mockRejectedValueOnce(new Error('db down'));
+    await expect(
+      setQuestionStatusWithModerationEvent({
+        questionId: 'q_1',
+        status: 'ANSWERED',
+        sessionId: 'qa_1',
+        action: 'answered',
+      }),
+    ).rejects.toThrow('db down');
+    expect(moderationEventCreate).not.toHaveBeenCalled();
+    expect(sessionUpdateMany).not.toHaveBeenCalled();
   });
 });
 
