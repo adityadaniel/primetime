@@ -3286,7 +3286,7 @@ async function assertQaFullLifecycleCsvExport() {
 
   try {
     // 1. Create session with moderation + downvotes + replies enabled
-    const { pin } = await qaCreateSession({
+    const { pin, sessionId } = await qaCreateSession({
       moderationEnabled: true,
       downvotesEnabled: true,
       participantRepliesEnabled: true,
@@ -3295,7 +3295,7 @@ async function assertQaFullLifecycleCsvExport() {
 
     // 2. Host attaches
     const hostAck = qaOk(
-      (await qaEmit(host, 'qa:host:attach', { pin })) as
+      (await qaEmit(host, 'qa:host:attach', { pin, sessionId })) as
         | { pin: string; sessionId: string; hostState: unknown }
         | { error: string },
       'host attach',
