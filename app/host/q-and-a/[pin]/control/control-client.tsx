@@ -865,6 +865,14 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
               <Link href="/host" className="ticker text-[11px] tracking-widest opacity-70">
                 ← studio master
               </Link>
+              <a
+                href={`/host/q-and-a/${pin}/questions.csv`}
+                download
+                className="ink-border stamp ticker text-[10px] tracking-widest px-3 text-center no-underline"
+                style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+              >
+                EXPORT CSV
+              </a>
               <span className="ticker text-[10px] tracking-widest opacity-60 text-right">
                 {sessionEnded
                   ? 'SESSION ENDED · BOARD IS VIEW ONLY'
