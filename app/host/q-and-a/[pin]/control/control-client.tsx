@@ -14,7 +14,8 @@
 // questions land in a filed pile with restore. Labels (MID-340): the host
 // can mint session-scoped labels mid-broadcast (with a per-label audience
 // toggle), pin them on questions from a per-row picker, and filter the board
-// by label. Session controls ship with a later issue.
+// by label. Session controls (MID-342): close/reopen question intake,
+// close/reopen voting, and end the session from the host control room.
 
 import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
@@ -50,6 +51,10 @@ type LabelCreateAck = { ok: true; label: QAPublicLabel } | { error: string };
 type LabelAssignAck = { ok: true; questionId: string; labelIds: string[] } | { error: string };
 
 type ReplyAck = { ok: true; questionId: string; reply: QAPublicReply } | { error: string };
+
+type SessionControlAck =
+  | { ok: true; status: QASessionStatus; submissionsOpen: boolean; votingOpen: boolean }
+  | { error: string };
 
 type SortMode = 'popular' | 'recent' | 'oldest';
 
@@ -151,6 +156,17 @@ function labelErrorMessage(error: string): string {
   }
 }
 
+function controlErrorMessage(error: string): string {
+  switch (error) {
+    case 'invalid_transition':
+      return 'That session move is not allowed.';
+    case 'session_ended':
+      return 'The session has already ended.';
+    default:
+      return moderationErrorMessage(error);
+  }
+}
+
 export default function QAndAControlClient({ pin, sessionId }: { pin: string; sessionId: string }) {
   const socket = useSocket();
   const [host, setHost] = useState<QAHostState | null>(null);
@@ -186,6 +202,10 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
     replyId: string;
     text: string;
   } | null>(null);
+  const [controlPending, setControlPending] = useState<'submissions' | 'voting' | 'end' | null>(
+    null,
+  );
+  const [confirmEnd, setConfirmEnd] = useState(false);
   const toastTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -507,6 +527,48 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
     });
   }
 
+  function setSessionControl(kind: 'submissions' | 'voting', open: boolean) {
+    if (!socket || controlPending) return;
+    setControlPending(kind);
+    const event =
+      kind === 'submissions' ? 'qa:host:set-submissions-open' : 'qa:host:set-voting-open';
+    socket.emit(event, { pin, open }, (res: SessionControlAck) => {
+      setControlPending(null);
+      if ('error' in res) {
+        showToast(controlErrorMessage(res.error));
+        return;
+      }
+      showToast(
+        kind === 'submissions'
+          ? open
+            ? 'Questions reopened.'
+            : 'Questions closed.'
+          : open
+            ? 'Voting reopened.'
+            : 'Voting closed.',
+      );
+    });
+  }
+
+  function endSession() {
+    if (!socket || controlPending) return;
+    if (!confirmEnd) {
+      setConfirmEnd(true);
+      showToast('Tap END Q&A again to confirm.');
+      return;
+    }
+    setControlPending('end');
+    socket.emit('qa:host:end', { pin }, (res: SessionControlAck) => {
+      setControlPending(null);
+      setConfirmEnd(false);
+      if ('error' in res) {
+        showToast(controlErrorMessage(res.error));
+        return;
+      }
+      showToast('Q&A ended.');
+    });
+  }
+
   function copyText(value: string, label: string) {
     if (!value || typeof navigator === 'undefined') return;
     navigator.clipboard?.writeText(value).then(
@@ -544,6 +606,8 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
   }
 
   const status: QASessionStatus = host?.status ?? 'OPEN';
+  const sessionEnded = status === 'ENDED';
+  const controlsDisabled = !attached || sessionEnded || controlPending !== null;
   const counts = host?.counts ?? { live: 0, inReview: 0, answered: 0, archived: 0, dismissed: 0 };
   // The empty/filtered messages care about boardable rows (LIVE + IN_REVIEW)
   // only — dismissed questions live in the spike pile below.
@@ -706,16 +770,70 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
             </div>
           </div>
 
-          <div
-            className="mt-5 pt-4 border-t-2 flex items-center justify-between"
-            style={{ borderColor: 'var(--ink)' }}
-          >
-            <Link href="/host" className="ticker text-[11px] tracking-widest opacity-70">
-              ← studio master
-            </Link>
-            <span className="ticker text-[10px] tracking-widest opacity-50">
-              SESSION CONTROLS ARRIVE WITH A LATER BROADCAST UPGRADE
-            </span>
+          <div className="mt-5 pt-4 border-t-2" style={{ borderColor: 'var(--ink)' }}>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSessionControl('submissions', !(host?.submissionsOpen ?? true))}
+                disabled={controlsDisabled}
+                aria-pressed={!(host?.submissionsOpen ?? true)}
+                className="ink-border stamp ticker text-[10px] tracking-widest px-3 disabled:opacity-40"
+                style={{
+                  minHeight: 44,
+                  background: host?.submissionsOpen ? 'var(--bone)' : 'var(--vermilion)',
+                  color: host?.submissionsOpen ? 'var(--ink)' : 'var(--bone)',
+                }}
+              >
+                {controlPending === 'submissions'
+                  ? 'SAVING…'
+                  : host?.submissionsOpen
+                    ? 'CLOSE QUESTIONS'
+                    : 'REOPEN QUESTIONS'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSessionControl('voting', !(host?.votingOpen ?? true))}
+                disabled={controlsDisabled}
+                aria-pressed={!(host?.votingOpen ?? true)}
+                className="ink-border stamp ticker text-[10px] tracking-widest px-3 disabled:opacity-40"
+                style={{
+                  minHeight: 44,
+                  background: host?.votingOpen ? 'var(--bone)' : 'var(--vermilion)',
+                  color: host?.votingOpen ? 'var(--ink)' : 'var(--bone)',
+                }}
+              >
+                {controlPending === 'voting'
+                  ? 'SAVING…'
+                  : host?.votingOpen
+                    ? 'CLOSE VOTING'
+                    : 'REOPEN VOTING'}
+              </button>
+              <button
+                type="button"
+                onClick={endSession}
+                disabled={!attached || sessionEnded || controlPending !== null}
+                className="ink-border stamp ticker text-[10px] tracking-widest px-3 disabled:opacity-40"
+                style={{
+                  minHeight: 44,
+                  background: confirmEnd ? 'var(--vermilion)' : 'var(--ink)',
+                  color: 'var(--bone)',
+                }}
+              >
+                {controlPending === 'end' ? 'ENDING…' : confirmEnd ? 'CONFIRM END Q&A' : 'END Q&A'}
+              </button>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <Link href="/host" className="ticker text-[11px] tracking-widest opacity-70">
+                ← studio master
+              </Link>
+              <span className="ticker text-[10px] tracking-widest opacity-60 text-right">
+                {sessionEnded
+                  ? 'SESSION ENDED · BOARD IS VIEW ONLY'
+                  : `${host?.submissionsOpen ? 'QUESTIONS OPEN' : 'QUESTIONS CLOSED'} · ${
+                      host?.votingOpen ? 'VOTING OPEN' : 'VOTING CLOSED'
+                    }`}
+              </span>
+            </div>
           </div>
         </div>
 

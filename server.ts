@@ -61,6 +61,9 @@ import {
   removeVote as qaRemoveVote,
   resolveJoinIdentity as qaResolveJoinIdentity,
   restoreQuestion as qaRestoreQuestion,
+  setSessionStatus as qaSetSessionStatus,
+  setSubmissionsOpen as qaSetSubmissionsOpen,
+  setVotingOpen as qaSetVotingOpen,
   submitQuestion as qaSubmitQuestion,
   unassignLabel as qaUnassignLabel,
   withdrawQuestion as qaWithdrawQuestion,
@@ -79,6 +82,8 @@ import {
   setHighlightedQuestion as qaRepoSetHighlightedQuestion,
   setQuestionStatus as qaRepoSetQuestionStatus,
   setQuestionStatusWithModerationEvent as qaRepoSetQuestionStatusWithModerationEvent,
+  setSessionStatus as qaRepoSetSessionStatus,
+  setVotingOpen as qaRepoSetVotingOpen,
   unassignLabel as qaRepoUnassignLabel,
   updateReplyText as qaRepoUpdateReplyText,
 } from './lib/qa-repo';
@@ -92,6 +97,7 @@ import type {
   QAPublicState,
   QAQuestionScore,
   QAQuestionStatus,
+  QASessionStatus,
   QAVoteType,
   Quiz,
 } from './lib/types';
@@ -311,6 +317,7 @@ void app.prepare().then(() => {
   const WC_RATE_LIMIT_MS = 800;
 
   const qaStates = new Map<string, QAState>();
+  const qaSessionControlQueues = new Map<string, Promise<void>>();
   const qaSocketToPin = new Map<
     string,
     { pin: string; role: 'host' | 'display' | 'participant' }
@@ -1268,6 +1275,14 @@ void app.prepare().then(() => {
         }
         labelIds = p.labelIds as string[];
       }
+      if (state.status === 'ENDED') {
+        cb({ error: 'session_ended' });
+        return;
+      }
+      if (!state.submissionsOpen) {
+        cb({ error: 'submissions_closed' });
+        return;
+      }
       const now = Date.now();
       const last = qaLastSubmitAt.get(participantId) ?? 0;
       if (now - last < QA_SUBMIT_RATE_LIMIT_MS) {
@@ -1570,6 +1585,206 @@ void app.prepare().then(() => {
       }
       return { state, p };
     }
+
+    type QaSessionControlAck =
+      | { ok: true; status: QASessionStatus; submissionsOpen: boolean; votingOpen: boolean }
+      | { error: string };
+
+    function qaSessionControlSnapshot(
+      state: QAState,
+    ): Exclude<QaSessionControlAck, { error: string }> {
+      return {
+        ok: true,
+        status: state.status,
+        submissionsOpen: state.submissionsOpen,
+        votingOpen: state.votingOpen,
+      };
+    }
+
+    function qaSnapshotSessionControls(state: QAState) {
+      return {
+        status: state.status,
+        submissionsOpen: state.submissionsOpen,
+        votingOpen: state.votingOpen,
+      };
+    }
+
+    function qaRestoreSessionControls(
+      state: QAState,
+      snapshot: { status: QASessionStatus; submissionsOpen: boolean; votingOpen: boolean },
+    ) {
+      state.status = snapshot.status;
+      state.submissionsOpen = snapshot.submissionsOpen;
+      state.votingOpen = snapshot.votingOpen;
+    }
+
+    function isQaSessionStatus(value: unknown): value is QASessionStatus {
+      return value === 'OPEN' || value === 'CLOSED' || value === 'ENDED';
+    }
+
+    function qaEnqueueSessionControl(
+      payload: unknown,
+      eventName: string,
+      task: () => Promise<void>,
+    ) {
+      if (!payload || typeof payload !== 'object') {
+        void task();
+        return;
+      }
+      const pin = (payload as Record<string, unknown>).pin;
+      if (!isPin(pin)) {
+        void task();
+        return;
+      }
+      const previous = qaSessionControlQueues.get(pin) ?? Promise.resolve();
+      const next = previous
+        .catch(() => undefined)
+        .then(task)
+        .finally(() => {
+          if (qaSessionControlQueues.get(pin) === next) qaSessionControlQueues.delete(pin);
+        });
+      qaSessionControlQueues.set(pin, next);
+      void next.catch((err) => console.error(`[${eventName}] session control queue`, err));
+    }
+
+    async function qaHandleSetSubmissionsOpen(payload: unknown, ack: unknown, eventName: string) {
+      if (typeof ack !== 'function') {
+        console.warn(`[${eventName}] missing ack — ignoring`);
+        return;
+      }
+      const cb = ack as (res: QaSessionControlAck) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      if (typeof p.open !== 'boolean') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const snapshot = qaSnapshotSessionControls(state);
+      const result = qaSetSubmissionsOpen(state, p.open);
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      try {
+        await qaRepoSetSessionStatus({ sessionId: state.sessionId, status: state.status });
+      } catch (err) {
+        console.error('[qa-repo] setSessionStatus (submissions)', err);
+        qaRestoreSessionControls(state, snapshot);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      cb(qaSessionControlSnapshot(state));
+      qaEmitPublicState(state);
+    }
+
+    async function qaHandleSetVotingOpen(payload: unknown, ack: unknown, eventName: string) {
+      if (typeof ack !== 'function') {
+        console.warn(`[${eventName}] missing ack — ignoring`);
+        return;
+      }
+      const cb = ack as (res: QaSessionControlAck) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      if (typeof p.open !== 'boolean') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const previous = state.votingOpen;
+      const result = qaSetVotingOpen(state, p.open);
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      try {
+        await qaRepoSetVotingOpen({ sessionId: state.sessionId, votingOpen: state.votingOpen });
+      } catch (err) {
+        console.error('[qa-repo] setVotingOpen', err);
+        state.votingOpen = previous;
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      cb(qaSessionControlSnapshot(state));
+      qaEmitPublicState(state);
+    }
+
+    async function qaHandleSetSessionStatus(
+      payload: unknown,
+      ack: unknown,
+      eventName: string,
+      forcedStatus?: QASessionStatus,
+    ) {
+      if (typeof ack !== 'function') {
+        console.warn(`[${eventName}] missing ack — ignoring`);
+        return;
+      }
+      const cb = ack as (res: QaSessionControlAck) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      const status = forcedStatus ?? p.status;
+      if (!isQaSessionStatus(status)) {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const snapshot = qaSnapshotSessionControls(state);
+      const result = qaSetSessionStatus(state, status);
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      try {
+        await qaRepoSetSessionStatus({ sessionId: state.sessionId, status });
+      } catch (err) {
+        console.error('[qa-repo] setSessionStatus', err);
+        qaRestoreSessionControls(state, snapshot);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      cb(qaSessionControlSnapshot(state));
+      qaEmitPublicState(state);
+    }
+
+    socket.on('qa:host:set-submissions', (payload: unknown, ack: unknown) =>
+      qaEnqueueSessionControl(payload, 'qa:host:set-submissions', () =>
+        qaHandleSetSubmissionsOpen(payload, ack, 'qa:host:set-submissions'),
+      ),
+    );
+    socket.on('qa:host:set-submissions-open', (payload: unknown, ack: unknown) =>
+      qaEnqueueSessionControl(payload, 'qa:host:set-submissions-open', () =>
+        qaHandleSetSubmissionsOpen(payload, ack, 'qa:host:set-submissions-open'),
+      ),
+    );
+    socket.on('qa:host:set-voting', (payload: unknown, ack: unknown) =>
+      qaEnqueueSessionControl(payload, 'qa:host:set-voting', () =>
+        qaHandleSetVotingOpen(payload, ack, 'qa:host:set-voting'),
+      ),
+    );
+    socket.on('qa:host:set-voting-open', (payload: unknown, ack: unknown) =>
+      qaEnqueueSessionControl(payload, 'qa:host:set-voting-open', () =>
+        qaHandleSetVotingOpen(payload, ack, 'qa:host:set-voting-open'),
+      ),
+    );
+    socket.on('qa:host:end', (payload: unknown, ack: unknown) =>
+      qaEnqueueSessionControl(payload, 'qa:host:end', () =>
+        qaHandleSetSessionStatus(payload, ack, 'qa:host:end', 'ENDED'),
+      ),
+    );
+    socket.on('qa:host:set-session-status', (payload: unknown, ack: unknown) =>
+      qaEnqueueSessionControl(payload, 'qa:host:set-session-status', () =>
+        qaHandleSetSessionStatus(payload, ack, 'qa:host:set-session-status'),
+      ),
+    );
 
     // Single id or bulk (`questionIds`) — both normalize to a list. Bulk is
     // capped to keep one event from holding the loop on a huge board.
@@ -2159,6 +2374,14 @@ void app.prepare().then(() => {
         typeof p.text !== 'string'
       ) {
         cb({ error: 'invalid' });
+        return;
+      }
+      if (state.status === 'ENDED') {
+        cb({ error: 'session_ended' });
+        return;
+      }
+      if (!state.submissionsOpen) {
+        cb({ error: 'submissions_closed' });
         return;
       }
       const now = Date.now();

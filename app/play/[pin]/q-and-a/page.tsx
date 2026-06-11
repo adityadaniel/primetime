@@ -750,7 +750,9 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
         ) : (
           <div className="mt-6 ink-border px-4 py-5" style={{ background: 'var(--bone)' }}>
             <p className="ticker text-[11px] tracking-widest opacity-80">
-              QUESTIONS CLOSED · THE HOST IS WORKING THE BOARD
+              {pub.votingOpen
+                ? 'QUESTIONS CLOSED · THE HOST IS WORKING THE BOARD'
+                : 'QUESTIONS AND VOTING CLOSED · THE HOST IS WORKING THE BOARD'}
             </p>
           </div>
         )}

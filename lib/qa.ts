@@ -264,6 +264,7 @@ export function submitQuestion(
     labelIds?: string[];
   },
 ): SubmitQuestionResult {
+  if (state.status === 'ENDED') return { ok: false, reason: 'session_ended' };
   if (!state.submissionsOpen) return { ok: false, reason: 'submissions_closed' };
   const participant = state.participants.get(args.participantId);
   if (!participant) return { ok: false, reason: 'unknown_participant' };
@@ -656,6 +657,7 @@ export function applyVote(
   state: QAState,
   args: { questionId: string; participantId: string; type?: QAVoteType },
 ): VoteResult {
+  if (state.status === 'ENDED') return { ok: false, reason: 'session_ended' };
   if (!state.votingOpen) return { ok: false, reason: 'voting_closed' };
   if (!state.participants.has(args.participantId)) {
     return { ok: false, reason: 'unknown_participant' };
@@ -679,6 +681,7 @@ export function removeVote(
   state: QAState,
   args: { questionId: string; participantId: string },
 ): RemoveVoteResult {
+  if (state.status === 'ENDED') return { ok: false, reason: 'session_ended' };
   if (!state.votingOpen) return { ok: false, reason: 'voting_closed' };
   const question = state.questions.get(args.questionId);
   if (!question) return { ok: false, reason: 'unknown_question' };

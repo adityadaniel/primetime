@@ -161,6 +161,7 @@ async function main() {
   await assertQaVoting();
   await assertQaModerationQueue();
   await assertQaReplies();
+  await assertQaSessionControls();
 
   await assertPersistenceRowsWritten();
 }
@@ -1223,6 +1224,9 @@ type QaPublicSnapshot = {
   title: string;
   participantCount: number;
   questionCount: number;
+  status: 'OPEN' | 'CLOSED' | 'ENDED';
+  submissionsOpen: boolean;
+  votingOpen: boolean;
   questions: {
     id: string;
     text: string;
@@ -2582,6 +2586,303 @@ async function assertQaReplies() {
     display.disconnect();
     alice.disconnect();
     bob.disconnect();
+    await prisma.$disconnect();
+  }
+}
+
+type QaSessionControlAck =
+  | { ok: true; status: 'OPEN' | 'CLOSED' | 'ENDED'; submissionsOpen: boolean; votingOpen: boolean }
+  | { error: string };
+
+async function assertQaSessionControls() {
+  console.log('\n--- scenario 23 (MID-342): Q&A session controls ---');
+  const prisma = new PrismaClient();
+  const host = await connectSock();
+  const display = await connectSock();
+  const alice = await connectSock();
+  const bob = await connectSock();
+  const probe = await connectSock();
+  const reconnectDisplay = await connectSock();
+  try {
+    const { pin, sessionId } = await qaCreateSession({ participantRepliesEnabled: true });
+    console.log('qa session-controls pin:', pin);
+    qaOk(await qaEmit(host, 'qa:host:attach', { pin, sessionId }), 'qa:host:attach');
+    qaOk(
+      (await qaEmit(display, 'qa:display:attach', { pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'qa:display:attach',
+    );
+    const aliceJoin = qaOk<Exclude<QaJoinAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:join', { pin, displayName: 'Alice' })) as QaJoinAck,
+      'alice join',
+    );
+    const bobJoin = qaOk<Exclude<QaJoinAck, { error: string }>>(
+      (await qaEmit(bob, 'qa:participant:join', { pin, displayName: 'Bob' })) as QaJoinAck,
+      'bob join',
+    );
+
+    const displaySawQuestion = qaWaitForState(display, (s) => s.questionCount === 1);
+    const submit = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:submit', {
+        pin,
+        text: 'Can we still vote while questions are closed?',
+      })) as QaActionAck,
+      'initial submit',
+    );
+    await displaySawQuestion;
+
+    qaExpectError(
+      await qaEmit(probe, 'qa:host:set-voting-open', { pin, open: false }),
+      'forbidden',
+      'non-host voting control',
+    );
+
+    const displaySawClosedSubmissions = qaWaitForState(
+      display,
+      (s) => s.status === 'CLOSED' && !s.submissionsOpen && s.votingOpen,
+    );
+    const closeSubmissions = qaOk<Exclude<QaSessionControlAck, { error: string }>>(
+      (await qaEmit(host, 'qa:host:set-submissions-open', {
+        pin,
+        open: false,
+      })) as QaSessionControlAck,
+      'close submissions',
+    );
+    if (closeSubmissions.status !== 'CLOSED' || closeSubmissions.votingOpen !== true) {
+      throw new Error(`bad close submissions ack: ${JSON.stringify(closeSubmissions)}`);
+    }
+    await displaySawClosedSubmissions;
+    const closedRow = await prisma.qASession.findUnique({ where: { id: sessionId } });
+    if (!closedRow || closedRow.status !== 'CLOSED' || !closedRow.votingOpen) {
+      throw new Error(`bad persisted closed-submissions state: ${JSON.stringify(closedRow)}`);
+    }
+    const reconnectClosed = qaOk(
+      (await qaEmit(reconnectDisplay, 'qa:display:attach', { pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'display reconnect while questions closed',
+    );
+    if (
+      reconnectClosed.state.status !== 'CLOSED' ||
+      reconnectClosed.state.submissionsOpen ||
+      !reconnectClosed.state.votingOpen
+    ) {
+      throw new Error(`bad reconnect closed state: ${JSON.stringify(reconnectClosed.state)}`);
+    }
+
+    qaExpectError(
+      await qaEmit(bob, 'qa:participant:submit', { pin, text: 'late question' }),
+      'submissions_closed',
+      'submit while closed',
+    );
+    qaExpectError(
+      await qaEmit(bob, 'qa:participant:reply', {
+        pin,
+        questionId: submit.questionId,
+        text: 'same here',
+      }),
+      'submissions_closed',
+      'reply while closed',
+    );
+
+    const voteWhileClosed = qaOk<{ score: number; upvotes: number; downvotes: number }>(
+      (await qaEmit(bob, 'qa:participant:vote', {
+        pin,
+        questionId: submit.questionId,
+        type: 'UP',
+      })) as { score: number; upvotes: number; downvotes: number } | { error: string },
+      'vote while submissions closed',
+    );
+    if (voteWhileClosed.score !== 1 || voteWhileClosed.upvotes !== 1) {
+      throw new Error(`bad vote while closed: ${JSON.stringify(voteWhileClosed)}`);
+    }
+
+    const displaySawVotingClosed = qaWaitForState(display, (s) => !s.votingOpen);
+    const closeVoting = qaOk<Exclude<QaSessionControlAck, { error: string }>>(
+      (await qaEmit(host, 'qa:host:set-voting-open', { pin, open: false })) as QaSessionControlAck,
+      'close voting',
+    );
+    if (closeVoting.votingOpen !== false) {
+      throw new Error(`bad close voting ack: ${JSON.stringify(closeVoting)}`);
+    }
+    await displaySawVotingClosed;
+    const votingClosedRow = await prisma.qASession.findUnique({ where: { id: sessionId } });
+    if (!votingClosedRow || votingClosedRow.status !== 'CLOSED' || votingClosedRow.votingOpen) {
+      throw new Error(`bad persisted voting-closed state: ${JSON.stringify(votingClosedRow)}`);
+    }
+
+    qaExpectError(
+      await qaEmit(alice, 'qa:participant:vote', {
+        pin,
+        questionId: submit.questionId,
+        type: 'UP',
+      }),
+      'voting_closed',
+      'vote while voting closed',
+    );
+
+    const displaySawReopenedSubmissions = qaWaitForState(
+      display,
+      (s) => s.status === 'OPEN' && s.submissionsOpen && !s.votingOpen,
+    );
+    const reconnectSawReopenedSubmissions = qaWaitForState(
+      reconnectDisplay,
+      (s) => s.status === 'OPEN' && s.submissionsOpen && !s.votingOpen,
+    );
+    const reopenSubmissions = qaOk<Exclude<QaSessionControlAck, { error: string }>>(
+      (await qaEmit(host, 'qa:host:set-submissions-open', {
+        pin,
+        open: true,
+      })) as QaSessionControlAck,
+      'reopen submissions',
+    );
+    if (reopenSubmissions.status !== 'OPEN' || !reopenSubmissions.submissionsOpen) {
+      throw new Error(`bad reopen submissions ack: ${JSON.stringify(reopenSubmissions)}`);
+    }
+    await Promise.all([displaySawReopenedSubmissions, reconnectSawReopenedSubmissions]);
+    const reopenedSubmissionsRow = await prisma.qASession.findUnique({ where: { id: sessionId } });
+    if (
+      !reopenedSubmissionsRow ||
+      reopenedSubmissionsRow.status !== 'OPEN' ||
+      reopenedSubmissionsRow.votingOpen
+    ) {
+      throw new Error(
+        `bad persisted reopened-submissions state: ${JSON.stringify(reopenedSubmissionsRow)}`,
+      );
+    }
+    const displaySawReopenedVoting = qaWaitForState(
+      display,
+      (s) => s.status === 'OPEN' && s.submissionsOpen && s.votingOpen,
+    );
+    const reconnectSawReopenedVoting = qaWaitForState(
+      reconnectDisplay,
+      (s) => s.status === 'OPEN' && s.submissionsOpen && s.votingOpen,
+    );
+    const reopenVoting = qaOk<Exclude<QaSessionControlAck, { error: string }>>(
+      (await qaEmit(host, 'qa:host:set-voting-open', { pin, open: true })) as QaSessionControlAck,
+      'reopen voting',
+    );
+    if (!reopenVoting.votingOpen) {
+      throw new Error(`bad reopen voting ack: ${JSON.stringify(reopenVoting)}`);
+    }
+    await Promise.all([displaySawReopenedVoting, reconnectSawReopenedVoting]);
+    const reopenedVotingRow = await prisma.qASession.findUnique({ where: { id: sessionId } });
+    if (
+      !reopenedVotingRow ||
+      reopenedVotingRow.status !== 'OPEN' ||
+      !reopenedVotingRow.votingOpen
+    ) {
+      throw new Error(`bad persisted reopened-voting state: ${JSON.stringify(reopenedVotingRow)}`);
+    }
+
+    const displaySawConcurrentVotingClosed = qaWaitForState(
+      display,
+      (s) => s.status === 'OPEN' && s.submissionsOpen && !s.votingOpen,
+    );
+    const displaySawConcurrentVotingOpen = qaWaitForState(
+      display,
+      (s) => s.status === 'OPEN' && s.submissionsOpen && s.votingOpen,
+    );
+    const [concurrentCloseVoting, concurrentReopenVoting] = await Promise.all([
+      qaEmit(host, 'qa:host:set-voting-open', { pin, open: false }),
+      qaEmit(host, 'qa:host:set-voting-open', { pin, open: true }),
+    ]);
+    const queuedCloseVoting = qaOk<Exclude<QaSessionControlAck, { error: string }>>(
+      concurrentCloseVoting as QaSessionControlAck,
+      'queued close voting',
+    );
+    const queuedReopenVoting = qaOk<Exclude<QaSessionControlAck, { error: string }>>(
+      concurrentReopenVoting as QaSessionControlAck,
+      'queued reopen voting',
+    );
+    if (queuedCloseVoting.votingOpen || !queuedReopenVoting.votingOpen) {
+      throw new Error(
+        `bad queued voting acks: ${JSON.stringify({ queuedCloseVoting, queuedReopenVoting })}`,
+      );
+    }
+    await Promise.all([displaySawConcurrentVotingClosed, displaySawConcurrentVotingOpen]);
+    const queuedVotingRow = await prisma.qASession.findUnique({ where: { id: sessionId } });
+    if (!queuedVotingRow || queuedVotingRow.status !== 'OPEN' || !queuedVotingRow.votingOpen) {
+      throw new Error(`bad persisted queued-voting state: ${JSON.stringify(queuedVotingRow)}`);
+    }
+
+    await sleep(1100); // Bob used a rejected reply attempt; keep the submit throttle unambiguous.
+    qaOk(
+      (await qaEmit(bob, 'qa:participant:submit', { pin, text: 'Back open?' })) as QaActionAck,
+      'submit after reopen',
+    );
+
+    const displaySawEnded = qaWaitForState(
+      display,
+      (s) => s.status === 'ENDED' && !s.submissionsOpen && !s.votingOpen,
+    );
+    const end = qaOk<Exclude<QaSessionControlAck, { error: string }>>(
+      (await qaEmit(host, 'qa:host:set-session-status', {
+        pin,
+        status: 'ENDED',
+      })) as QaSessionControlAck,
+      'end session',
+    );
+    if (end.status !== 'ENDED' || end.submissionsOpen || end.votingOpen) {
+      throw new Error(`bad end ack: ${JSON.stringify(end)}`);
+    }
+    await displaySawEnded;
+
+    const endedReconnect = qaOk(
+      (await qaEmit(reconnectDisplay, 'qa:display:attach', { pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'display reconnect after end',
+    );
+    if (
+      endedReconnect.state.status !== 'ENDED' ||
+      endedReconnect.state.submissionsOpen ||
+      endedReconnect.state.votingOpen
+    ) {
+      throw new Error(`bad reconnect ended state: ${JSON.stringify(endedReconnect.state)}`);
+    }
+
+    const persisted = await prisma.qASession.findUnique({ where: { id: sessionId } });
+    if (!persisted || persisted.status !== 'ENDED' || persisted.votingOpen || !persisted.endedAt) {
+      throw new Error(`bad persisted end state: ${JSON.stringify(persisted)}`);
+    }
+    qaExpectError(
+      await qaEmit(bob, 'qa:participant:submit', { pin, text: 'ended question' }),
+      'session_ended',
+      'submit after end despite submit throttle',
+    );
+    qaExpectError(
+      await qaEmit(alice, 'qa:participant:vote', {
+        pin,
+        questionId: submit.questionId,
+        type: 'UP',
+      }),
+      'session_ended',
+      'vote after end',
+    );
+    qaExpectError(
+      await qaEmit(probe, 'qa:participant:join', { pin, displayName: 'Late' }),
+      'session_ended',
+      'join after end',
+    );
+    qaExpectError(
+      await qaEmit(host, 'qa:host:set-voting-open', { pin, open: true }),
+      'session_ended',
+      'reopen voting after end',
+    );
+
+    if (aliceJoin.participantId === bobJoin.participantId) {
+      throw new Error('participants were not distinct');
+    }
+    console.log('✓ Q&A session controls (MID-342)');
+  } finally {
+    host.disconnect();
+    display.disconnect();
+    alice.disconnect();
+    bob.disconnect();
+    probe.disconnect();
+    reconnectDisplay.disconnect();
     await prisma.$disconnect();
   }
 }

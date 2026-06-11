@@ -124,8 +124,13 @@ export async function setSessionStatus(args: {
   sessionId: string;
   status: QASessionStatus;
 }): Promise<QASession> {
-  const data: { status: QASessionStatus; endedAt?: Date } = { status: args.status };
-  if (args.status === 'ENDED') data.endedAt = new Date();
+  const data: { status: QASessionStatus; endedAt?: Date; votingOpen?: boolean } = {
+    status: args.status,
+  };
+  if (args.status === 'ENDED') {
+    data.endedAt = new Date();
+    data.votingOpen = false;
+  }
   return prisma.qASession.update({
     where: { id: args.sessionId },
     data,

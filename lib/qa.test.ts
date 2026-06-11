@@ -890,6 +890,27 @@ describe('session status and open flags', () => {
     expect(applyVote(state, { questionId: qid, participantId: voter }).ok).toBe(true);
   });
 
+  it('ENDED rejects stale participant submit and vote attempts with session_ended', () => {
+    const state = makeState();
+    const author = join(state);
+    const voter = join(state);
+    const qid = submitLive(state, author);
+    setSessionStatus(state, 'ENDED');
+
+    expect(submitQuestion(state, { participantId: author, text: 'too late' })).toEqual({
+      ok: false,
+      reason: 'session_ended',
+    });
+    expect(applyVote(state, { questionId: qid, participantId: voter })).toEqual({
+      ok: false,
+      reason: 'session_ended',
+    });
+    expect(removeVote(state, { questionId: qid, participantId: voter })).toEqual({
+      ok: false,
+      reason: 'session_ended',
+    });
+  });
+
   it('setVotingOpen rejects changes after the session ended', () => {
     const state = makeState();
     setSessionStatus(state, 'ENDED');
