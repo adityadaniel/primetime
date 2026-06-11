@@ -166,11 +166,11 @@ async function main() {
 }
 
 async function assertCapEnforcement() {
-  // OSS: the cap is env-driven (PLAYER_CAP, default 10). Server and this smoke
-  // run share the same lib/config, so we fill exactly config.playerCap slots
+  // OSS: the cap is a code-level product constant. Server and this smoke run
+  // share the same lib/config, so we fill exactly config.playerCap slots
   // and expect the next join to be rejected with code "full".
   const cap = config.playerCap;
-  console.log(`\n--- cap enforcement: env PLAYER_CAP = ${cap} ---`);
+  console.log(`\n--- cap enforcement: PLAYER_CAP = ${cap} ---`);
   const capHost = io(URL, { transports: ['websocket'] });
   await new Promise<void>((r) => capHost.on('connect', () => r()));
 

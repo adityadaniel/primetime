@@ -12,6 +12,7 @@
 
 import { loadEnvConfig } from '@next/env';
 import { deriveE2eDatabaseUrl } from '../../lib/config';
+import { PLAYER_CAP } from '../../lib/constants';
 
 // Populate process.env from .env / .env.local exactly like Next does, so the
 // base DATABASE_URL resolves the same way the dev server would. In CI, where
@@ -37,7 +38,7 @@ export const E2E_BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${E2E_
  * Pins the OSS config surface to a known test profile:
  *   • token-print email so /api/auth/reset returns a capturable devUrl
  *   • local uploads (no cloud provider)
- *   • PLAYER_CAP=3 so the cap-rejection test only needs 4 sockets (fast)
+ *   • code-level PLAYER_CAP from lib/constants.ts
  *   • session persistence on so GameSession rows are written
  * Shell env wins over .env files under @next/env, so these reliably override a
  * developer's local .env.local.
@@ -52,7 +53,6 @@ export const webServerEnv: Record<string, string> = {
   AUTH_MODE: 'password',
   EMAIL_PROVIDER: 'token-print',
   UPLOAD_PROVIDER: 'local',
-  PLAYER_CAP: '3',
   REQUIRE_INVITE_CODE: 'false',
   ENABLE_SESSION_PERSISTENCE: 'true',
   ENABLE_APPLE_SIGNIN: 'false',
@@ -60,4 +60,4 @@ export const webServerEnv: Record<string, string> = {
 };
 
 /** PLAYER_CAP the server boots with — the cap-rejection test reads this. */
-export const E2E_PLAYER_CAP = Number(webServerEnv.PLAYER_CAP);
+export const E2E_PLAYER_CAP = PLAYER_CAP;

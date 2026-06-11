@@ -522,5 +522,5 @@ back; reveal and later phases always render server truth.
 answer-burst traffic dropped ~38× (88,330 → 2,296 deliveries over 3 questions
 at 120 players). Anything that wants per-answer realtime updates mid-question
 (e.g. a live answer counter) must ride the coalesced tick, not per-answer
-broadcasts. `scripts/load-fanout.ts` is the measurement harness; server must
-run with `PLAYER_CAP >= PLAYERS`.
+broadcasts. `scripts/load-fanout.ts` is the measurement harness; the
+`PLAYER_CAP` constant in `lib/constants.ts` must be `>= PLAYERS`.

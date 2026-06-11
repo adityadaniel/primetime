@@ -15,7 +15,7 @@
 // and confirm latency that grows with answer order (late answerers wait for
 // everyone ahead of them).
 //
-// Usage: server must already run on :4321 with PLAYER_CAP >= PLAYERS.
+// Usage: server must already run on :4321 with lib/constants.ts PLAYER_CAP >= PLAYERS.
 //   PLAYERS=120 npx tsx scripts/load-fanout.ts
 
 import { io } from 'socket.io-client';

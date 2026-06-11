@@ -7,6 +7,7 @@ vi.mock('./session-repo', () => ({
   finalizeSession: vi.fn(async () => undefined),
 }));
 
+import { PLAYER_CAP } from './constants';
 import {
   advance,
   advanceToQuestion,
@@ -300,13 +301,13 @@ describe('joinPlayer lifecycle', () => {
     expect(r51.code).toBe('full');
   });
 
-  it('defaults to the OSS config cap (10) when none is injected', () => {
+  it('defaults to the OSS code-level cap when none is injected', () => {
     const game = setupGame();
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < PLAYER_CAP; i++) {
       const r = joinPlayer(game.pin, `s${i}`, `P${i}`);
       expect(r.ok).toBe(true);
     }
-    const overflow = joinPlayer(game.pin, 's10', 'P10');
+    const overflow = joinPlayer(game.pin, `s${PLAYER_CAP}`, `P${PLAYER_CAP}`);
     expect(overflow.ok).toBe(false);
     if (overflow.ok) return;
     expect(overflow.code).toBe('full');
@@ -771,7 +772,7 @@ describe('misc surfaces (coverage)', () => {
     expect(s.pin).toBe(game.pin);
     expect(s.phase).toBe('lobby');
     expect(s.players).toHaveLength(1);
-    expect(s.cap).toEqual({ max: 10 });
+    expect(s.cap).toEqual({ max: PLAYER_CAP });
     expect(s.totalQuestions).toBe(2);
   });
 

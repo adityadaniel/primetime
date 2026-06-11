@@ -18,9 +18,9 @@ import type {
   Quiz,
 } from './types';
 
-// OSS has a single, env-driven player cap (MID-216 · OSS-CAP-01). There are no
+// OSS has a single code-level player cap (MID-216 · OSS-CAP-01). There are no
 // billing tiers, so there is no soft/hard split and no upgrade prompt: every
-// game is capped at `config.playerCap` (PLAYER_CAP env, default 10).
+// game is capped at `config.playerCap` (from lib/constants.ts).
 let RECONNECT_GRACE_MS = 30_000;
 const HOST_GRACE_MS = 60_000;
 
@@ -36,7 +36,7 @@ export type Tier = 'free' | 'pro';
 export interface GameSession {
   pin: string;
   tier: Tier;
-  /** Max concurrent players for this game (OSS env cap, see config.playerCap). */
+  /** Max concurrent players for this game (OSS code cap, see config.playerCap). */
   playerCap: number;
   hostSocketId?: string;
   displaySocketIds: Set<string>;

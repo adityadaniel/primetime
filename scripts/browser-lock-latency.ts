@@ -3,7 +3,7 @@
 // personal), taken while BOTS socket players burst-answer the same question
 // so the tap lands inside the fanout window the dead-button bug lived in.
 //
-// Requires a running server on :4321 with PLAYER_CAP > BOTS.
+// Requires a running server on :4321 with lib/constants.ts PLAYER_CAP > BOTS.
 //   BOTS=119 npx tsx scripts/browser-lock-latency.ts
 
 import { chromium } from '@playwright/test';

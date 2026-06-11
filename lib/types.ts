@@ -66,7 +66,7 @@ export interface PublicGameState {
   endedReason?: 'host-left';
   playerCount?: number;
   cap?: {
-    /** Configured max players for this game (OSS PLAYER_CAP). */
+    /** Configured max players for this game (OSS code-level cap). */
     max: number;
   };
   players: Array<{ id: string; nickname: string; score: number; connected: boolean }>;
