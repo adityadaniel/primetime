@@ -206,6 +206,7 @@ The timer auto-locks when it hits zero, and locks early once every connected pla
 - **Light profanity filter** for nicknames — rejects with `nickname-rejected` code so the join page can show a friendly retry
 - Smoke test extended to cover reconnect, host pause, cap enforcement, CSV export, and profanity rejection: `npm run smoke`
 - Word Cloud activity (alternative to quiz): host posts a prompt, players submit words, real-time projection cloud with CSV export
+- **Q&A live activity** (Slido-style): host creates a session, participants submit/vote on questions, host moderates/highlights/answers, public display/present mode with board + fullscreen highlight, labels, replies, session controls (close/reopen/end), and CSV export of all questions with votes/labels/replies
 - **OSS configuration surface** — password auth, email, uploads, and billing are configurable via env vars; the player cap is a code-level constant. Defaults require zero SaaS accounts.
 - **Local file upload** — `POST /api/upload` for on-disk file uploads (quiz covers, etc.) with size and MIME validation
 - **Password reset** — optional SMTP or token-print reset flow for OSS self-hosters

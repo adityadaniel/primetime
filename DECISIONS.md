@@ -10,6 +10,33 @@ and add a new entry below.
 
 ---
 
+## 2026-06-11 · Q&A edit window: unlimited for host, no time limit for participants (withdraw-and-resubmit model)
+
+**Status:** Accepted
+
+**Context:** PRD §4.5 says participants can edit their own questions. The
+implementation needed to decide whether edits have a time window (e.g., 5 min
+after submission) or are unlimited. A time-based window adds complexity
+(countdown UI, server-side expiry checks, timezone edge cases) and the primary
+abuse vector — editing a question after approval to inject inappropriate
+content — is already mitigated by the moderation flow: an edited LIVE question
+returns to IN_REVIEW status when moderation is enabled, giving the host a
+second approval gate.
+
+**Decision:** No time-based edit window. Participants can edit any question
+they own that is not WITHDRAWN. When moderation is enabled, edits on LIVE
+questions send the question back to IN_REVIEW (the original text is preserved
+server-side for audit/export). When moderation is disabled, edits take effect
+immediately. The host can always edit any question without restriction.
+Participants who want to fully retract use withdraw (terminal state) and
+resubmit.
+
+**Consequences:** Simpler implementation, no stale-timer UX. The trade-off is
+that unmoderated sessions could see late edits — acceptable for a v1 launch
+where the host can enable moderation if they need tighter control.
+
+---
+
 ## 2026-06-11 · Q&A participant replies publish immediately — no reply moderation queue in v1
 
 **Status:** Accepted

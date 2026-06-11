@@ -1,6 +1,6 @@
 # Q&A — Live Activity PRD
 
-Version: 1.0 · Status: Draft · Last Updated: June 2026 · Owner: Aditya Daniel
+Version: 1.0 · Status: Implemented · Last Updated: June 2026 · Owner: Aditya Daniel
 
 Sister document to `PRD.md` and `docs/wordcloud-prd.md`. Defines the third activity type in PRIMETIME: a live audience Q&A session inspired by Slido, adapted to PRIMETIME's vintage broadcast identity and existing PIN / host / player / display architecture.
 

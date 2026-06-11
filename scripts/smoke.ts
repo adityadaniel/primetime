@@ -163,6 +163,7 @@ async function main() {
   await assertQaReplies();
   await assertQaSessionControls();
   await assertQaDisplayPresentMode();
+  await assertQaFullLifecycleCsvExport();
 
   await assertPersistenceRowsWritten();
 }
@@ -3272,4 +3273,240 @@ async function assertWordCloudHostTrash() {
 
   host.disconnect();
   a.disconnect();
+}
+
+// --- scenario 25 (MID-345): Q&A full lifecycle + CSV export ---
+
+async function assertQaFullLifecycleCsvExport() {
+  console.log('\n--- scenario 25 (MID-345): Q&A full lifecycle + CSV export ---');
+  const host = await connectSock();
+  const display = await connectSock();
+  const alice = await connectSock();
+  const bob = await connectSock();
+
+  try {
+    // 1. Create session with moderation + downvotes + replies enabled
+    const { pin } = await qaCreateSession({
+      moderationEnabled: true,
+      downvotesEnabled: true,
+      participantRepliesEnabled: true,
+      privacyMode: 'NAMED_BY_DEFAULT',
+    });
+
+    // 2. Host attaches
+    const hostAck = qaOk(
+      (await qaEmit(host, 'qa:host:attach', { pin })) as
+        | { pin: string; sessionId: string; hostState: unknown }
+        | { error: string },
+      'host attach',
+    );
+    if (!('pin' in hostAck)) throw new Error('host attach failed');
+
+    // 3. Display attaches
+    const displayAck = qaOk(
+      (await qaEmit(display, 'qa:display:attach', { pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'display attach',
+    );
+    if (!('state' in displayAck)) throw new Error('display attach failed');
+
+    // 4. Participants join
+    const aliceJoin = qaOk(
+      (await qaEmit(alice, 'qa:participant:join', { pin, displayName: 'Alice' })) as QaJoinAck,
+      'alice join',
+    );
+    if (!('participantId' in aliceJoin)) throw new Error('alice join failed');
+    const alicePid = aliceJoin.participantId;
+
+    const bobJoin = qaOk(
+      (await qaEmit(bob, 'qa:participant:join', { pin, displayName: 'Bob' })) as QaJoinAck,
+      'bob join',
+    );
+    if (!('participantId' in bobJoin)) throw new Error('bob join failed');
+    const bobPid = bobJoin.participantId;
+
+    // 5. Alice submits a question (goes to IN_REVIEW because moderation is on)
+    const submitAck = qaOk(
+      (await qaEmit(alice, 'qa:participant:submit', {
+        pin,
+        participantId: alicePid,
+        text: 'What is the roadmap for 2027?',
+        isAnonymous: false,
+      })) as { ok: true; questionId: string } | { error: string },
+      'alice submit',
+    );
+    if (!('questionId' in submitAck)) throw new Error('submit failed');
+    const q1Id = submitAck.questionId;
+
+    // Bob submits an anonymous question
+    const submitAck2 = qaOk(
+      (await qaEmit(bob, 'qa:participant:submit', {
+        pin,
+        participantId: bobPid,
+        text: 'Will there be layoffs?',
+        isAnonymous: true,
+      })) as { ok: true; questionId: string } | { error: string },
+      'bob submit',
+    );
+    if (!('questionId' in submitAck2)) throw new Error('submit2 failed');
+    const q2Id = submitAck2.questionId;
+
+    // 6. Host approves both questions (moderate: IN_REVIEW -> LIVE)
+    qaOk(
+      (await qaEmit(host, 'qa:host:moderate', {
+        pin,
+        questionId: q1Id,
+        action: 'approve',
+      })) as { ok: true } | { error: string },
+      'approve q1',
+    );
+    qaOk(
+      (await qaEmit(host, 'qa:host:moderate', {
+        pin,
+        questionId: q2Id,
+        action: 'approve',
+      })) as { ok: true } | { error: string },
+      'approve q2',
+    );
+
+    await sleep(200);
+
+    // 7. Bob upvotes Alice's question, Alice downvotes Bob's question
+    qaOk(
+      (await qaEmit(bob, 'qa:participant:vote', {
+        pin,
+        participantId: bobPid,
+        questionId: q1Id,
+        type: 'UP',
+      })) as { ok: true } | { error: string },
+      'bob upvote q1',
+    );
+    qaOk(
+      (await qaEmit(alice, 'qa:participant:vote', {
+        pin,
+        participantId: alicePid,
+        questionId: q2Id,
+        type: 'DOWN',
+      })) as { ok: true } | { error: string },
+      'alice downvote q2',
+    );
+
+    await sleep(200);
+
+    // 8. Host creates a label and assigns it to q1
+    const labelAck = qaOk(
+      (await qaEmit(host, 'qa:host:label:create', {
+        pin,
+        name: 'strategy',
+        participantSelectable: true,
+      })) as { ok: true; label: { id: string; name: string } } | { error: string },
+      'create label',
+    );
+    if (!('label' in labelAck)) throw new Error('label create failed');
+    const labelId = labelAck.label.id;
+
+    qaOk(
+      (await qaEmit(host, 'qa:host:label:assign', {
+        pin,
+        questionId: q1Id,
+        labelIds: [labelId],
+      })) as { ok: true } | { error: string },
+      'assign label',
+    );
+
+    // 9. Host highlights q1
+    qaOk(
+      (await qaEmit(host, 'qa:host:highlight', {
+        pin,
+        questionId: q1Id,
+      })) as { ok: true } | { error: string },
+      'highlight q1',
+    );
+
+    // 10. Host replies to q1
+    const replyAck = qaOk(
+      (await qaEmit(host, 'qa:host:reply', {
+        pin,
+        questionId: q1Id,
+        text: 'Great question, we will share soon.',
+      })) as { ok: true; questionId: string; reply: { id: string } } | { error: string },
+      'host reply',
+    );
+    if (!('reply' in replyAck)) throw new Error('reply failed');
+
+    // 11. Host marks q1 as answered
+    qaOk(
+      (await qaEmit(host, 'qa:host:moderate', {
+        pin,
+        questionId: q1Id,
+        action: 'answer',
+      })) as { ok: true } | { error: string },
+      'mark answered',
+    );
+
+    await sleep(200);
+
+    // 12. Host closes submissions, closes voting, ends session
+    qaOk(
+      (await qaEmit(host, 'qa:host:set-submissions-open', {
+        pin,
+        open: false,
+      })) as { ok: true } | { error: string },
+      'close submissions',
+    );
+    qaOk(
+      (await qaEmit(host, 'qa:host:set-voting-open', {
+        pin,
+        open: false,
+      })) as { ok: true } | { error: string },
+      'close voting',
+    );
+    qaOk(
+      (await qaEmit(host, 'qa:host:set-session-status', {
+        pin,
+        status: 'ENDED',
+      })) as { ok: true } | { error: string },
+      'end session',
+    );
+
+    await sleep(500);
+
+    // 13. Verify CSV export
+    const res = await fetch(`${URL}/host/q-and-a/${pin}/questions.csv`);
+    if (res.status !== 200) {
+      throw new Error(`CSV export expected 200, got ${res.status}`);
+    }
+    const csv = await res.text();
+    const lines = csv.split(/\r\n|\n/).filter((l) => l.length > 0);
+    // header + 2 questions
+    if (lines.length !== 3) {
+      throw new Error(`CSV expected 3 lines (header + 2 data), got ${lines.length}:\n${csv}`);
+    }
+    // header check
+    if (!lines[0].includes('question_id') || !lines[0].includes('host_replies')) {
+      throw new Error(`unexpected CSV header: ${lines[0]}`);
+    }
+    // q1 row: named, has label "strategy", has host reply, status ANSWERED
+    const q1Row = lines.find((l) => l.includes(q1Id));
+    if (!q1Row) throw new Error(`CSV missing q1 row (${q1Id})`);
+    if (!q1Row.includes('Alice')) throw new Error('q1 row missing author Alice');
+    if (!q1Row.includes('named')) throw new Error('q1 row missing named privacy');
+    if (!q1Row.includes('strategy')) throw new Error('q1 row missing label strategy');
+    if (!q1Row.includes('ANSWERED')) throw new Error('q1 row missing ANSWERED status');
+    if (!q1Row.includes('Great question')) throw new Error('q1 row missing host reply');
+
+    // q2 row: anonymous, no labels, LIVE status
+    const q2Row = lines.find((l) => l.includes(q2Id));
+    if (!q2Row) throw new Error(`CSV missing q2 row (${q2Id})`);
+    if (!q2Row.includes('[anonymous]')) throw new Error('q2 row missing anonymous marker');
+    if (!q2Row.includes('anonymous')) throw new Error('q2 row missing anonymous privacy');
+
+    console.log('✓ Q&A full lifecycle + CSV export (MID-345)');
+  } finally {
+    host.disconnect();
+    display.disconnect();
+    alice.disconnect();
+    bob.disconnect();
+  }
 }
