@@ -162,6 +162,7 @@ async function main() {
   await assertQaModerationQueue();
   await assertQaReplies();
   await assertQaSessionControls();
+  await assertQaDisplayPresentMode();
 
   await assertPersistenceRowsWritten();
 }
@@ -1219,14 +1220,25 @@ async function assertWordCloudProfanityRejection() {
 
 // --- scenario 18 (MID-334): Q&A socket foundation ---
 
+type QaDisplaySettings = {
+  sort: 'popular' | 'recent' | 'oldest';
+  labelFilter: string | null;
+  visibleCount: number;
+  showTicker: boolean;
+  highlightFullscreen: boolean;
+};
+
 type QaPublicSnapshot = {
   pin: string;
   title: string;
   participantCount: number;
   questionCount: number;
+  highlightedQuestionId: string | null;
   status: 'OPEN' | 'CLOSED' | 'ENDED';
   submissionsOpen: boolean;
   votingOpen: boolean;
+  labels: { id: string; name: string; participantSelectable: boolean }[];
+  displaySettings: QaDisplaySettings;
   questions: {
     id: string;
     text: string;
@@ -1235,6 +1247,8 @@ type QaPublicSnapshot = {
     score: number;
     upvotes: number;
     downvotes: number;
+    labelIds: string[];
+    highlighted: boolean;
   }[];
 };
 
@@ -1285,6 +1299,25 @@ function qaWaitForState(sock: ReturnType<typeof io>, predicate: (s: QaPublicSnap
         sock.off('qa:state', onState);
         clearTimeout(t);
         resolve(s);
+      }
+    });
+  });
+}
+
+function qaWaitForDisplaySettings(
+  sock: ReturnType<typeof io>,
+  predicate: (settings: QaDisplaySettings) => boolean,
+) {
+  return new Promise<QaDisplaySettings>((resolve, reject) => {
+    const t = setTimeout(
+      () => reject(new Error('no matching qa:display:settings broadcast')),
+      3000,
+    );
+    sock.on('qa:display:settings', function onSettings(settings: QaDisplaySettings) {
+      if (predicate(settings)) {
+        sock.off('qa:display:settings', onSettings);
+        clearTimeout(t);
+        resolve(settings);
       }
     });
   });
@@ -2594,6 +2627,16 @@ type QaSessionControlAck =
   | { ok: true; status: 'OPEN' | 'CLOSED' | 'ENDED'; submissionsOpen: boolean; votingOpen: boolean }
   | { error: string };
 
+type QaDisplaySettingsAck = { ok: true; settings: QaDisplaySettings } | { error: string };
+
+type QaLabelAck =
+  | { ok: true; label: { id: string; name: string; participantSelectable: boolean } }
+  | { error: string };
+
+type QaLabelAssignmentAck =
+  | { ok: true; questionId: string; labelIds: string[] }
+  | { error: string };
+
 async function assertQaSessionControls() {
   console.log('\n--- scenario 23 (MID-342): Q&A session controls ---');
   const prisma = new PrismaClient();
@@ -2884,6 +2927,269 @@ async function assertQaSessionControls() {
     probe.disconnect();
     reconnectDisplay.disconnect();
     await prisma.$disconnect();
+  }
+}
+
+async function assertQaDisplayPresentMode() {
+  console.log('\n--- scenario 24 (MID-343): Q&A display / present mode ---');
+  const host = await connectSock();
+  const display = await connectSock();
+  const mirrorDisplay = await connectSock();
+  const reconnectDisplay = await connectSock();
+  const alice = await connectSock();
+  const bob = await connectSock();
+  const probe = await connectSock();
+  try {
+    const { pin, sessionId } = await qaCreateSession();
+    console.log('qa display pin:', pin);
+    qaOk(await qaEmit(host, 'qa:host:attach', { pin, sessionId }), 'qa:host:attach');
+    const initialDisplay = qaOk<{ state: QaPublicSnapshot }>(
+      (await qaEmit(display, 'qa:display:attach', { pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'qa:display:attach',
+    );
+    qaOk(
+      (await qaEmit(mirrorDisplay, 'qa:display:attach', { pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'qa:display:attach mirror',
+    );
+    if (
+      JSON.stringify(initialDisplay.state.displaySettings) !==
+      JSON.stringify({
+        sort: 'popular',
+        labelFilter: null,
+        visibleCount: 4,
+        showTicker: true,
+        highlightFullscreen: true,
+      })
+    ) {
+      throw new Error(`bad default display settings: ${JSON.stringify(initialDisplay.state)}`);
+    }
+
+    qaOk(
+      (await qaEmit(alice, 'qa:participant:join', { pin, displayName: 'Alice' })) as QaJoinAck,
+      'alice join',
+    );
+    qaOk(
+      (await qaEmit(bob, 'qa:participant:join', { pin, displayName: 'Bob' })) as QaJoinAck,
+      'bob join',
+    );
+
+    const publicLabel = qaOk<Exclude<QaLabelAck, { error: string }>>(
+      (await qaEmit(host, 'qa:host:label:create', {
+        pin,
+        name: 'Roadmap',
+        participantSelectable: true,
+      })) as QaLabelAck,
+      'create public display label',
+    ).label;
+    const privateLabel = qaOk<Exclude<QaLabelAck, { error: string }>>(
+      (await qaEmit(host, 'qa:host:label:create', {
+        pin,
+        name: 'Backstage',
+        participantSelectable: false,
+      })) as QaLabelAck,
+      'create private display label',
+    ).label;
+
+    const displaySawQ1 = qaWaitForState(display, (s) => s.questionCount === 1);
+    const q1 = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:submit', {
+        pin,
+        text: 'What ships next?',
+      })) as QaActionAck,
+      'display submit q1',
+    );
+    await displaySawQ1;
+    await sleep(1100);
+    const displaySawQ2 = qaWaitForState(display, (s) => s.questionCount === 2);
+    const q2 = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(bob, 'qa:participant:submit', {
+        pin,
+        text: 'Internal-only launch detail?',
+      })) as QaActionAck,
+      'display submit q2',
+    );
+    await displaySawQ2;
+
+    const displaySawPublicLabel = qaWaitForState(display, (s) =>
+      s.questions.some((q) => q.id === q1.questionId && q.labelIds.includes(publicLabel.id)),
+    );
+    const assignPublic = qaOk<Exclude<QaLabelAssignmentAck, { error: string }>>(
+      (await qaEmit(host, 'qa:host:label:assign', {
+        pin,
+        questionId: q1.questionId,
+        labelId: publicLabel.id,
+      })) as QaLabelAssignmentAck,
+      'assign public display label',
+    );
+    if (!assignPublic.labelIds.includes(publicLabel.id)) {
+      throw new Error(`public label assignment missing in ack: ${JSON.stringify(assignPublic)}`);
+    }
+    await displaySawPublicLabel;
+
+    const displaySawPrivateLabelAssignment = qaWaitForState(
+      display,
+      (s) => s.questionCount === 2 && s.labels.every((label) => label.id !== privateLabel.id),
+    );
+    const assignPrivate = qaOk<Exclude<QaLabelAssignmentAck, { error: string }>>(
+      (await qaEmit(host, 'qa:host:label:assign', {
+        pin,
+        questionId: q2.questionId,
+        labelId: privateLabel.id,
+      })) as QaLabelAssignmentAck,
+      'assign private display label',
+    );
+    if (!assignPrivate.labelIds.includes(privateLabel.id)) {
+      throw new Error(
+        `private label assignment missing in host ack: ${JSON.stringify(assignPrivate)}`,
+      );
+    }
+    const publicAfterPrivateAssignment = await displaySawPrivateLabelAssignment;
+    const q2Public = publicAfterPrivateAssignment.questions.find((q) => q.id === q2.questionId);
+    if (!q2Public || q2Public.labelIds.includes(privateLabel.id)) {
+      throw new Error(
+        `private label leaked to display state: ${JSON.stringify(publicAfterPrivateAssignment)}`,
+      );
+    }
+
+    qaExpectError(
+      await qaEmit(probe, 'qa:host:display-settings', { pin, sort: 'recent' }),
+      'forbidden',
+      'non-host display settings',
+    );
+    qaExpectError(
+      await qaEmit(host, 'qa:host:display-settings', { pin, labelFilter: 'qal_missing' }),
+      'unknown_label',
+      'unknown display label filter',
+    );
+    qaExpectError(
+      await qaEmit(host, 'qa:host:display-settings', { pin, labelFilter: privateLabel.id }),
+      'private_label',
+      'private display label filter',
+    );
+
+    const displaySawSettings = qaWaitForDisplaySettings(
+      display,
+      (settings) =>
+        settings.sort === 'recent' &&
+        settings.labelFilter === publicLabel.id &&
+        settings.visibleCount === 6 &&
+        !settings.showTicker &&
+        !settings.highlightFullscreen,
+    );
+    const mirrorSawSettings = qaWaitForDisplaySettings(
+      mirrorDisplay,
+      (settings) => settings.labelFilter === publicLabel.id && settings.visibleCount === 6,
+    );
+    const settingsAck = qaOk<Exclude<QaDisplaySettingsAck, { error: string }>>(
+      (await qaEmit(host, 'qa:host:display-settings', {
+        pin,
+        sort: 'recent',
+        labelFilter: publicLabel.id,
+        visibleCount: 99,
+        showTicker: false,
+        highlightFullscreen: false,
+      })) as QaDisplaySettingsAck,
+      'update display settings',
+    );
+    if (
+      settingsAck.settings.visibleCount !== 6 ||
+      settingsAck.settings.labelFilter !== publicLabel.id
+    ) {
+      throw new Error(`display settings were not normalized: ${JSON.stringify(settingsAck)}`);
+    }
+    await Promise.all([displaySawSettings, mirrorSawSettings]);
+
+    const reattach = qaOk<{ state: QaPublicSnapshot }>(
+      (await qaEmit(reconnectDisplay, 'qa:display:attach', { pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'display reconnect with settings',
+    );
+    if (
+      reattach.state.displaySettings.sort !== 'recent' ||
+      reattach.state.displaySettings.labelFilter !== publicLabel.id ||
+      reattach.state.displaySettings.visibleCount !== 6 ||
+      reattach.state.labels.some((label) => label.id === privateLabel.id)
+    ) {
+      throw new Error(`bad display settings hydration: ${JSON.stringify(reattach.state)}`);
+    }
+
+    const displaySawHighlight = qaWaitForState(
+      display,
+      (s) => s.highlightedQuestionId === q1.questionId && s.questions.some((q) => q.highlighted),
+    );
+    qaOk(
+      (await qaEmit(host, 'qa:host:highlight', { pin, questionId: q1.questionId })) as
+        | { ok: true; questionId: string | null }
+        | { error: string },
+      'highlight display question',
+    );
+    const highlighted = await displaySawHighlight;
+    if (!highlighted.questions.some((q) => q.id === q1.questionId && q.highlighted)) {
+      throw new Error(`highlight did not reach display: ${JSON.stringify(highlighted)}`);
+    }
+
+    const moderated = await qaCreateSession({ moderationEnabled: true });
+    qaOk(
+      await qaEmit(host, 'qa:host:attach', {
+        pin: moderated.pin,
+        sessionId: moderated.sessionId,
+      }),
+      'moderated display host attach',
+    );
+    qaOk(
+      (await qaEmit(display, 'qa:display:attach', { pin: moderated.pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'moderated display attach',
+    );
+    qaOk(
+      (await qaEmit(alice, 'qa:participant:join', {
+        pin: moderated.pin,
+        displayName: 'Alice',
+      })) as QaJoinAck,
+      'moderated alice join',
+    );
+    const inReview = qaOk<Exclude<QaActionAck, { error: string }>>(
+      (await qaEmit(alice, 'qa:participant:submit', {
+        pin: moderated.pin,
+        text: 'Do not project while in review',
+      })) as QaActionAck,
+      'moderated display submit',
+    );
+    if (inReview.status !== 'IN_REVIEW')
+      throw new Error(`expected IN_REVIEW, got ${inReview.status}`);
+    qaExpectError(
+      await qaEmit(host, 'qa:host:display-settings', {
+        pin: moderated.pin,
+        labelFilter: privateLabel.id,
+      }),
+      'unknown_label',
+      'label from another session as display filter',
+    );
+    const moderatedAttach = qaOk<{ state: QaPublicSnapshot }>(
+      (await qaEmit(display, 'qa:display:attach', { pin: moderated.pin })) as
+        | { state: QaPublicSnapshot }
+        | { error: string },
+      'moderated display privacy attach',
+    );
+    if (JSON.stringify(moderatedAttach.state).includes('Do not project while in review')) {
+      throw new Error(`in-review text leaked to display: ${JSON.stringify(moderatedAttach.state)}`);
+    }
+
+    console.log('✓ Q&A display / present mode (MID-343)');
+  } finally {
+    host.disconnect();
+    display.disconnect();
+    mirrorDisplay.disconnect();
+    reconnectDisplay.disconnect();
+    alice.disconnect();
+    bob.disconnect();
+    probe.disconnect();
   }
 }
 

@@ -9,6 +9,7 @@
 
 import { QA_HOST_REPLY_CHAR_LIMIT, validateLabelName, validateQuestionInput } from './qa-input';
 import type {
+  QADisplaySettings,
   QAHostQuestion,
   QAHostState,
   QAPersonalQuestion,
@@ -22,6 +23,17 @@ import type {
   QASettings,
   QAVoteType,
 } from './types';
+
+export const QA_DISPLAY_VISIBLE_COUNT_DEFAULT = 4;
+export const QA_DISPLAY_VISIBLE_COUNT_MAX = 6;
+
+export const DEFAULT_QA_DISPLAY_SETTINGS: QADisplaySettings = {
+  sort: 'popular',
+  labelFilter: null,
+  visibleCount: QA_DISPLAY_VISIBLE_COUNT_DEFAULT,
+  showTicker: true,
+  highlightFullscreen: true,
+};
 
 export type QAParticipantEntry = {
   displayName: string | null;
@@ -77,6 +89,7 @@ export type QAState = {
   questions: Map<string, QAQuestionEntry>;
   labels: Map<string, QALabelEntry>;
   highlightedQuestionId: string | null;
+  displaySettings: QADisplaySettings;
   // Synced with status: OPEN <-> true, CLOSED/ENDED -> false. Toggle via
   // setSubmissionsOpen/setSessionStatus only.
   submissionsOpen: boolean;
@@ -169,6 +182,7 @@ export function createQAState(args: {
     questions: new Map(),
     labels: new Map(),
     highlightedQuestionId: null,
+    displaySettings: { ...DEFAULT_QA_DISPLAY_SETTINGS },
     submissionsOpen: true,
     votingOpen: true,
     createdAt: Date.now(),
@@ -781,6 +795,7 @@ export function publicState(state: QAState): QAPublicState {
     questionCount: questions.length,
     highlightedQuestionId: state.highlightedQuestionId,
     labels: publicLabels,
+    displaySettings: { ...state.displaySettings },
     questions,
   };
 }
@@ -841,6 +856,7 @@ export function hostState(state: QAState): QAHostState {
       name: l.name,
       participantSelectable: l.participantSelectable,
     })),
+    displaySettings: { ...state.displaySettings },
     questions,
   };
 }

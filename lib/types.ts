@@ -149,6 +149,20 @@ export interface QAPublicLabel {
   participantSelectable: boolean;
 }
 
+export type QADisplaySortMode = 'popular' | 'recent' | 'oldest';
+
+/** Public-safe display/presentation controls for the Q&A projector. */
+export interface QADisplaySettings {
+  sort: QADisplaySortMode;
+  /** Null means no label filter. Only public label ids should be selected. */
+  labelFilter: string | null;
+  /** Number of questions to project on the board; server clamps to 1..6. */
+  visibleCount: number;
+  showTicker: boolean;
+  /** When true, the highlighted question takes over the projection. */
+  highlightFullscreen: boolean;
+}
+
 /**
  * A reply that is safe to show to everyone. Replies never expose participant
  * identity; only the host marker is public.
@@ -214,6 +228,7 @@ export interface QAPublicState {
   questionCount: number;
   highlightedQuestionId: string | null;
   labels: QAPublicLabel[];
+  displaySettings: QADisplaySettings;
   questions: QAPublicQuestion[];
 }
 
@@ -256,6 +271,7 @@ export interface QAHostState {
   counts: QAHostCounts;
   highlightedQuestionId: string | null;
   labels: QAPublicLabel[];
+  displaySettings: QADisplaySettings;
   /**
    * Every non-WITHDRAWN question, popular order (score desc, oldest first).
    * DISMISSED rows exist so the host can restore them to review (MID-338);

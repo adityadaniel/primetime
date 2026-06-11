@@ -26,6 +26,7 @@ import { publicUrl } from '@/lib/public-origin';
 import { QA_HOST_REPLY_CHAR_LIMIT, QA_LABEL_NAME_LIMIT, validateLabelName } from '@/lib/qa-input';
 import { useSocket } from '@/lib/socket';
 import type {
+  QADisplaySettings,
   QAHostQuestion,
   QAHostState,
   QAPublicLabel,
@@ -55,6 +56,16 @@ type ReplyAck = { ok: true; questionId: string; reply: QAPublicReply } | { error
 type SessionControlAck =
   | { ok: true; status: QASessionStatus; submissionsOpen: boolean; votingOpen: boolean }
   | { error: string };
+
+type DisplaySettingsAck = { ok: true; settings: QADisplaySettings } | { error: string };
+
+const DEFAULT_DISPLAY_SETTINGS: QADisplaySettings = {
+  sort: 'popular',
+  labelFilter: null,
+  visibleCount: 4,
+  showTicker: true,
+  highlightFullscreen: true,
+};
 
 type SortMode = 'popular' | 'recent' | 'oldest';
 
@@ -167,6 +178,17 @@ function controlErrorMessage(error: string): string {
   }
 }
 
+function displaySettingsErrorMessage(error: string): string {
+  switch (error) {
+    case 'unknown_label':
+      return "That display label isn't in this session.";
+    case 'private_label':
+      return 'Only audience-visible labels can filter the projection.';
+    default:
+      return moderationErrorMessage(error);
+  }
+}
+
 export default function QAndAControlClient({ pin, sessionId }: { pin: string; sessionId: string }) {
   const socket = useSocket();
   const [host, setHost] = useState<QAHostState | null>(null);
@@ -205,6 +227,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
   const [controlPending, setControlPending] = useState<'submissions' | 'voting' | 'end' | null>(
     null,
   );
+  const [displaySettingsPending, setDisplaySettingsPending] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const toastTimerRef = useRef<number | null>(null);
 
@@ -569,6 +592,19 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
     });
   }
 
+  function updateDisplaySettings(patch: Partial<QADisplaySettings>) {
+    if (!socket || displaySettingsPending) return;
+    setDisplaySettingsPending(true);
+    socket.emit('qa:host:display-settings', { pin, ...patch }, (res: DisplaySettingsAck) => {
+      setDisplaySettingsPending(false);
+      if ('error' in res) {
+        showToast(displaySettingsErrorMessage(res.error));
+        return;
+      }
+      showToast('Display updated.');
+    });
+  }
+
   function copyText(value: string, label: string) {
     if (!value || typeof navigator === 'undefined') return;
     navigator.clipboard?.writeText(value).then(
@@ -616,6 +652,9 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
   const inReviewBoard = board.filter((q) => q.status === 'IN_REVIEW');
   const allInReviewSelected =
     inReviewBoard.length > 0 && inReviewBoard.every((q) => selected.has(q.id));
+  const publicDisplayLabels = (host?.labels ?? []).filter((label) => label.participantSelectable);
+  const displaySettings = host?.displaySettings ?? DEFAULT_DISPLAY_SETTINGS;
+  const displayControlsDisabled = !attached || displaySettingsPending;
 
   return (
     <main className="relative min-h-screen pb-24">
@@ -834,6 +873,104 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
                     }`}
               </span>
             </div>
+          </div>
+
+          <div className="mt-5 pt-4 border-t-2" style={{ borderColor: 'var(--ink)' }}>
+            <div className="flex items-center justify-between gap-3">
+              <span className="chyron">DISPLAY DIRECTOR</span>
+              <span className="ticker text-[10px] tracking-widest opacity-60">
+                {displaySettingsPending ? 'SYNCING…' : 'LIVE SYNC'}
+              </span>
+            </div>
+            <div className="mt-3 grid grid-cols-12 gap-2">
+              <fieldset className="col-span-12 inline-flex ink-border" aria-label="Display sort">
+                {(Object.keys(SORT_LABELS) as SortMode[]).map((mode) => (
+                  <button
+                    key={`display-${mode}`}
+                    type="button"
+                    onClick={() => updateDisplaySettings({ sort: mode })}
+                    disabled={displayControlsDisabled}
+                    aria-pressed={displaySettings.sort === mode}
+                    className="flex-1 ticker text-[10px] tracking-widest px-2 disabled:opacity-40"
+                    style={{
+                      minHeight: 40,
+                      background: displaySettings.sort === mode ? 'var(--ink)' : 'var(--bone)',
+                      color: displaySettings.sort === mode ? 'var(--bone)' : 'var(--ink)',
+                    }}
+                  >
+                    {SORT_LABELS[mode]}
+                  </button>
+                ))}
+              </fieldset>
+              <select
+                value={displaySettings.labelFilter ?? ''}
+                onChange={(e) => updateDisplaySettings({ labelFilter: e.target.value || null })}
+                disabled={displayControlsDisabled || publicDisplayLabels.length === 0}
+                aria-label="Display label filter"
+                className="col-span-7 ink-border ticker text-[10px] tracking-widest px-2 disabled:opacity-40"
+                style={{ minHeight: 44, background: 'var(--bone)' }}
+              >
+                <option value="">ALL PUBLIC LABELS</option>
+                {publicDisplayLabels.map((label) => (
+                  <option key={label.id} value={label.id}>
+                    {label.name.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+              <label className="col-span-5 ink-border flex items-center justify-between gap-2 px-3">
+                <span className="ticker text-[10px] tracking-widest">VISIBLE</span>
+                <select
+                  value={displaySettings.visibleCount}
+                  onChange={(e) => updateDisplaySettings({ visibleCount: Number(e.target.value) })}
+                  disabled={displayControlsDisabled}
+                  aria-label="Display visible question count"
+                  className="ticker text-[12px] bg-transparent"
+                >
+                  {[1, 2, 3, 4, 5, 6].map((count) => (
+                    <option key={count} value={count}>
+                      {count}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => updateDisplaySettings({ showTicker: !displaySettings.showTicker })}
+                disabled={displayControlsDisabled}
+                aria-pressed={displaySettings.showTicker}
+                className="col-span-6 ink-border stamp ticker text-[10px] tracking-widest px-3 disabled:opacity-40"
+                style={{
+                  minHeight: 44,
+                  background: displaySettings.showTicker ? 'var(--ivy)' : 'var(--bone)',
+                  color: displaySettings.showTicker ? 'var(--bone)' : 'var(--ink)',
+                }}
+              >
+                {displaySettings.showTicker ? 'TICKER ON' : 'TICKER OFF'}
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  updateDisplaySettings({
+                    highlightFullscreen: !displaySettings.highlightFullscreen,
+                  })
+                }
+                disabled={displayControlsDisabled}
+                aria-pressed={displaySettings.highlightFullscreen}
+                className="col-span-6 ink-border stamp ticker text-[10px] tracking-widest px-3 disabled:opacity-40"
+                style={{
+                  minHeight: 44,
+                  background: displaySettings.highlightFullscreen
+                    ? 'var(--vermilion)'
+                    : 'var(--bone)',
+                  color: displaySettings.highlightFullscreen ? 'var(--bone)' : 'var(--ink)',
+                }}
+              >
+                {displaySettings.highlightFullscreen ? 'FULL HIGHLIGHT' : 'BOARD HIGHLIGHT'}
+              </button>
+            </div>
+            <p className="mt-2 ticker text-[10px] tracking-widest opacity-60">
+              Projection shows LIVE questions only · public labels only · max 06 rows
+            </p>
           </div>
         </div>
 

@@ -37,6 +37,8 @@ import {
   submitAnswer,
 } from './lib/game';
 import {
+  DEFAULT_QA_DISPLAY_SETTINGS,
+  QA_DISPLAY_VISIBLE_COUNT_MAX,
   type QAQuestionEntry,
   type QAReplyEntry,
   type QAState,
@@ -90,6 +92,8 @@ import {
 import { matchUploadsPath, resolveUploadFilePath, uploadContentType } from './lib/serve-upload';
 import type {
   AnswerIndex,
+  QADisplaySettings,
+  QADisplaySortMode,
   QAHostState,
   QAPersonalState,
   QAPublicLabel,
@@ -420,6 +424,54 @@ void app.prepare().then(() => {
   function qaEmitHostState(state: QAState) {
     if (!state.hostSocketId) return;
     io.to(state.hostSocketId).emit('qa:host:state', qaHostState(state));
+  }
+
+  function qaEmitDisplaySettings(state: QAState) {
+    io.to(`qa:${state.pin}`).emit('qa:display:settings', { ...state.displaySettings });
+    qaEmitHostState(state);
+  }
+
+  function qaClampDisplayVisibleCount(value: unknown): number | null {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+    return Math.min(QA_DISPLAY_VISIBLE_COUNT_MAX, Math.max(1, Math.round(value)));
+  }
+
+  function qaNormalizeDisplaySettingsPatch(
+    state: QAState,
+    p: Record<string, unknown>,
+  ): Partial<QADisplaySettings> | { error: string } {
+    const patch: Partial<QADisplaySettings> = {};
+    if (p.sort !== undefined) {
+      if (p.sort !== 'popular' && p.sort !== 'recent' && p.sort !== 'oldest')
+        return { error: 'invalid' };
+      patch.sort = p.sort as QADisplaySortMode;
+    }
+    if (p.labelFilter !== undefined) {
+      if (p.labelFilter === null || p.labelFilter === '') {
+        patch.labelFilter = null;
+      } else if (typeof p.labelFilter === 'string') {
+        const label = state.labels.get(p.labelFilter);
+        if (!label) return { error: 'unknown_label' };
+        if (!label.participantSelectable) return { error: 'private_label' };
+        patch.labelFilter = p.labelFilter;
+      } else {
+        return { error: 'invalid' };
+      }
+    }
+    if (p.visibleCount !== undefined) {
+      const visibleCount = qaClampDisplayVisibleCount(p.visibleCount);
+      if (visibleCount === null) return { error: 'invalid' };
+      patch.visibleCount = visibleCount;
+    }
+    if (p.showTicker !== undefined) {
+      if (typeof p.showTicker !== 'boolean') return { error: 'invalid' };
+      patch.showTicker = p.showTicker;
+    }
+    if (p.highlightFullscreen !== undefined) {
+      if (typeof p.highlightFullscreen !== 'boolean') return { error: 'invalid' };
+      patch.highlightFullscreen = p.highlightFullscreen;
+    }
+    return patch;
   }
 
   // Personal projection push (MID-338): when a host moderation action changes
@@ -1110,6 +1162,7 @@ void app.prepare().then(() => {
       // Displays are public and get the public projection only.
       const publicSnapshot = qaPublicState(state);
       socket.emit('qa:state', publicSnapshot);
+      socket.emit('qa:display:settings', { ...state.displaySettings });
       cb?.({ state: publicSnapshot });
     });
 
@@ -1585,6 +1638,39 @@ void app.prepare().then(() => {
       }
       return { state, p };
     }
+
+    type QaDisplaySettingsAck = { ok: true; settings: QADisplaySettings } | { error: string };
+
+    socket.on('qa:host:display-settings', (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:host:display-settings] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: QaDisplaySettingsAck) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      const patch = qaNormalizeDisplaySettingsPatch(state, p);
+      if ('error' in patch) {
+        cb(patch);
+        return;
+      }
+      const next: QADisplaySettings = {
+        ...DEFAULT_QA_DISPLAY_SETTINGS,
+        ...state.displaySettings,
+        ...patch,
+      };
+      if (next.labelFilter) {
+        const label = state.labels.get(next.labelFilter);
+        if (!label?.participantSelectable) next.labelFilter = null;
+      }
+      state.displaySettings = next;
+      cb({ ok: true, settings: { ...state.displaySettings } });
+      qaEmitDisplaySettings(state);
+    });
 
     type QaSessionControlAck =
       | { ok: true; status: QASessionStatus; submissionsOpen: boolean; votingOpen: boolean }
