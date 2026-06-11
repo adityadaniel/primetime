@@ -26,37 +26,21 @@ test.describe('Q&A host lifecycle', () => {
   test('full Q&A lifecycle: create → submit → moderate → highlight → display → export', async ({
     request,
   }) => {
-    // 1. Create session via API
-    const createRes = await request.post('/api/q-and-a', {
-      data: {
-        title: 'E2E Q&A Session',
-        privacyMode: 'NAMED_BY_DEFAULT',
-        moderationEnabled: true,
-        participantRepliesEnabled: false,
-        downvotesEnabled: false,
-      },
+    // Create session directly (same approach as smoke tests — avoids needing
+    // an authenticated API request context in the Playwright worker).
+    const { allocatePin } = await import('../../lib/pin-allocator');
+    const { createSession } = await import('../../lib/qa-repo');
+    const allocated = await allocatePin();
+    const session = await createSession({
+      pin: allocated,
+      title: 'E2E Q&A Session',
+      privacyMode: 'NAMED_BY_DEFAULT',
+      hostUserId: null,
+      moderationEnabled: true,
+      participantRepliesEnabled: false,
+      downvotesEnabled: false,
     });
-    // If auth is required, the route may 401. In that case, create via socket helpers.
-    if (createRes.status() === 401) {
-      // Fallback: use pin-allocator directly (same as smoke tests)
-      const { allocatePin } = await import('../../lib/pin-allocator');
-      const { createSession } = await import('../../lib/qa-repo');
-      const allocated = await allocatePin();
-      const session = await createSession({
-        pin: allocated,
-        title: 'E2E Q&A Session',
-        privacyMode: 'NAMED_BY_DEFAULT',
-        hostUserId: null,
-        moderationEnabled: true,
-        participantRepliesEnabled: false,
-        downvotesEnabled: false,
-      });
-      pin = session.pin;
-    } else {
-      expect(createRes.status()).toBe(200);
-      const body = await createRes.json();
-      pin = body.pin;
-    }
+    pin = session.pin;
     expect(pin).toMatch(/^\d{6}$/);
 
     // 2. Host attaches
