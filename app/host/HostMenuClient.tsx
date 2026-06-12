@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import AccountMenu from '@/components/AccountMenu';
-import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import type { QuizSummary } from '@/lib/types';
 
 export default function HostMenuClient({ initialQuizzes }: { initialQuizzes: QuizSummary[] }) {
@@ -13,13 +13,11 @@ export default function HostMenuClient({ initialQuizzes }: { initialQuizzes: Qui
 
   return (
     <main className="relative min-h-screen pb-24">
-      <CornerMarks />
       <header className="px-8 pt-6 flex items-center justify-between">
         <Chyron label="DIRECTOR · ACTIVITIES" number="00" />
         <div className="flex items-center gap-6">
           <FrameCounter index={0} />
           <Clock />
-          <OnAir live={false} />
           <AccountMenu />
         </div>
       </header>

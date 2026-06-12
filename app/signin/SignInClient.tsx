@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
-import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Clock, DateStamp, SmpteBars } from '@/components/Broadcast';
 
 export default function SignInClient({
   enableApple,
@@ -52,14 +52,12 @@ export default function SignInClient({
 
   return (
     <main className="relative flex flex-col min-h-[100dvh] overflow-hidden">
-      <CornerMarks fixed />
       <header className="px-6 pt-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <DateStamp />
           <span className="ticker text-[11px] opacity-40">·</span>
           <Clock />
         </div>
-        <OnAir live={false} />
       </header>
       <SmpteBars className="h-1.5 mt-2" />
 

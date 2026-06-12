@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import Link from 'next/link';
-import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Clock, DateStamp, SmpteBars } from '@/components/Broadcast';
 import { prisma } from '@/lib/db';
 import ResetTokenClient from './ResetTokenClient';
 
@@ -19,14 +19,12 @@ export default async function ResetTokenPage({ params }: { params: Promise<{ tok
   if (!valid) {
     return (
       <main className="relative flex flex-col min-h-[100dvh] overflow-hidden">
-        <CornerMarks fixed />
         <header className="px-6 pt-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <DateStamp />
             <span className="ticker text-[11px] opacity-40">·</span>
             <Clock />
           </div>
-          <OnAir live={false} />
         </header>
         <SmpteBars className="h-1.5 mt-2" />
         <section className="px-6 pt-8 pb-8 flex-1">

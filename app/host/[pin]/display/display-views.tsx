@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useState } from 'react';
-import { Chyron, Clock, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { Countdown } from '@/components/Countdown';
 import { CHANNELS, Checkmark, Shape } from '@/components/Shape';
 import { publicUrl } from '@/lib/public-origin';
@@ -12,7 +12,6 @@ import type { PublicGameState } from '@/lib/types';
 export function DisplayView({ state, pin }: { state: PublicGameState | null; pin: string }) {
   const phase = state?.phase ?? 'lobby';
   const dark = phase === 'question' || phase === 'reveal';
-  const live = phase !== 'lobby' && phase !== 'final';
   const currentNo = Math.max(0, (state?.questionIndex ?? -1) + 1);
 
   return (
@@ -23,13 +22,11 @@ export function DisplayView({ state, pin }: { state: PublicGameState | null; pin
         color: dark ? 'var(--bone)' : 'var(--ink)',
       }}
     >
-      <CornerMarksDark dark={dark} />
       <header className="px-8 pt-5 flex items-center justify-between">
         <Chyron label="LIVE FEED · STUDIO 4" number="A" dark={dark} />
         <div className="flex items-center gap-7">
           <FrameCounter index={currentNo} dark={dark} />
           <Clock dark={dark} />
-          <OnAir live={live} dark={dark} />
         </div>
       </header>
       <SmpteBars className="h-2 mt-3" />
@@ -43,34 +40,6 @@ export function DisplayView({ state, pin }: { state: PublicGameState | null; pin
         {phase === 'final' && state && <FinalDisplay state={state} />}
       </section>
     </main>
-  );
-}
-
-export function CornerMarksDark({ dark }: { dark: boolean }) {
-  const color = dark ? 'var(--bone)' : 'var(--ink)';
-  return (
-    <>
-      <span
-        className="absolute top-3 left-3 w-4 h-4 border-t-2 border-l-2"
-        style={{ borderColor: color }}
-        aria-hidden
-      />
-      <span
-        className="absolute top-3 right-3 w-4 h-4 border-t-2 border-r-2"
-        style={{ borderColor: color }}
-        aria-hidden
-      />
-      <span
-        className="absolute bottom-3 left-3 w-4 h-4 border-b-2 border-l-2"
-        style={{ borderColor: color }}
-        aria-hidden
-      />
-      <span
-        className="absolute bottom-3 right-3 w-4 h-4 border-b-2 border-r-2"
-        style={{ borderColor: color }}
-        aria-hidden
-      />
-    </>
   );
 }
 

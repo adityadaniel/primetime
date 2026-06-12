@@ -21,7 +21,7 @@ import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AccountMenu from '@/components/AccountMenu';
-import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { publicUrl } from '@/lib/public-origin';
 import { QA_HOST_REPLY_CHAR_LIMIT, QA_LABEL_NAME_LIMIT, validateLabelName } from '@/lib/qa-input';
 import { useSocket } from '@/lib/socket';
@@ -658,7 +658,6 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
 
   return (
     <main className="relative min-h-screen pb-24">
-      <CornerMarks />
       {toast && (
         <div
           className="fixed top-4 left-1/2 -translate-x-1/2 z-50 ink-border stamp ticker text-[11px] tracking-widest px-3 py-2 flex items-center gap-3"
@@ -688,7 +687,6 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
         <div className="flex items-center gap-6">
           <FrameCounter index={Math.min(999, counts.live)} />
           <Clock />
-          <OnAir live={status === 'OPEN'} />
           <AccountMenu />
         </div>
       </header>

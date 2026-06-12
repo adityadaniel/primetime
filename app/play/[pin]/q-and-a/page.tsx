@@ -12,7 +12,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { validateQuestionInput } from '@/lib/qa-input';
 import { useSocket } from '@/lib/socket';
 import type {
@@ -587,8 +587,6 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
 
   return (
     <main className="relative min-h-[100dvh] pb-10 flex flex-col">
-      <CornerMarks />
-
       {toast && (
         <div
           className="fixed top-4 left-1/2 -translate-x-1/2 z-50 ink-border stamp ticker text-[11px] tracking-widest px-3 py-2"
@@ -607,7 +605,6 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
         <div className="flex items-center gap-4">
           <FrameCounter index={pub.questionCount} />
           <Clock />
-          <OnAir live={!ended} />
         </div>
       </header>
       <SmpteBars className="h-1.5 mt-3" />

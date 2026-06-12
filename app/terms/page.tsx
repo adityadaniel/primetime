@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Chyron, Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Chyron, Clock, DateStamp, SmpteBars } from '@/components/Broadcast';
 
 export const metadata: Metadata = {
   title: 'Terms',
@@ -11,14 +11,12 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <main className="relative flex flex-col min-h-[100dvh] overflow-hidden grain">
-      <CornerMarks fixed />
       <header className="px-6 pt-4 flex items-center justify-between">
         <Chyron label="PRIMETIME / DOC.TERMS" number="T" />
         <div className="flex items-center gap-3">
           <DateStamp />
           <span className="ticker text-[11px] opacity-40">·</span>
           <Clock />
-          <OnAir live={false} />
         </div>
       </header>
       <SmpteBars className="h-1.5 mt-2" />

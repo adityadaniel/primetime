@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { Countdown } from '@/components/Countdown';
 import { CHANNELS, Checkmark, Shape } from '@/components/Shape';
 import { publicUrl } from '@/lib/public-origin';
@@ -29,7 +29,6 @@ export function ControlView({
   onKick = () => {},
 }: ControlViewProps) {
   const phase = state?.phase ?? 'lobby';
-  const live = phase !== 'lobby' && phase !== 'final';
   const currentNo = Math.max(0, (state?.questionIndex ?? -1) + 1);
 
   const responseCount = state?.reveal?.totalAnswers ?? 0;
@@ -44,7 +43,6 @@ export function ControlView({
 
   return (
     <main className="relative min-h-screen pb-20">
-      <CornerMarks />
       {toast && (
         <div
           className="fixed top-4 left-1/2 -translate-x-1/2 z-50 ink-border stamp ticker text-[11px] tracking-widest px-3 py-2"
@@ -58,7 +56,6 @@ export function ControlView({
         <div className="flex items-center gap-6">
           <FrameCounter index={currentNo} />
           <Clock />
-          <OnAir live={live} />
           <button
             type="button"
             onClick={onToggleMute}

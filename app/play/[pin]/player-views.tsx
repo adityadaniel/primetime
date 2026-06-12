@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Chyron, Clock, CornerMarks, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Chyron, Clock, SmpteBars } from '@/components/Broadcast';
 import { Countdown } from '@/components/Countdown';
 import { CHANNELS, Shape } from '@/components/Shape';
 import type { AnswerIndex, PublicGameState } from '@/lib/types';
@@ -47,11 +47,9 @@ export function PlayerView({
   onAnswer = () => {},
 }: PlayerViewProps) {
   const phase = state?.phase ?? 'lobby';
-  const live = phase !== 'lobby' && phase !== 'final';
 
   return (
     <main className="relative min-h-screen pb-10 flex flex-col">
-      <CornerMarks />
       <button
         type="button"
         onClick={onToggleMute}
@@ -80,7 +78,6 @@ export function PlayerView({
         <Chyron number="B" label="TALENT" />
         <div className="flex items-center gap-4">
           <Clock />
-          <OnAir live={live} />
         </div>
       </header>
       <SmpteBars className="h-1.5 mt-3" />

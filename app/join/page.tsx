@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
-import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Clock, DateStamp, SmpteBars } from '@/components/Broadcast';
 import { useSocket } from '@/lib/socket';
 
 export default function JoinPage() {
@@ -84,14 +84,12 @@ export default function JoinPage() {
 
   return (
     <main className="relative flex flex-col h-[100dvh] overflow-hidden">
-      <CornerMarks fixed />
       <header className="px-6 pt-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <DateStamp />
           <span className="ticker text-[11px] opacity-40">·</span>
           <Clock />
         </div>
-        <OnAir live={false} />
       </header>
       <SmpteBars className="h-1.5 mt-2" />
 
