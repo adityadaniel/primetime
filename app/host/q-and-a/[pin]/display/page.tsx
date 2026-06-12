@@ -2,7 +2,7 @@
 
 import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useMemo, useState } from 'react';
-import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { publicHost, publicUrl } from '@/lib/public-origin';
 import { useSocket } from '@/lib/socket';
 import type {
@@ -123,7 +123,6 @@ export default function QAndADisplay({ params }: { params: Promise<{ pin: string
   }, [state?.highlightedQuestionId, state?.questions]);
 
   const status: QASessionStatus = state?.status ?? 'OPEN';
-  const live = status === 'OPEN' || status === 'CLOSED';
   const statusCopy =
     status === 'ENDED'
       ? 'SESSION ENDED · FINAL BOARD'
@@ -138,7 +137,6 @@ export default function QAndADisplay({ params }: { params: Promise<{ pin: string
   if (attachError) {
     return (
       <main className="relative grid h-[100dvh] place-items-center overflow-hidden grain px-6">
-        <CornerMarks fixed />
         <div className="max-w-xl text-center">
           <p className="chyron mb-3" style={{ color: 'var(--vermilion)' }}>
             DISPLAY SIGNAL LOST
@@ -156,13 +154,11 @@ export default function QAndADisplay({ params }: { params: Promise<{ pin: string
 
   return (
     <main className="relative flex h-[100dvh] flex-col overflow-hidden grain">
-      <CornerMarks fixed />
       <header className="shrink-0 px-8 pt-5 flex items-center justify-between">
         <Chyron label="LIVE FEED · AUDIENCE Q&A" number="QA" />
         <div className="flex items-center gap-7">
           <FrameCounter index={Math.min(999, totalQuestions)} />
           <Clock />
-          <OnAir live={live} />
         </div>
       </header>
       <SmpteBars className="h-2 mt-3 shrink-0" />
@@ -181,7 +177,6 @@ export default function QAndADisplay({ params }: { params: Promise<{ pin: string
             description={state?.description ?? null}
             questions={board}
             labels={labelNames}
-            statusCopy={statusCopy}
             participantCount={state?.participantCount ?? 0}
             questionCount={totalQuestions}
             ticker={settings.showTicker}
@@ -309,7 +304,6 @@ function QuestionBoard({
   description,
   questions,
   labels,
-  statusCopy,
   participantCount,
   questionCount,
   ticker,
@@ -319,12 +313,37 @@ function QuestionBoard({
   description: string | null;
   questions: QAPublicQuestion[];
   labels: Map<string, string>;
-  statusCopy: string;
   participantCount: number;
   questionCount: number;
   ticker: boolean;
   activeLabel: string | null;
 }) {
+  // Scale type with board density so cards never paint over each other:
+  // fewer questions get poster type, a full board drops to one clamped line.
+  // Short screens (e.g. 720p projectors) shift one density tier down.
+  const [shortScreen, setShortScreen] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-height: 899px)');
+    const update = () => setShortScreen(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
+  // Vermilion pill is reserved for the current top score so the board reads
+  // as a ranking at a glance; with no votes yet, every pill stays neutral.
+  const topScore = Math.max(...questions.map((question) => question.score));
+
+  const density = questions.length + (shortScreen ? 2 : 0);
+  const dense = density >= 5;
+  const clampLines = density <= 3 ? 'line-clamp-2' : 'line-clamp-1';
+  const questionFontSize =
+    density <= 2
+      ? 'clamp(36px, 4.5vw, 76px)'
+      : density <= 4
+        ? 'clamp(24px, 2.4vw, 46px)'
+        : 'clamp(18px, 1.7vw, 32px)';
+
   return (
     <div className="flex flex-1 min-h-0 flex-col">
       <div className="shrink-0 flex items-end justify-between gap-8">
@@ -343,7 +362,6 @@ function QuestionBoard({
           )}
         </div>
         <div className="text-right ticker text-[12px] tracking-widest opacity-75">
-          <p>{statusCopy}</p>
           <p>
             {String(participantCount).padStart(2, '0')} AUDIENCE ·{' '}
             {String(questionCount).padStart(2, '0')} QUESTIONS
@@ -352,29 +370,61 @@ function QuestionBoard({
         </div>
       </div>
 
-      <div className="mt-7 grid flex-1 min-h-0 grid-cols-12 gap-4">
+      <div
+        className="mt-7 grid flex-1 min-h-0 overflow-hidden grid-cols-12 gap-4"
+        style={{ gridAutoRows: 'minmax(min-content, 1fr)' }}
+      >
         {questions.map((question, index) => (
           <article
             key={question.id}
-            className="col-span-12 min-h-0 ink-border p-5 flex flex-col justify-between"
+            className={`col-span-12 overflow-hidden ink-border flex flex-col ${
+              dense
+                ? 'p-4 justify-center gap-2'
+                : density <= 2
+                  ? 'p-5 justify-between'
+                  : 'p-4 justify-between'
+            }`}
             style={{
               background: question.highlighted ? 'var(--ink)' : 'var(--bone)',
               color: question.highlighted ? 'var(--bone)' : 'var(--ink)',
             }}
           >
-            <div className="flex items-start justify-between gap-6">
-              <span className="ticker text-[13px] tracking-widest opacity-70">
-                #{String(index + 1).padStart(2, '0')}
-              </span>
-              <ScorePill question={question} inverted={question.highlighted} />
+            <div className="shrink-0 flex items-center justify-between gap-6">
+              <div className="flex items-baseline gap-4 min-w-0">
+                <span className="ticker text-[13px] tracking-widest opacity-70">
+                  #{String(index + 1).padStart(2, '0')}
+                </span>
+                {dense && (
+                  <QuestionMeta
+                    question={question}
+                    labels={labels}
+                    inverted={question.highlighted}
+                    compact
+                  />
+                )}
+              </div>
+              <ScorePill
+                question={question}
+                inverted={question.highlighted}
+                small={dense}
+                numberOnly
+                accent={question.score === topScore && topScore > 0}
+              />
             </div>
             <p
-              className="font-editorial leading-tight mt-3"
-              style={{ fontSize: 'clamp(32px, 3.8vw, 66px)' }}
+              className={`font-editorial leading-tight shrink-0 ${dense ? '' : 'mt-2'} ${clampLines}`}
+              style={{ fontSize: questionFontSize }}
             >
               {question.text}
             </p>
-            <QuestionMeta question={question} labels={labels} inverted={question.highlighted} />
+            {!dense && (
+              <QuestionMeta
+                question={question}
+                labels={labels}
+                inverted={question.highlighted}
+                tight={density > 2}
+              />
+            )}
           </article>
         ))}
       </div>
@@ -432,22 +482,29 @@ function ScorePill({
   question,
   inverted = false,
   large = false,
+  small = false,
+  numberOnly = false,
+  accent = true,
 }: {
   question: QAPublicQuestion;
   inverted?: boolean;
   large?: boolean;
+  small?: boolean;
+  numberOnly?: boolean;
+  accent?: boolean;
 }) {
   return (
     <div
       className="inline-flex items-center gap-3 ink-border ticker tracking-widest"
       style={{
-        background: inverted ? 'var(--bone)' : 'var(--vermilion)',
-        color: inverted ? 'var(--ink)' : 'var(--bone)',
-        padding: large ? '12px 18px' : '8px 12px',
-        fontSize: large ? 15 : 12,
+        background: accent ? (inverted ? 'var(--bone)' : 'var(--vermilion)') : 'transparent',
+        color: accent ? (inverted ? 'var(--ink)' : 'var(--bone)') : 'inherit',
+        borderColor: !accent && inverted ? 'var(--bone)' : undefined,
+        padding: large ? '12px 18px' : small ? '4px 10px' : '8px 12px',
+        fontSize: large ? 15 : small ? 11 : 12,
       }}
     >
-      <span>SCORE</span>
+      {!numberOnly && <span>SCORE</span>}
       <span className="tabular-nums">
         {question.score >= 0 ? `+${question.score}` : question.score}
       </span>
@@ -460,17 +517,23 @@ function QuestionMeta({
   labels,
   inverted = false,
   centered = false,
+  compact = false,
+  tight = false,
 }: {
   question: QAPublicQuestion;
   labels: Map<string, string>;
   inverted?: boolean;
   centered?: boolean;
+  compact?: boolean;
+  tight?: boolean;
 }) {
   const visibleLabels = question.labelIds
     .map((labelId) => labels.get(labelId))
     .filter((label): label is string => Boolean(label));
   return (
-    <div className={`mt-5 flex flex-wrap gap-2 ${centered ? 'justify-center' : 'items-center'}`}>
+    <div
+      className={`${compact ? 'min-w-0' : tight ? 'mt-2' : 'mt-5'} shrink-0 flex flex-wrap gap-2 ${centered ? 'justify-center' : 'items-center'}`}
+    >
       <span className="ticker text-[12px] tracking-widest opacity-70">
         {question.authorDisplayName ?? 'ANONYMOUS'} · {question.upvotes} UP
         {question.downvotes > 0 ? ` · ${question.downvotes} DOWN` : ''}
