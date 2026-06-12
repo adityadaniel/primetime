@@ -209,6 +209,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
   const [labelSelectable, setLabelSelectable] = useState(false);
   const [labelPickerId, setLabelPickerId] = useState<string | null>(null);
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+  const [boardMenuOpen, setBoardMenuOpen] = useState(false);
   // Reply desk (MID-341): one open thread at a time; the composer draft and
   // any in-flight reply rewrite are kept locally so live re-sorts never
   // clobber the host's typing.
@@ -805,14 +806,6 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
               <Link href="/host" className="ticker text-[11px] tracking-widest opacity-70">
                 ← studio master
               </Link>
-              <a
-                href={`/host/q-and-a/${pin}/questions.csv`}
-                download
-                className="ink-border stamp ticker text-[10px] tracking-widest px-3 text-center no-underline"
-                style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
-              >
-                EXPORT CSV
-              </a>
               <span className="ticker text-[10px] tracking-widest opacity-60 text-right">
                 {sessionEnded
                   ? 'SESSION ENDED · BOARD IS VIEW ONLY'
@@ -972,19 +965,6 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
                 ))}
               </select>
             )}
-            <button
-              type="button"
-              onClick={() => setLabelFormOpen((v) => !v)}
-              aria-expanded={labelFormOpen}
-              className="ink-border ticker text-[11px] tracking-widest px-3"
-              style={{
-                minHeight: 44,
-                background: labelFormOpen ? 'var(--ink)' : 'var(--bone)',
-                color: labelFormOpen ? 'var(--bone)' : 'var(--ink)',
-              }}
-            >
-              {labelFormOpen ? '✕ LABELS' : '+ LABEL'}
-            </button>
             <input
               type="search"
               value={query}
@@ -994,6 +974,49 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
               className="ink-border ticker text-[12px] tracking-wide px-3 flex-1 min-w-[160px] bg-transparent outline-none"
               style={{ minHeight: 44, background: 'var(--bone)' }}
             />
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                aria-label="Board actions"
+                aria-expanded={boardMenuOpen}
+                onClick={() => setBoardMenuOpen((open) => !open)}
+                className="ink-border ticker text-[11px] tracking-widest px-3"
+                style={{
+                  minHeight: 44,
+                  background: boardMenuOpen ? 'var(--ink)' : 'var(--bone)',
+                  color: boardMenuOpen ? 'var(--bone)' : 'var(--ink)',
+                }}
+              >
+                ⋯
+              </button>
+              {boardMenuOpen && (
+                <div
+                  className="absolute right-0 top-full mt-1 z-20 ink-border flex flex-col min-w-[180px]"
+                  style={{ background: 'var(--bone)' }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLabelFormOpen(true);
+                      setBoardMenuOpen(false);
+                    }}
+                    className="ticker text-[10px] tracking-widest px-3 text-left flex items-center hover:bg-[var(--ink)] hover:text-[var(--bone)]"
+                    style={{ minHeight: 44 }}
+                  >
+                    + LABEL
+                  </button>
+                  <a
+                    href={`/host/q-and-a/${pin}/questions.csv`}
+                    download
+                    onClick={() => setBoardMenuOpen(false)}
+                    className="ticker text-[10px] tracking-widest px-3 no-underline flex items-center hover:bg-[var(--ink)] hover:text-[var(--bone)]"
+                    style={{ minHeight: 44 }}
+                  >
+                    ⤓ EXPORT CSV
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Label rack (MID-340): mint a session-scoped label mid-broadcast.
@@ -1040,6 +1063,15 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
                 style={{ minHeight: 44, background: 'var(--ink)', color: 'var(--bone)' }}
               >
                 + MINT LABEL
+              </button>
+              <button
+                type="button"
+                onClick={() => setLabelFormOpen(false)}
+                aria-label="Close label rack"
+                className="ink-border ticker text-[10px] tracking-widest px-3"
+                style={{ minHeight: 44, background: 'var(--bone)', color: 'var(--ink)' }}
+              >
+                ✕
               </button>
             </div>
           )}
