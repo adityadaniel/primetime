@@ -18,11 +18,11 @@
 // close/reopen voting, and end the session from the host control room.
 
 import Link from 'next/link';
-import { QRCodeSVG } from 'qrcode.react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AccountMenu from '@/components/AccountMenu';
 import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { publicUrl } from '@/lib/public-origin';
+import { DEFAULT_QA_DISPLAY_SETTINGS, QA_DISPLAY_VISIBLE_COUNT_MAX } from '@/lib/qa';
 import { QA_HOST_REPLY_CHAR_LIMIT, QA_LABEL_NAME_LIMIT, validateLabelName } from '@/lib/qa-input';
 import { useSocket } from '@/lib/socket';
 import type {
@@ -59,13 +59,7 @@ type SessionControlAck =
 
 type DisplaySettingsAck = { ok: true; settings: QADisplaySettings } | { error: string };
 
-const DEFAULT_DISPLAY_SETTINGS: QADisplaySettings = {
-  sort: 'popular',
-  labelFilter: null,
-  visibleCount: 4,
-  showTicker: true,
-  highlightFullscreen: true,
-};
+const DEFAULT_DISPLAY_SETTINGS: QADisplaySettings = { ...DEFAULT_QA_DISPLAY_SETTINGS };
 
 type SortMode = 'popular' | 'recent' | 'oldest';
 
@@ -214,6 +208,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
   const [labelDraft, setLabelDraft] = useState('');
   const [labelSelectable, setLabelSelectable] = useState(false);
   const [labelPickerId, setLabelPickerId] = useState<string | null>(null);
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null);
   // Reply desk (MID-341): one open thread at a time; the composer draft and
   // any in-flight reply rewrite are kept locally so live re-sorts never
   // clobber the host's typing.
@@ -657,7 +652,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
   const displayControlsDisabled = !attached || displaySettingsPending;
 
   return (
-    <main className="relative min-h-screen pb-24">
+    <main className="relative h-[100dvh] flex flex-col overflow-hidden">
       {toast && (
         <div
           className="fixed top-4 left-1/2 -translate-x-1/2 z-50 ink-border stamp ticker text-[11px] tracking-widest px-3 py-2 flex items-center gap-3"
@@ -682,7 +677,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
         </div>
       )}
 
-      <header className="px-6 pt-4 flex items-center justify-between">
+      <header className="px-6 pt-4 flex items-center justify-between shrink-0">
         <Chyron label="CONTROL ROOM · AUDIENCE Q&A" number="QA" />
         <div className="flex items-center gap-6">
           <FrameCounter index={Math.min(999, counts.live)} />
@@ -690,12 +685,12 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
           <AccountMenu />
         </div>
       </header>
-      <SmpteBars className="h-1.5 mt-3" />
+      <SmpteBars className="h-1.5 mt-3 shrink-0" />
 
-      <section className="px-4 sm:px-6 pt-6 max-w-[1500px] mx-auto grid grid-cols-12 gap-5">
+      <section className="px-4 sm:px-6 pt-6 pb-6 max-w-[1500px] mx-auto w-full flex-1 min-h-0 grid grid-cols-12 gap-5">
         {/* Session header */}
         <div
-          className="col-span-12 lg:col-span-5 ink-border p-5 sm:p-6"
+          className="col-span-12 lg:col-span-5 ink-border p-5 sm:p-6 min-h-0 overflow-y-auto"
           style={{ background: 'var(--bone)' }}
         >
           <div className="flex flex-col-reverse md:flex-row md:items-start md:justify-between gap-4">
@@ -721,12 +716,12 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
           <div className="mt-5 grid grid-cols-12 gap-3">
             <button
               type="button"
-              onClick={() => copyText(pin, 'PIN')}
+              onClick={() => copyText(joinUrl || pin, 'Join link')}
               className="col-span-12 ink-border text-left p-4 transition-colors hover:bg-[var(--ink)] hover:text-[var(--bone)] focus:bg-[var(--ink)] focus:text-[var(--bone)] outline-none"
               style={{ background: 'var(--bone)', minHeight: 56 }}
-              aria-label="Copy PIN to clipboard"
+              aria-label="Copy join link to clipboard"
             >
-              <span className="chyron opacity-70">GAME PIN · TAP TO COPY</span>
+              <span className="chyron opacity-70">GAME PIN · TAP TO COPY JOIN LINK</span>
               <p
                 className="display-num ticker mt-1 tabular-nums"
                 style={{ fontSize: 'clamp(48px, 7vw, 96px)', letterSpacing: '0.08em' }}
@@ -735,76 +730,23 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
               </p>
             </button>
             <PanelStat
-              cols="col-span-6 sm:col-span-4"
+              cols="col-span-6"
               label="AUDIENCE"
               value={String(host?.participantCount ?? 0).padStart(2, '0')}
             />
             <PanelStat
-              cols="col-span-6 sm:col-span-2"
+              cols="col-span-6"
               label="LIVE"
               value={String(counts.live).padStart(2, '0')}
             />
-            <PanelStat
-              cols="col-span-4 sm:col-span-2"
-              label="REVIEW"
-              value={String(counts.inReview).padStart(2, '0')}
-            />
-            <PanelStat
-              cols="col-span-4 sm:col-span-2"
-              label="ANSWERED"
-              value={String(counts.answered).padStart(2, '0')}
-            />
-            <PanelStat
-              cols="col-span-4 sm:col-span-2"
-              label="ARCHIVED"
-              value={String(counts.archived).padStart(2, '0')}
-            />
-          </div>
-
-          <div className="mt-5 flex flex-col sm:flex-row gap-4 items-start">
-            <div className="flex-1 min-w-0 w-full">
-              <span className="chyron opacity-70">JOIN LINK</span>
-              <button
-                type="button"
-                onClick={() => copyText(joinUrl, 'Join link')}
-                className="mt-1 w-full ink-border text-left px-3 py-3 transition-colors hover:bg-[var(--ink)] hover:text-[var(--bone)] outline-none"
-                style={{ background: 'var(--bone)', minHeight: 56 }}
-                aria-label="Copy join link to clipboard"
-              >
-                <span className="ticker text-[12px] tracking-wide break-all">{joinUrl || '…'}</span>
-                <span className="block ticker text-[10px] tracking-widest opacity-60 mt-1">
-                  TAP TO COPY
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={openDisplay}
-                className="mt-3 ink-border ticker text-[11px] tracking-widest px-3"
-                style={{ minHeight: 56, background: 'var(--bone)', color: 'var(--ink)' }}
-              >
-                ⤴ OPEN DISPLAY
-              </button>
-            </div>
-            <div className="flex flex-col items-center gap-2 shrink-0">
-              <div
-                className="ink-border p-3 grid place-items-center"
-                style={{ background: 'var(--bone)' }}
-              >
-                {joinUrl ? (
-                  <QRCodeSVG
-                    value={joinUrl}
-                    size={132}
-                    bgColor="transparent"
-                    fgColor="var(--ink)"
-                    level="M"
-                    marginSize={0}
-                  />
-                ) : (
-                  <div style={{ width: 132, height: 132 }} aria-hidden />
-                )}
-              </div>
-              <span className="ticker text-[10px] tracking-widest opacity-70">SCAN TO JOIN</span>
-            </div>
+            <button
+              type="button"
+              onClick={openDisplay}
+              className="col-span-12 ink-border ticker text-[11px] tracking-widest px-3"
+              style={{ minHeight: 56, background: 'var(--bone)', color: 'var(--ink)' }}
+            >
+              ⤴ OPEN DISPLAY
+            </button>
           </div>
 
           <div className="mt-5 pt-4 border-t-2" style={{ borderColor: 'var(--ink)' }}>
@@ -932,11 +874,13 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
                   aria-label="Display visible question count"
                   className="ticker text-[12px] bg-transparent"
                 >
-                  {[1, 2, 3, 4, 5, 6].map((count) => (
-                    <option key={count} value={count}>
-                      {count}
-                    </option>
-                  ))}
+                  {Array.from({ length: QA_DISPLAY_VISIBLE_COUNT_MAX }, (_, i) => i + 1).map(
+                    (count) => (
+                      <option key={count} value={count}>
+                        {count}
+                      </option>
+                    ),
+                  )}
                 </select>
               </label>
               <button
@@ -982,11 +926,11 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
 
         {/* Live question board */}
         <aside
-          className="col-span-12 lg:col-span-7 ink-border p-5 flex flex-col"
+          className="col-span-12 lg:col-span-7 ink-border p-5 flex flex-col min-h-0"
           style={{ background: 'var(--bone)' }}
         >
           <div className="flex items-center justify-between gap-3">
-            <span className="chyron">QUESTION BOARD · LIVE WIRE</span>
+            <span className="chyron">QUESTION BOARD</span>
             <span className="ticker text-[11px] tracking-widest opacity-60">
               {String(counts.live).padStart(2, '0')} LIVE ·{' '}
               {String(counts.inReview).padStart(2, '0')} IN REVIEW
@@ -1145,505 +1089,575 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
             </div>
           )}
 
-          <ol
-            className="mt-3 overflow-y-auto pr-1 flex-1"
-            style={{ maxHeight: 640 }}
-            aria-live="polite"
-          >
-            {!hasQuestions && (
-              <li className="font-editorial italic opacity-60 py-4">
-                Nothing on the wire yet — share PIN {pin} (or the QR) and the board fills as
-                questions arrive.
-              </li>
-            )}
-            {filtered && (
-              <li className="font-editorial italic opacity-60 py-4">
-                No questions match — clear the search{labelFilter ? ' or label filter' : ''} to see
-                the full board.
-              </li>
-            )}
-            {board.map((q, i) => (
-              <li
-                key={q.id}
-                className="py-3 border-b last:border-b-0"
-                style={{
-                  borderColor: 'rgba(15,15,15,.18)',
-                  opacity: q.status === 'IN_REVIEW' ? 0.85 : 1,
-                }}
-              >
-                <div className="flex items-start gap-3">
-                  {q.status === 'IN_REVIEW' ? (
-                    <input
-                      type="checkbox"
-                      checked={selected.has(q.id)}
-                      onChange={() => toggleSelected(q.id)}
-                      aria-label={`Select question for bulk action: ${q.text}`}
-                      className="mt-1 size-5 shrink-0 accent-[var(--ink)]"
-                      style={{ minWidth: 36 }}
-                    />
-                  ) : (
-                    <span className="display-num text-2xl tabular-nums" style={{ minWidth: 36 }}>
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border"
-                        style={
-                          q.status === 'IN_REVIEW'
-                            ? { background: 'var(--marigold)', color: 'var(--ink)' }
-                            : { background: 'var(--vermilion)', color: 'var(--bone)' }
-                        }
-                      >
-                        {q.status === 'IN_REVIEW' ? 'IN REVIEW' : 'LIVE'}
+          <div className="mt-3 flex-1 min-h-0 overflow-y-auto pr-1">
+            <ol aria-live="polite">
+              {!hasQuestions && (
+                <li className="font-editorial italic opacity-60 py-4">
+                  Nothing on the wire yet — share PIN {pin} and the board fills as questions arrive.
+                </li>
+              )}
+              {filtered && (
+                <li className="font-editorial italic opacity-60 py-4">
+                  No questions match — clear the search{labelFilter ? ' or label filter' : ''} to
+                  see the full board.
+                </li>
+              )}
+              {board.map((q, i) => (
+                <li
+                  key={q.id}
+                  className="py-3 border-b last:border-b-0"
+                  style={{
+                    borderColor: 'rgba(15,15,15,.18)',
+                    opacity: q.status === 'IN_REVIEW' ? 0.85 : 1,
+                  }}
+                >
+                  <div className="flex items-start gap-3">
+                    {q.status === 'IN_REVIEW' ? (
+                      <input
+                        type="checkbox"
+                        checked={selected.has(q.id)}
+                        onChange={() => toggleSelected(q.id)}
+                        aria-label={`Select question for bulk action: ${q.text}`}
+                        className="mt-1 size-5 shrink-0 accent-[var(--ink)]"
+                        style={{ minWidth: 36 }}
+                      />
+                    ) : (
+                      <span className="display-num text-2xl tabular-nums" style={{ minWidth: 36 }}>
+                        {String(i + 1).padStart(2, '0')}
                       </span>
-                      {q.highlighted && (
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span
                           className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border"
-                          style={{ background: 'var(--ink)', color: 'var(--bone)' }}
-                        >
-                          ★ ON AIR
-                        </span>
-                      )}
-                      {q.labelIds.map((id) => (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => toggleLabelAssignment(q, id)}
-                          aria-label={`Remove label ${labelNames.get(id) ?? 'label'} from question`}
-                          title="Tap to remove this label"
-                          className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border opacity-80 hover:opacity-100"
-                        >
-                          {(labelNames.get(id) ?? 'LABEL').toUpperCase()} ✕
-                        </button>
-                      ))}
-                      {(host?.labels.length ?? 0) > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setLabelPickerId((id) => (id === q.id ? null : q.id))}
-                          aria-expanded={labelPickerId === q.id}
-                          aria-label={`Pick labels for question: ${q.text}`}
-                          className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border opacity-60 hover:opacity-100"
-                        >
-                          {labelPickerId === q.id ? '✕' : '⊕ LABEL'}
-                        </button>
-                      )}
-                    </div>
-                    {/* Label picker (MID-340): every session label as a chip
-                        toggle — filled = assigned, hollow = tap to assign. */}
-                    {labelPickerId === q.id && (
-                      <div
-                        className="mt-2 ink-border px-2 py-2 flex flex-wrap gap-1"
-                        style={{ background: 'var(--bone)' }}
-                      >
-                        {(host?.labels ?? []).map((label) => {
-                          const assigned = q.labelIds.includes(label.id);
-                          return (
-                            <button
-                              key={label.id}
-                              type="button"
-                              onClick={() => toggleLabelAssignment(q, label.id)}
-                              aria-pressed={assigned}
-                              className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border"
-                              style={{
-                                minHeight: 32,
-                                background: assigned ? 'var(--ink)' : 'var(--bone)',
-                                color: assigned ? 'var(--bone)' : 'var(--ink)',
-                              }}
-                            >
-                              {assigned ? '◼' : '◻'} {label.name.toUpperCase()}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {editing?.id === q.id ? (
-                      <div className="mt-1">
-                        <textarea
-                          value={editing.text}
-                          onChange={(e) =>
-                            setEditing((prev) => (prev ? { ...prev, text: e.target.value } : prev))
+                          style={
+                            q.status === 'IN_REVIEW'
+                              ? { background: 'var(--marigold)', color: 'var(--ink)' }
+                              : { background: 'var(--vermilion)', color: 'var(--bone)' }
                           }
-                          maxLength={host?.questionCharLimit ?? 280}
-                          rows={3}
-                          aria-label="Edit question text"
-                          className="w-full ink-border font-editorial text-lg leading-snug p-2 bg-transparent outline-none resize-y"
-                          style={{ background: 'var(--bone)' }}
-                        />
-                        <div className="mt-1 flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={saveEdit}
-                            className="ink-border stamp ticker text-[9px] tracking-widest px-2"
-                            style={{
-                              minHeight: 36,
-                              background: 'var(--ivy)',
-                              color: 'var(--bone)',
-                            }}
+                        >
+                          {q.status === 'IN_REVIEW' ? 'IN REVIEW' : 'LIVE'}
+                        </span>
+                        {q.highlighted && (
+                          <span
+                            className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border"
+                            style={{ background: 'var(--ink)', color: 'var(--bone)' }}
                           >
-                            ✓ SAVE REWRITE
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditing(null)}
-                            className="ink-border ticker text-[9px] tracking-widest px-2"
-                            style={{
-                              minHeight: 36,
-                              background: 'var(--bone)',
-                              color: 'var(--ink)',
-                            }}
-                          >
-                            ✕ CANCEL
-                          </button>
-                          <span className="ticker text-[10px] tracking-widest opacity-60 ml-auto tabular-nums">
-                            {editing.text.trim().length}/{host?.questionCharLimit ?? 280}
+                            ★ ON AIR
                           </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <p
-                        className="font-editorial text-lg leading-snug mt-1"
-                        style={{ wordBreak: 'break-word' }}
-                      >
-                        {q.text}
-                      </p>
-                    )}
-                    <div className="flex flex-wrap items-center gap-2 mt-1">
-                      <p className="ticker text-[10px] tracking-widest opacity-60">
-                        {q.isAnonymous ? 'ANONYMOUS' : (q.authorDisplayName ?? 'ANONYMOUS')} ·{' '}
-                        {new Date(q.submittedAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setReplyThreadId((id) => (id === q.id ? null : q.id));
-                          setReplyDraft('');
-                          setReplyEditing(null);
-                        }}
-                        aria-expanded={replyThreadId === q.id}
-                        aria-label={`${replyThreadId === q.id ? 'Close' : 'Open'} reply thread: ${q.text}`}
-                        className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border opacity-70 hover:opacity-100"
-                      >
-                        {replyThreadId === q.id
-                          ? '✕ THREAD'
-                          : `↩ REPLY${q.replyCount > 0 ? ` (${q.replyCount})` : ''}`}
-                      </button>
-                    </div>
-                    {/* Reply desk (MID-341): thread + composer. Replies to an
-                        in-review question are a private desk note to the
-                        submitter; approval makes the whole thread public. */}
-                    {replyThreadId === q.id && (
-                      <div
-                        className="mt-2 ink-border px-3 py-2"
-                        style={{ background: 'var(--bone)' }}
-                      >
-                        {q.status === 'IN_REVIEW' && (
-                          <p
-                            className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border inline-block"
-                            style={{ background: 'var(--marigold)', color: 'var(--ink)' }}
+                        )}
+                        {q.labelIds.map((id) => (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => toggleLabelAssignment(q, id)}
+                            aria-label={`Remove label ${labelNames.get(id) ?? 'label'} from question`}
+                            title="Tap to remove this label"
+                            className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border opacity-80 hover:opacity-100"
                           >
-                            ◆ PRIVATE NOTE · ONLY THE SUBMITTER SEES THIS UNTIL APPROVAL
-                          </p>
-                        )}
-                        {q.replies.length > 0 && (
-                          <ul className="mt-2">
-                            {q.replies.map((r) => (
-                              <li
-                                key={r.id}
-                                className="py-2 border-b last:border-b-0"
-                                style={{ borderColor: 'rgba(15,15,15,.14)' }}
+                            {(labelNames.get(id) ?? 'LABEL').toUpperCase()} ✕
+                          </button>
+                        ))}
+                      </div>
+                      {/* Label picker (MID-340): every session label as a chip
+                        toggle — filled = assigned, hollow = tap to assign. */}
+                      {labelPickerId === q.id && (
+                        <div
+                          className="mt-2 ink-border px-2 py-2 flex flex-wrap gap-1"
+                          style={{ background: 'var(--bone)' }}
+                        >
+                          {(host?.labels ?? []).map((label) => {
+                            const assigned = q.labelIds.includes(label.id);
+                            return (
+                              <button
+                                key={label.id}
+                                type="button"
+                                onClick={() => toggleLabelAssignment(q, label.id)}
+                                aria-pressed={assigned}
+                                className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border"
+                                style={{
+                                  minHeight: 32,
+                                  background: assigned ? 'var(--ink)' : 'var(--bone)',
+                                  color: assigned ? 'var(--bone)' : 'var(--ink)',
+                                }}
                               >
-                                {replyEditing?.replyId === r.id ? (
-                                  <div>
-                                    <textarea
-                                      value={replyEditing.text}
-                                      onChange={(e) =>
-                                        setReplyEditing((prev) =>
-                                          prev ? { ...prev, text: e.target.value } : prev,
-                                        )
-                                      }
-                                      maxLength={QA_HOST_REPLY_CHAR_LIMIT}
-                                      rows={2}
-                                      aria-label="Edit reply text"
-                                      className="w-full ink-border font-editorial text-[15px] leading-snug p-2 bg-transparent outline-none resize-y"
-                                      style={{ background: 'var(--bone)' }}
-                                    />
-                                    <div className="mt-1 flex items-center gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={saveReplyEdit}
-                                        className="ink-border stamp ticker text-[9px] tracking-widest px-2"
-                                        style={{
-                                          minHeight: 36,
-                                          background: 'var(--ivy)',
-                                          color: 'var(--bone)',
-                                        }}
-                                      >
-                                        ✓ SAVE REPLY
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setReplyEditing(null)}
-                                        className="ink-border ticker text-[9px] tracking-widest px-2"
-                                        style={{
-                                          minHeight: 36,
-                                          background: 'var(--bone)',
-                                          color: 'var(--ink)',
-                                        }}
-                                      >
-                                        ✕ CANCEL
-                                      </button>
-                                      <span className="ticker text-[10px] tracking-widest opacity-60 ml-auto tabular-nums">
-                                        {replyEditing.text.trim().length}/{QA_HOST_REPLY_CHAR_LIMIT}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div>
-                                    <div className="flex items-center gap-2">
-                                      <span
-                                        className="ticker text-[9px] tracking-widest px-2 py-[2px] ink-border"
-                                        style={
-                                          r.isHostReply
-                                            ? { background: 'var(--ink)', color: 'var(--bone)' }
-                                            : { background: 'var(--bone)', color: 'var(--ink)' }
-                                        }
-                                      >
-                                        {r.isHostReply ? '◼ THE DESK' : '◻ AUDIENCE'}
-                                      </span>
-                                      <span className="ticker text-[10px] tracking-widest opacity-50">
-                                        {new Date(r.createdAt).toLocaleTimeString([], {
-                                          hour: '2-digit',
-                                          minute: '2-digit',
-                                        })}
-                                      </span>
-                                      {r.isHostReply && (
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            setReplyEditing({
-                                              questionId: q.id,
-                                              replyId: r.id,
-                                              text: r.text,
-                                            })
-                                          }
-                                          aria-label={`Edit reply: ${r.text}`}
-                                          className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border opacity-60 hover:opacity-100 ml-auto"
-                                        >
-                                          ✎ EDIT
-                                        </button>
-                                      )}
-                                    </div>
-                                    <p
-                                      className="font-editorial text-[15px] leading-snug mt-1"
-                                      style={{ wordBreak: 'break-word' }}
-                                    >
-                                      {r.text}
-                                    </p>
-                                  </div>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        <div className="mt-2">
+                                {assigned ? '◼' : '◻'} {label.name.toUpperCase()}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {editing?.id === q.id ? (
+                        <div className="mt-1">
                           <textarea
-                            value={replyDraft}
-                            onChange={(e) => setReplyDraft(e.target.value)}
-                            maxLength={QA_HOST_REPLY_CHAR_LIMIT}
-                            rows={2}
-                            placeholder={
-                              q.status === 'IN_REVIEW'
-                                ? 'Write a private reply to the submitter…'
-                                : 'Write a reply for the room…'
+                            value={editing.text}
+                            onChange={(e) =>
+                              setEditing((prev) =>
+                                prev ? { ...prev, text: e.target.value } : prev,
+                              )
                             }
-                            aria-label="Write a reply"
-                            className="w-full ink-border font-editorial text-[15px] leading-snug p-2 bg-transparent outline-none resize-y"
+                            maxLength={host?.questionCharLimit ?? 280}
+                            rows={3}
+                            aria-label="Edit question text"
+                            className="w-full ink-border font-editorial text-lg leading-snug p-2 bg-transparent outline-none resize-y"
                             style={{ background: 'var(--bone)' }}
                           />
                           <div className="mt-1 flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => sendReply(q)}
+                              onClick={saveEdit}
                               className="ink-border stamp ticker text-[9px] tracking-widest px-2"
                               style={{
                                 minHeight: 36,
-                                background: 'var(--vermilion)',
+                                background: 'var(--ivy)',
                                 color: 'var(--bone)',
                               }}
                             >
-                              ↩ SEND REPLY
+                              ✓ SAVE REWRITE
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditing(null)}
+                              className="ink-border ticker text-[9px] tracking-widest px-2"
+                              style={{
+                                minHeight: 36,
+                                background: 'var(--bone)',
+                                color: 'var(--ink)',
+                              }}
+                            >
+                              ✕ CANCEL
                             </button>
                             <span className="ticker text-[10px] tracking-widest opacity-60 ml-auto tabular-nums">
-                              {replyDraft.trim().length}/{QA_HOST_REPLY_CHAR_LIMIT}
+                              {editing.text.trim().length}/{host?.questionCharLimit ?? 280}
                             </span>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    <span
-                      className="display-num ticker tabular-nums text-2xl"
-                      title={
-                        host?.downvotesEnabled
-                          ? `▲ ${q.upvotes} · ▼ ${q.downvotes}`
-                          : `${q.upvotes} upvotes`
-                      }
-                    >
-                      ▲{q.score}
-                    </span>
-                    {q.status === 'IN_REVIEW' ? (
-                      <div className="flex gap-1 flex-wrap justify-end">
-                        <button
-                          type="button"
-                          onClick={() => moderate('approve', q.id)}
-                          className="ink-border stamp ticker text-[9px] tracking-widest px-2"
-                          style={{ minHeight: 36, background: 'var(--ivy)', color: 'var(--bone)' }}
-                        >
-                          ✓ APPROVE
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => moderate('dismiss', q.id)}
-                          className="ink-border stamp ticker text-[9px] tracking-widest px-2"
-                          style={{ minHeight: 36, background: 'var(--ink)', color: 'var(--bone)' }}
-                        >
-                          ✕ DISMISS
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditing({ id: q.id, text: q.text })}
-                          aria-label={`Edit question: ${q.text}`}
-                          className="ink-border ticker text-[9px] tracking-widest px-2"
-                          style={{ minHeight: 36, background: 'var(--bone)', color: 'var(--ink)' }}
-                        >
-                          ✎ EDIT
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex gap-1 flex-wrap justify-end">
-                        <button
-                          type="button"
-                          onClick={() => toggleHighlight(q)}
-                          aria-pressed={q.highlighted}
-                          aria-label={
-                            q.highlighted
-                              ? `Take question off air: ${q.text}`
-                              : `Put question on air: ${q.text}`
-                          }
-                          className="ink-border stamp ticker text-[9px] tracking-widest px-2"
-                          style={{
-                            minHeight: 36,
-                            background: q.highlighted ? 'var(--ink)' : 'var(--vermilion)',
-                            color: 'var(--bone)',
-                          }}
-                        >
-                          {q.highlighted ? '★ OFF AIR' : '★ ON AIR'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditing({ id: q.id, text: q.text })}
-                          aria-label={`Edit question: ${q.text}`}
-                          className="ink-border ticker text-[9px] tracking-widest px-2"
-                          style={{ minHeight: 36, background: 'var(--bone)', color: 'var(--ink)' }}
-                        >
-                          ✎ EDIT
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => moderate('answered', q.id)}
-                          aria-label={`Mark question answered: ${q.text}`}
-                          className="ink-border stamp ticker text-[9px] tracking-widest px-2"
-                          style={{ minHeight: 36, background: 'var(--ivy)', color: 'var(--bone)' }}
-                        >
-                          ✓ ANSWERED
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => moderate('archive', q.id)}
-                          aria-label={`Archive question: ${q.text}`}
-                          className="ink-border ticker text-[9px] tracking-widest px-2"
-                          style={{ minHeight: 36, background: 'var(--bone)', color: 'var(--ink)' }}
-                        >
-                          ▣ ARCHIVE
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ol>
-
-          {/* Filed pile (MID-339): answered + archived questions, host-only,
-              restorable to the live board. Never part of the public
-              projection — this list only exists in qa:host:state. */}
-          {filed.length > 0 && (
-            <div className="mt-4 pt-3 border-t-2" style={{ borderColor: 'var(--ink)' }}>
-              <button
-                type="button"
-                onClick={() => setShowFiled((v) => !v)}
-                aria-expanded={showFiled}
-                className="ticker text-[11px] tracking-widest flex items-center gap-2"
-                style={{ minHeight: 44 }}
-              >
-                <span aria-hidden>{showFiled ? '▾' : '▸'}</span>
-                THE ARCHIVE · {String(filed.length).padStart(2, '0')} FILED
-              </button>
-              {showFiled && (
-                <ul className="mt-2">
-                  {filed.map((q) => (
-                    <li
-                      key={q.id}
-                      className="py-2 border-b last:border-b-0 flex items-start gap-3"
-                      style={{ borderColor: 'rgba(15,15,15,.18)', opacity: 0.85 }}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <span
-                          className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border"
-                          style={
-                            q.status === 'ANSWERED'
-                              ? { background: 'var(--ivy)', color: 'var(--bone)' }
-                              : { background: 'var(--ash)', color: 'var(--ink)' }
-                          }
-                        >
-                          {q.status === 'ANSWERED' ? '✓ ANSWERED' : '▣ ARCHIVED'}
-                        </span>
+                      ) : (
                         <p
-                          className="font-editorial text-base leading-snug mt-1"
+                          className="font-editorial text-lg leading-snug mt-1"
                           style={{ wordBreak: 'break-word' }}
                         >
                           {q.text}
                         </p>
-                        <p className="ticker text-[10px] tracking-widest opacity-60 mt-1">
+                      )}
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <p className="ticker text-[10px] tracking-widest opacity-60">
                           {q.isAnonymous ? 'ANONYMOUS' : (q.authorDisplayName ?? 'ANONYMOUS')} ·{' '}
                           {new Date(q.submittedAt).toLocaleTimeString([], {
                             hour: '2-digit',
                             minute: '2-digit',
                           })}
-                          {' · '}▲ {q.score}
                         </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReplyThreadId((id) => (id === q.id ? null : q.id));
+                            setReplyDraft('');
+                            setReplyEditing(null);
+                          }}
+                          aria-expanded={replyThreadId === q.id}
+                          aria-label={`${replyThreadId === q.id ? 'Close' : 'Open'} reply thread: ${q.text}`}
+                          className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border opacity-70 hover:opacity-100"
+                        >
+                          {replyThreadId === q.id
+                            ? '✕ THREAD'
+                            : `↩ REPLY${q.replyCount > 0 ? ` (${q.replyCount})` : ''}`}
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => moderate('restore', q.id)}
-                        aria-label={`Restore question to the live board: ${q.text}`}
-                        className="ink-border stamp ticker text-[9px] tracking-widest px-2 shrink-0"
-                        style={{ minHeight: 36, background: 'var(--bone)', color: 'var(--ink)' }}
+                      {/* Reply desk (MID-341): thread + composer. Replies to an
+                        in-review question are a private desk note to the
+                        submitter; approval makes the whole thread public. */}
+                      {replyThreadId === q.id && (
+                        <div
+                          className="mt-2 ink-border px-3 py-2"
+                          style={{ background: 'var(--bone)' }}
+                        >
+                          {q.status === 'IN_REVIEW' && (
+                            <p
+                              className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border inline-block"
+                              style={{ background: 'var(--marigold)', color: 'var(--ink)' }}
+                            >
+                              ◆ PRIVATE NOTE · ONLY THE SUBMITTER SEES THIS UNTIL APPROVAL
+                            </p>
+                          )}
+                          {q.replies.length > 0 && (
+                            <ul className="mt-2">
+                              {q.replies.map((r) => (
+                                <li
+                                  key={r.id}
+                                  className="py-2 border-b last:border-b-0"
+                                  style={{ borderColor: 'rgba(15,15,15,.14)' }}
+                                >
+                                  {replyEditing?.replyId === r.id ? (
+                                    <div>
+                                      <textarea
+                                        value={replyEditing.text}
+                                        onChange={(e) =>
+                                          setReplyEditing((prev) =>
+                                            prev ? { ...prev, text: e.target.value } : prev,
+                                          )
+                                        }
+                                        maxLength={QA_HOST_REPLY_CHAR_LIMIT}
+                                        rows={2}
+                                        aria-label="Edit reply text"
+                                        className="w-full ink-border font-editorial text-[15px] leading-snug p-2 bg-transparent outline-none resize-y"
+                                        style={{ background: 'var(--bone)' }}
+                                      />
+                                      <div className="mt-1 flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={saveReplyEdit}
+                                          className="ink-border stamp ticker text-[9px] tracking-widest px-2"
+                                          style={{
+                                            minHeight: 36,
+                                            background: 'var(--ivy)',
+                                            color: 'var(--bone)',
+                                          }}
+                                        >
+                                          ✓ SAVE REPLY
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setReplyEditing(null)}
+                                          className="ink-border ticker text-[9px] tracking-widest px-2"
+                                          style={{
+                                            minHeight: 36,
+                                            background: 'var(--bone)',
+                                            color: 'var(--ink)',
+                                          }}
+                                        >
+                                          ✕ CANCEL
+                                        </button>
+                                        <span className="ticker text-[10px] tracking-widest opacity-60 ml-auto tabular-nums">
+                                          {replyEditing.text.trim().length}/
+                                          {QA_HOST_REPLY_CHAR_LIMIT}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className="ticker text-[9px] tracking-widest px-2 py-[2px] ink-border"
+                                          style={
+                                            r.isHostReply
+                                              ? { background: 'var(--ink)', color: 'var(--bone)' }
+                                              : { background: 'var(--bone)', color: 'var(--ink)' }
+                                          }
+                                        >
+                                          {r.isHostReply ? '◼ THE DESK' : '◻ AUDIENCE'}
+                                        </span>
+                                        <span className="ticker text-[10px] tracking-widest opacity-50">
+                                          {new Date(r.createdAt).toLocaleTimeString([], {
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                          })}
+                                        </span>
+                                        {r.isHostReply && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setReplyEditing({
+                                                questionId: q.id,
+                                                replyId: r.id,
+                                                text: r.text,
+                                              })
+                                            }
+                                            aria-label={`Edit reply: ${r.text}`}
+                                            className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border opacity-60 hover:opacity-100 ml-auto"
+                                          >
+                                            ✎ EDIT
+                                          </button>
+                                        )}
+                                      </div>
+                                      <p
+                                        className="font-editorial text-[15px] leading-snug mt-1"
+                                        style={{ wordBreak: 'break-word' }}
+                                      >
+                                        {r.text}
+                                      </p>
+                                    </div>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          <div className="mt-2">
+                            <textarea
+                              value={replyDraft}
+                              onChange={(e) => setReplyDraft(e.target.value)}
+                              maxLength={QA_HOST_REPLY_CHAR_LIMIT}
+                              rows={2}
+                              placeholder={
+                                q.status === 'IN_REVIEW'
+                                  ? 'Write a private reply to the submitter…'
+                                  : 'Write a reply for the room…'
+                              }
+                              aria-label="Write a reply"
+                              className="w-full ink-border font-editorial text-[15px] leading-snug p-2 bg-transparent outline-none resize-y"
+                              style={{ background: 'var(--bone)' }}
+                            />
+                            <div className="mt-1 flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => sendReply(q)}
+                                className="ink-border stamp ticker text-[9px] tracking-widest px-2"
+                                style={{
+                                  minHeight: 36,
+                                  background: 'var(--vermilion)',
+                                  color: 'var(--bone)',
+                                }}
+                              >
+                                ↩ SEND REPLY
+                              </button>
+                              <span className="ticker text-[10px] tracking-widest opacity-60 ml-auto tabular-nums">
+                                {replyDraft.trim().length}/{QA_HOST_REPLY_CHAR_LIMIT}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <span
+                        className="display-num ticker tabular-nums text-2xl"
+                        title={
+                          host?.downvotesEnabled
+                            ? `▲ ${q.upvotes} · ▼ ${q.downvotes}`
+                            : `${q.upvotes} upvotes`
+                        }
                       >
-                        ↩ RESTORE
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
+                        ▲{q.score}
+                      </span>
+                      {q.status === 'IN_REVIEW' ? (
+                        <div className="flex flex-col items-end">
+                          <div className="flex gap-1 flex-wrap justify-end">
+                            <button
+                              type="button"
+                              onClick={() => moderate('approve', q.id)}
+                              className="ink-border stamp ticker text-[9px] tracking-widest px-2"
+                              style={{
+                                minHeight: 36,
+                                background: 'var(--ivy)',
+                                color: 'var(--bone)',
+                              }}
+                            >
+                              ✓ APPROVE
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moderate('dismiss', q.id)}
+                              className="ink-border stamp ticker text-[9px] tracking-widest px-2"
+                              style={{
+                                minHeight: 36,
+                                background: 'var(--ink)',
+                                color: 'var(--bone)',
+                              }}
+                            >
+                              ✕ DISMISS
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActionMenuId((id) => (id === q.id ? null : q.id))}
+                              aria-label={`More actions for question: ${q.text}`}
+                              aria-expanded={actionMenuId === q.id}
+                              className="ink-border ticker text-[9px] tracking-widest px-2"
+                              style={{
+                                minHeight: 36,
+                                background: 'var(--bone)',
+                                color: 'var(--ink)',
+                              }}
+                            >
+                              ⋯
+                            </button>
+                          </div>
+                          {actionMenuId === q.id && (
+                            <div
+                              className="mt-1 ink-border flex flex-col"
+                              style={{ background: 'var(--bone)' }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditing({ id: q.id, text: q.text });
+                                  setActionMenuId(null);
+                                }}
+                                aria-label={`Edit question: ${q.text}`}
+                                className="w-full text-left ticker text-[9px] tracking-widest px-3 hover:bg-[var(--ink)] hover:text-[var(--bone)]"
+                                style={{ minHeight: 36 }}
+                              >
+                                ✎ EDIT
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-end">
+                          <div className="flex gap-1 flex-wrap justify-end">
+                            <button
+                              type="button"
+                              onClick={() => toggleHighlight(q)}
+                              aria-pressed={q.highlighted}
+                              aria-label={
+                                q.highlighted
+                                  ? `Take question off air: ${q.text}`
+                                  : `Put question on air: ${q.text}`
+                              }
+                              className="ink-border ticker text-[9px] tracking-widest px-2"
+                              style={{
+                                minHeight: 36,
+                                background: q.highlighted ? 'var(--ink)' : 'var(--vermilion)',
+                                color: 'var(--bone)',
+                              }}
+                            >
+                              {q.highlighted ? '★ OFF AIR' : '★ ON AIR'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moderate('answered', q.id)}
+                              aria-label={`Mark question answered: ${q.text}`}
+                              className="ink-border ticker text-[9px] tracking-widest px-2"
+                              style={{
+                                minHeight: 36,
+                                background: 'var(--ivy)',
+                                color: 'var(--bone)',
+                              }}
+                            >
+                              ✓ ANSWERED
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActionMenuId((id) => (id === q.id ? null : q.id))}
+                              aria-label={`More actions for question: ${q.text}`}
+                              aria-expanded={actionMenuId === q.id}
+                              className="ink-border ticker text-[9px] tracking-widest px-2"
+                              style={{
+                                minHeight: 36,
+                                background: 'var(--bone)',
+                                color: 'var(--ink)',
+                              }}
+                            >
+                              ⋯
+                            </button>
+                          </div>
+                          {actionMenuId === q.id && (
+                            <div
+                              className="mt-1 ink-border flex flex-col"
+                              style={{ background: 'var(--bone)' }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditing({ id: q.id, text: q.text });
+                                  setActionMenuId(null);
+                                }}
+                                aria-label={`Edit question: ${q.text}`}
+                                className="w-full text-left ticker text-[9px] tracking-widest px-3 hover:bg-[var(--ink)] hover:text-[var(--bone)]"
+                                style={{ minHeight: 36 }}
+                              >
+                                ✎ EDIT
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  moderate('archive', q.id);
+                                  setActionMenuId(null);
+                                }}
+                                aria-label={`Archive question: ${q.text}`}
+                                className="w-full text-left ticker text-[9px] tracking-widest px-3 hover:bg-[var(--ink)] hover:text-[var(--bone)]"
+                                style={{ minHeight: 36 }}
+                              >
+                                ▣ ARCHIVE
+                              </button>
+                              {(host?.labels.length ?? 0) > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setLabelPickerId((id) => (id === q.id ? null : q.id));
+                                    setActionMenuId(null);
+                                  }}
+                                  aria-label={`Pick labels for question: ${q.text}`}
+                                  className="w-full text-left ticker text-[9px] tracking-widest px-3 hover:bg-[var(--ink)] hover:text-[var(--bone)]"
+                                  style={{ minHeight: 36 }}
+                                >
+                                  ⊕ LABELS
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            {/* Filed pile (MID-339): answered + archived questions, host-only,
+                restorable to the live board. Never part of the public
+                projection — this list only exists in qa:host:state. */}
+            {filed.length > 0 && (
+              <div className="mt-4 pt-3 border-t-2" style={{ borderColor: 'var(--ink)' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowFiled((v) => !v)}
+                  aria-expanded={showFiled}
+                  className="ticker text-[11px] tracking-widest flex items-center gap-2"
+                  style={{ minHeight: 44 }}
+                >
+                  <span aria-hidden>{showFiled ? '▾' : '▸'}</span>
+                  THE ARCHIVE · {String(filed.length).padStart(2, '0')} FILED
+                </button>
+                {showFiled && (
+                  <ul className="mt-2">
+                    {filed.map((q) => (
+                      <li
+                        key={q.id}
+                        className="py-2 border-b last:border-b-0 flex items-start gap-3"
+                        style={{ borderColor: 'rgba(15,15,15,.18)', opacity: 0.85 }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <span
+                            className="ticker text-[10px] tracking-widest px-2 py-[2px] ink-border"
+                            style={
+                              q.status === 'ANSWERED'
+                                ? { background: 'var(--ivy)', color: 'var(--bone)' }
+                                : { background: 'var(--ash)', color: 'var(--ink)' }
+                            }
+                          >
+                            {q.status === 'ANSWERED' ? '✓ ANSWERED' : '▣ ARCHIVED'}
+                          </span>
+                          <p
+                            className="font-editorial text-base leading-snug mt-1"
+                            style={{ wordBreak: 'break-word' }}
+                          >
+                            {q.text}
+                          </p>
+                          <p className="ticker text-[10px] tracking-widest opacity-60 mt-1">
+                            {q.isAnonymous ? 'ANONYMOUS' : (q.authorDisplayName ?? 'ANONYMOUS')} ·{' '}
+                            {new Date(q.submittedAt).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                            {' · '}▲ {q.score}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => moderate('restore', q.id)}
+                          aria-label={`Restore question to the live board: ${q.text}`}
+                          className="ink-border stamp ticker text-[9px] tracking-widest px-2 shrink-0"
+                          style={{ minHeight: 36, background: 'var(--bone)', color: 'var(--ink)' }}
+                        >
+                          ↩ RESTORE
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Spike pile (MID-338): dismissed questions, host-only, restorable.
               Never part of the public projection — this list only exists in

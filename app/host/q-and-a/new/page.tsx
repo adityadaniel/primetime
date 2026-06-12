@@ -23,37 +23,15 @@ const TITLE_PLACEHOLDERS = [
   'What should we cover next?',
 ];
 
-const PRIVACY_MODES = [
-  {
-    value: 'ANONYMOUS_BY_DEFAULT',
-    label: 'ANONYMOUS BY DEFAULT',
-    hint: 'Questions are anonymous unless the sender adds a name.',
-  },
-  {
-    value: 'ALWAYS_ANONYMOUS',
-    label: 'ALWAYS ANONYMOUS',
-    hint: 'No names, ever. Not even to you.',
-  },
-  {
-    value: 'NAMED_BY_DEFAULT',
-    label: 'NAMED BY DEFAULT',
-    hint: 'Senders are asked for a name but can go anonymous.',
-  },
-  {
-    value: 'NAME_REQUIRED',
-    label: 'NAME REQUIRED',
-    hint: 'Every question carries the sender’s name.',
-  },
-] as const;
-
 const CHAR_LIMITS = [140, 280, 500] as const;
 
 export default function QAndANew() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [privacyMode, setPrivacyMode] =
-    useState<(typeof PRIVACY_MODES)[number]['value']>('ANONYMOUS_BY_DEFAULT');
+  const [privacyMode, setPrivacyMode] = useState<'ANONYMOUS_BY_DEFAULT' | 'NAME_REQUIRED'>(
+    'ANONYMOUS_BY_DEFAULT',
+  );
   const [moderationEnabled, setModerationEnabled] = useState(false);
   const [participantRepliesEnabled, setParticipantRepliesEnabled] = useState(false);
   const [downvotesEnabled, setDownvotesEnabled] = useState(false);
@@ -215,38 +193,23 @@ export default function QAndANew() {
             />
           </div>
 
-          <fieldset className="mt-10">
-            <legend className="chyron">PARTICIPANT PRIVACY</legend>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-              {PRIVACY_MODES.map((mode) => {
-                const active = privacyMode === mode.value;
-                return (
-                  <button
-                    key={mode.value}
-                    type="button"
-                    onClick={() => setPrivacyMode(mode.value)}
-                    aria-pressed={active}
-                    className="ink-border text-left px-4 py-3"
-                    style={{
-                      minHeight: 56,
-                      background: active ? 'var(--ink)' : 'var(--bone)',
-                      color: active ? 'var(--bone)' : 'var(--ink)',
-                    }}
-                  >
-                    <span className="ticker text-[12px] tracking-widest flex items-center justify-between">
-                      <span>{mode.label}</span>
-                      <span aria-hidden>{active ? '●' : '○'}</span>
-                    </span>
-                    <span className="block font-editorial italic text-[13px] mt-1 opacity-80">
-                      {mode.hint}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10">
+          <div className="mt-10 space-y-6">
+            <ToggleControl
+              label="NAME REQUIRED"
+              on={privacyMode === 'NAME_REQUIRED'}
+              onToggle={() =>
+                setPrivacyMode((prev) =>
+                  prev === 'NAME_REQUIRED' ? 'ANONYMOUS_BY_DEFAULT' : 'NAME_REQUIRED',
+                )
+              }
+              onText="ON · NAMES ON AIR"
+              offText="OFF · OPTIONAL"
+              hint={
+                privacyMode === 'NAME_REQUIRED'
+                  ? 'Every question carries the sender’s name.'
+                  : 'Senders can ask anonymously or add their name.'
+              }
+            />
             <ToggleControl
               label="MODERATION"
               on={moderationEnabled}
@@ -284,32 +247,40 @@ export default function QAndANew() {
           </div>
 
           <fieldset className="mt-10">
-            <legend className="chyron">QUESTION CHARACTER LIMIT</legend>
-            <div className="grid grid-cols-3 gap-3 mt-2">
-              {CHAR_LIMITS.map((limit) => {
-                const active = questionCharLimit === limit;
-                return (
-                  <button
-                    key={limit}
-                    type="button"
-                    onClick={() => setQuestionCharLimit(limit)}
-                    aria-pressed={active}
-                    className="ink-border ticker text-[12px] tracking-widest"
-                    style={{
-                      minHeight: 56,
-                      background: active ? 'var(--vermilion)' : 'var(--bone)',
-                      color: active ? 'var(--bone)' : 'var(--ink)',
-                    }}
-                  >
-                    {limit}
-                  </button>
-                );
-              })}
+            <legend className="sr-only">Question character limit</legend>
+            <div className="flex items-start justify-between gap-6 flex-wrap">
+              <div className="max-w-[520px]">
+                <span className="chyron block">QUESTION CHARACTER LIMIT</span>
+                <p className="font-editorial italic text-[13px] mt-1 opacity-70">
+                  Maximum length of a single question.
+                </p>
+              </div>
+              <div className="flex flex-wrap">
+                {CHAR_LIMITS.map((limit) => {
+                  const active = questionCharLimit === limit;
+                  return (
+                    <button
+                      key={limit}
+                      type="button"
+                      onClick={() => setQuestionCharLimit(limit)}
+                      aria-pressed={active}
+                      className="ink-border ticker text-[11px] tracking-widest px-4"
+                      style={{
+                        minHeight: 44,
+                        background: active ? 'var(--vermilion)' : 'var(--bone)',
+                        color: active ? 'var(--bone)' : 'var(--ink)',
+                      }}
+                    >
+                      {limit}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </fieldset>
 
           <fieldset className="mt-10">
-            <legend className="chyron">LABELS · OPTIONAL · SORT THE WIRE</legend>
+            <legend className="chyron">LABELS · OPTIONAL</legend>
             <p className="font-editorial italic text-[13px] mt-1 opacity-70">
               Tag questions by topic or segment. Flip a label to AUDIENCE to let senders pick it
               when they ask. You can add more mid-broadcast.
@@ -446,23 +417,25 @@ function ToggleControl({
   hint: string;
 }) {
   return (
-    <div className="flex flex-col">
-      <span className="chyron">{label}</span>
+    <div className="flex items-start justify-between gap-6 flex-wrap">
+      <div className="max-w-[520px]">
+        <span className="chyron">{label}</span>
+        <p className="font-editorial italic text-[13px] mt-1 opacity-70">{hint}</p>
+      </div>
       <button
         type="button"
         onClick={onToggle}
         aria-pressed={on}
-        className="mt-2 w-full ink-border ticker text-[12px] tracking-widest flex items-center justify-between px-4"
+        className="ink-border ticker text-[11px] tracking-widest flex items-center justify-between gap-3 px-3 min-w-[220px]"
         style={{
-          minHeight: 56,
+          minHeight: 44,
           background: on ? 'var(--ivy)' : 'var(--bone)',
           color: on ? 'var(--bone)' : 'var(--ink)',
         }}
       >
-        <span>{on ? onText : offText}</span>
         <span aria-hidden>{on ? '●' : '○'}</span>
+        <span>{on ? onText : offText}</span>
       </button>
-      <p className="font-editorial italic text-[13px] mt-2 opacity-70">{hint}</p>
     </div>
   );
 }

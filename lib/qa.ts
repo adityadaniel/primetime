@@ -24,8 +24,8 @@ import type {
   QAVoteType,
 } from './types';
 
-export const QA_DISPLAY_VISIBLE_COUNT_DEFAULT = 4;
-export const QA_DISPLAY_VISIBLE_COUNT_MAX = 6;
+export const QA_DISPLAY_VISIBLE_COUNT_DEFAULT = 10;
+export const QA_DISPLAY_VISIBLE_COUNT_MAX = 10;
 
 export const DEFAULT_QA_DISPLAY_SETTINGS: QADisplaySettings = {
   sort: 'popular',

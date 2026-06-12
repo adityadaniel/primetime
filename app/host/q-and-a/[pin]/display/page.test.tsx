@@ -30,16 +30,20 @@ const baseSettings: QADisplaySettings = {
 };
 
 describe('selectQADisplayQuestions', () => {
-  it('filters to the active public label and clamps visible questions to six', () => {
+  it('filters to the active public label and clamps visible questions to ten', () => {
     const questions = [
       question({ id: 'q1', score: 1, submittedAt: 1, labelIds: ['roadmap'] }),
-      question({ id: 'q2', score: 9, submittedAt: 2, labelIds: ['private'] }),
-      question({ id: 'q3', score: 8, submittedAt: 3, labelIds: ['roadmap'] }),
-      question({ id: 'q4', score: 7, submittedAt: 4, labelIds: ['roadmap'] }),
-      question({ id: 'q5', score: 6, submittedAt: 5, labelIds: ['roadmap'] }),
-      question({ id: 'q6', score: 5, submittedAt: 6, labelIds: ['roadmap'] }),
-      question({ id: 'q7', score: 4, submittedAt: 7, labelIds: ['roadmap'] }),
-      question({ id: 'q8', score: 3, submittedAt: 8, labelIds: ['roadmap'] }),
+      question({ id: 'q2', score: 12, submittedAt: 2, labelIds: ['private'] }),
+      question({ id: 'q3', score: 11, submittedAt: 3, labelIds: ['roadmap'] }),
+      question({ id: 'q4', score: 10, submittedAt: 4, labelIds: ['roadmap'] }),
+      question({ id: 'q5', score: 9, submittedAt: 5, labelIds: ['roadmap'] }),
+      question({ id: 'q6', score: 8, submittedAt: 6, labelIds: ['roadmap'] }),
+      question({ id: 'q7', score: 7, submittedAt: 7, labelIds: ['roadmap'] }),
+      question({ id: 'q8', score: 6, submittedAt: 8, labelIds: ['roadmap'] }),
+      question({ id: 'q9', score: 5, submittedAt: 9, labelIds: ['roadmap'] }),
+      question({ id: 'q10', score: 4, submittedAt: 10, labelIds: ['roadmap'] }),
+      question({ id: 'q11', score: 3, submittedAt: 11, labelIds: ['roadmap'] }),
+      question({ id: 'q12', score: 2, submittedAt: 12, labelIds: ['roadmap'] }),
     ];
 
     expect(
@@ -48,7 +52,7 @@ describe('selectQADisplayQuestions', () => {
         labelFilter: 'roadmap',
         visibleCount: 99,
       }).map((q) => q.id),
-    ).toEqual(['q3', 'q4', 'q5', 'q6', 'q7', 'q8']);
+    ).toEqual(['q3', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9', 'q10', 'q11', 'q12']);
   });
 
   it('sorts recent and oldest modes deterministically', () => {

@@ -1,14 +1,15 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useRef, useState } from 'react';
 import { Clock, DateStamp, SmpteBars } from '@/components/Broadcast';
 import { useSocket } from '@/lib/socket';
 
-export default function JoinPage() {
+function JoinPageInner() {
   const router = useRouter();
+  const search = useSearchParams();
   const socket = useSocket();
-  const [pin, setPin] = useState('');
+  const [pin, setPin] = useState(() => (search.get('pin') ?? '').replace(/\D/g, '').slice(0, 6));
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
@@ -188,5 +189,13 @@ export default function JoinPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function JoinPage() {
+  return (
+    <Suspense fallback={null}>
+      <JoinPageInner />
+    </Suspense>
   );
 }

@@ -283,29 +283,43 @@ void app.prepare().then(() => {
       }
       const cookieHeader = socket.handshake.headers.cookie ?? '';
       const cookies = parseRawCookieHeader(cookieHeader);
-      let token: string | null = null;
-      let salt = 'authjs.session-token';
+      // A browser can hold several session cookies at once (e.g. a stale
+      // authjs.session-token from an old dev secret next to the live
+      // __Secure-authjs.session-token), so try each candidate and keep the
+      // first one that actually decrypts instead of stopping at the first
+      // that exists.
+      let userId: string | null = null;
+      const failures: string[] = [];
       for (const cookieName of COOKIE_NAMES) {
-        token = readCookieValue(cookies, cookieName);
-        if (token) {
-          salt = cookieName;
-          break;
+        const token = readCookieValue(cookies, cookieName);
+        if (!token) continue;
+        try {
+          const decoded = await decodeAuthJwt({
+            token,
+            secret: authSecret,
+            salt: cookieName,
+          });
+          const id =
+            decoded && typeof decoded === 'object' ? (decoded as { id?: unknown }).id : null;
+          if (typeof id === 'string') {
+            userId = id;
+            break;
+          }
+        } catch (err) {
+          failures.push(`${cookieName}: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
-      if (!token) {
-        socket.data.userId = null;
-        return next();
+      // Stale cookies that fail to decrypt are routine (old dev secrets,
+      // other apps on localhost) as long as one candidate works — only warn
+      // when every present session cookie failed and the socket stays
+      // anonymous despite carrying credentials.
+      if (userId === null && failures.length > 0) {
+        console.warn(`[socket auth] no session cookie decrypted (${failures.join('; ')})`);
       }
-      const decoded = await decodeAuthJwt({
-        token,
-        secret: authSecret,
-        salt,
-      });
-      const id = decoded && typeof decoded === 'object' ? (decoded as { id?: unknown }).id : null;
-      socket.data.userId = typeof id === 'string' ? id : null;
+      socket.data.userId = userId;
       next();
     } catch (err) {
-      console.warn('[socket auth] decode failed:', err);
+      console.warn('[socket auth] unexpected failure:', err);
       socket.data.userId = null;
       next();
     }

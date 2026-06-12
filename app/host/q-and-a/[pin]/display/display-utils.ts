@@ -1,3 +1,4 @@
+import { QA_DISPLAY_VISIBLE_COUNT_MAX } from '@/lib/qa';
 import type { QADisplaySettings, QAPublicQuestion } from '@/lib/types';
 
 const SORTERS: Record<
@@ -18,5 +19,5 @@ export function selectQADisplayQuestions(
     : questions;
   return [...filtered]
     .sort(SORTERS[settings.sort])
-    .slice(0, Math.min(6, Math.max(1, settings.visibleCount)));
+    .slice(0, Math.min(QA_DISPLAY_VISIBLE_COUNT_MAX, Math.max(1, settings.visibleCount)));
 }

@@ -137,7 +137,11 @@ function byPopular(a: PublicQuestion, b: PublicQuestion): number {
 }
 
 const STATUS_BADGES: Record<QAQuestionStatus, { label: string; bg: string; fg: string }> = {
-  IN_REVIEW: { label: 'WAITING FOR REVIEW', bg: 'var(--marigold)', fg: 'var(--ink)' },
+  IN_REVIEW: {
+    label: 'WAITING FOR REVIEW',
+    bg: 'var(--marigold)',
+    fg: 'var(--ink)',
+  },
   LIVE: { label: 'LIVE', bg: 'var(--vermilion)', fg: 'var(--bone)' },
   ANSWERED: { label: 'ANSWERED', bg: 'var(--ivy)', fg: 'var(--bone)' },
   ARCHIVED: { label: 'ARCHIVED', bg: 'var(--ash)', fg: 'var(--ink)' },
@@ -281,7 +285,14 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
           ...prev,
           questions: prev.questions.map((q) => {
             const s = byId.get(q.id);
-            return s ? { ...q, score: s.score, upvotes: s.upvotes, downvotes: s.downvotes } : q;
+            return s
+              ? {
+                  ...q,
+                  score: s.score,
+                  upvotes: s.upvotes,
+                  downvotes: s.downvotes,
+                }
+              : q;
           }),
         };
       });
@@ -491,7 +502,12 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
           ...prev,
           questions: prev.questions.map((q) =>
             q.id === res.questionId
-              ? { ...q, score: res.score, upvotes: res.upvotes, downvotes: res.downvotes }
+              ? {
+                  ...q,
+                  score: res.score,
+                  upvotes: res.upvotes,
+                  downvotes: res.downvotes,
+                }
               : q,
           ),
         };
@@ -550,7 +566,11 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
           <button
             type="submit"
             className="w-full mt-3 ink-border stamp ticker tracking-widest text-[13px] py-4"
-            style={{ background: 'var(--vermilion)', color: 'var(--bone)', minHeight: 56 }}
+            style={{
+              background: 'var(--vermilion)',
+              color: 'var(--bone)',
+              minHeight: 56,
+            }}
           >
             ▶ CHECK IN
           </button>
@@ -758,7 +778,7 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
           <div className="flex items-center justify-between">
             <p className="chyron opacity-70">ON THE BOARD</p>
             <span className="ticker text-[11px] tracking-widest opacity-60">
-              {votingEnabled ? 'MOST VOTED FIRST' : 'VOTING CLOSED'}
+              {votingEnabled ? 'POPULAR' : 'VOTING CLOSED'}
             </span>
           </div>
           {/* Label filter (PRD §4.7): participant-selectable labels only. */}
@@ -1079,7 +1099,11 @@ function BoardQuestionCard({
                 aria-label="Your reply"
                 rows={2}
                 className="w-full ink-border bg-transparent font-editorial px-3 py-2 resize-none"
-                style={{ fontSize: '16px', background: 'var(--bone)', minHeight: 64 }}
+                style={{
+                  fontSize: '16px',
+                  background: 'var(--bone)',
+                  minHeight: 64,
+                }}
               />
               <div className="flex items-center justify-between mt-1">
                 <span className="ticker tabular-nums text-[10px] tracking-widest opacity-60">
@@ -1217,7 +1241,11 @@ function MyQuestionCard({
                 type="button"
                 onClick={onEditSave}
                 className="ink-border stamp ticker text-[11px] tracking-widest px-3 py-2"
-                style={{ background: 'var(--ink)', color: 'var(--bone)', minHeight: 44 }}
+                style={{
+                  background: 'var(--ink)',
+                  color: 'var(--bone)',
+                  minHeight: 44,
+                }}
               >
                 SAVE
               </button>
@@ -1233,7 +1261,9 @@ function MyQuestionCard({
           {question.replies.length > 0 && (
             <div
               className="mt-2 pl-3 border-l-2"
-              style={{ borderColor: question.status === 'LIVE' ? 'var(--ink)' : 'var(--marigold)' }}
+              style={{
+                borderColor: question.status === 'LIVE' ? 'var(--ink)' : 'var(--marigold)',
+              }}
             >
               {question.status !== 'LIVE' && (
                 <p className="ticker text-[10px] tracking-widest opacity-70">

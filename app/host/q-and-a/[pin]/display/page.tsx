@@ -4,6 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useMemo, useState } from 'react';
 import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { publicHost, publicUrl } from '@/lib/public-origin';
+import { DEFAULT_QA_DISPLAY_SETTINGS } from '@/lib/qa';
 import { useSocket } from '@/lib/socket';
 import type {
   QADisplaySettings,
@@ -15,11 +16,7 @@ import type {
 import { selectQADisplayQuestions } from './display-utils';
 
 const DEFAULT_DISPLAY_SETTINGS: QADisplaySettings = {
-  sort: 'popular',
-  labelFilter: null,
-  visibleCount: 4,
-  showTicker: true,
-  highlightFullscreen: true,
+  ...DEFAULT_QA_DISPLAY_SETTINGS,
 };
 
 type DisplayAttachAck = { state: QAPublicState } | { error: string };
@@ -122,6 +119,17 @@ export default function QAndADisplay({ params }: { params: Promise<{ pin: string
     return (state?.questions ?? []).find((question) => question.id === highlightedId) ?? null;
   }, [state?.highlightedQuestionId, state?.questions]);
 
+  // Slido-style "latest question" slot: surface the newest submission under
+  // the board when the sort order has pushed it off the visible list.
+  const latest = useMemo(() => {
+    const list = state?.questions ?? [];
+    if (list.length === 0) return null;
+    const newest = list.reduce((acc, question) =>
+      question.submittedAt > acc.submittedAt ? question : acc,
+    );
+    return board.some((question) => question.id === newest.id) ? null : newest;
+  }, [state?.questions, board]);
+
   const status: QASessionStatus = state?.status ?? 'OPEN';
   const statusCopy =
     status === 'ENDED'
@@ -176,10 +184,14 @@ export default function QAndADisplay({ params }: { params: Promise<{ pin: string
             title={state?.title ?? 'Audience Q&A'}
             description={state?.description ?? null}
             questions={board}
+            latest={latest}
             labels={labelNames}
             participantCount={state?.participantCount ?? 0}
             questionCount={totalQuestions}
-            ticker={settings.showTicker}
+            sort={settings.sort}
+            pin={pin}
+            joinUrl={joinUrl}
+            joinHost={joinHost}
             activeLabel={
               settings.labelFilter ? (labelNames.get(settings.labelFilter) ?? null) : null
             }
@@ -299,28 +311,43 @@ function CollectingLobby({
   );
 }
 
+const SORT_COPY: Record<QADisplaySettings['sort'], string> = {
+  popular: 'POPULAR',
+  recent: 'NEWEST FIRST',
+  oldest: 'OLDEST FIRST',
+};
+
 function QuestionBoard({
   title,
   description,
   questions,
+  latest,
   labels,
   participantCount,
   questionCount,
-  ticker,
+  sort,
+  pin,
+  joinUrl,
+  joinHost,
   activeLabel,
 }: {
   title: string;
   description: string | null;
   questions: QAPublicQuestion[];
+  latest: QAPublicQuestion | null;
   labels: Map<string, string>;
   participantCount: number;
   questionCount: number;
-  ticker: boolean;
+  sort: QADisplaySettings['sort'];
+  pin: string;
+  joinUrl: string;
+  joinHost: string;
   activeLabel: string | null;
 }) {
   // Scale type with board density so cards never paint over each other:
-  // fewer questions get poster type, a full board drops to one clamped line.
-  // Short screens (e.g. 720p projectors) shift one density tier down.
+  // fewer questions get poster type and room to wrap several lines, a full
+  // board drops to a tighter clamp. Short screens (e.g. 720p projectors)
+  // shift one density tier down.
   const [shortScreen, setShortScreen] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia('(max-height: 899px)');
@@ -334,107 +361,163 @@ function QuestionBoard({
   // as a ranking at a glance; with no votes yet, every pill stays neutral.
   const topScore = Math.max(...questions.map((question) => question.score));
 
-  const density = questions.length + (shortScreen ? 2 : 0);
+  const density = questions.length + (latest ? 1 : 0) + (shortScreen ? 2 : 0);
   const dense = density >= 5;
-  const clampLines = density <= 3 ? 'line-clamp-2' : 'line-clamp-1';
+  const clampLines =
+    density <= 2
+      ? 'line-clamp-5'
+      : density <= 4
+        ? 'line-clamp-4'
+        : density <= 6
+          ? 'line-clamp-3'
+          : 'line-clamp-2';
   const questionFontSize =
     density <= 2
-      ? 'clamp(36px, 4.5vw, 76px)'
+      ? 'clamp(32px, 4vw, 64px)'
       : density <= 4
-        ? 'clamp(24px, 2.4vw, 46px)'
-        : 'clamp(18px, 1.7vw, 32px)';
+        ? 'clamp(22px, 2.2vw, 42px)'
+        : 'clamp(16px, 1.6vw, 28px)';
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col">
-      <div className="shrink-0 flex items-end justify-between gap-8">
+    <div className="flex flex-1 min-h-0 gap-10">
+      <aside className="w-[300px] shrink-0 flex flex-col justify-between">
         <div>
           <p className="chyron mb-3" style={{ color: 'var(--vermilion)' }}>
-            QUESTION BOARD · LIVE WIRE
+            QUESTION BOARD
           </p>
           <h1
             className="font-editorial leading-none"
-            style={{ fontSize: 'clamp(44px, 5vw, 86px)' }}
+            style={{ fontSize: 'clamp(32px, 2.6vw, 52px)' }}
           >
             {title}
           </h1>
           {description && (
-            <p className="font-editorial italic text-2xl mt-2 opacity-70">{description}</p>
+            <p className="font-editorial italic text-xl mt-2 opacity-70">{description}</p>
           )}
         </div>
-        <div className="text-right ticker text-[12px] tracking-widest opacity-75">
-          <p>
+        <div>
+          <div className="ink-border inline-block p-3" style={{ background: 'var(--bone)' }}>
+            {joinUrl ? (
+              <QRCodeSVG
+                value={joinUrl}
+                size={150}
+                bgColor="transparent"
+                fgColor="var(--ink)"
+                level="M"
+              />
+            ) : (
+              <div style={{ width: 150, height: 150 }} aria-hidden />
+            )}
+          </div>
+          <p className="ticker mt-5 text-[12px] tracking-widest opacity-70">JOIN AT</p>
+          <p className="font-editorial text-2xl mt-1">{joinHost || 'primetime.local'}/join</p>
+          <p
+            className="display-num ticker mt-3 tabular-nums"
+            style={{
+              fontSize: 'clamp(44px, 4vw, 72px)',
+              lineHeight: 0.9,
+              letterSpacing: '0.06em',
+            }}
+          >
+            {pin || '······'}
+          </p>
+          <p className="ticker mt-5 text-[11px] tracking-widest opacity-70">
             {String(participantCount).padStart(2, '0')} AUDIENCE ·{' '}
             {String(questionCount).padStart(2, '0')} QUESTIONS
           </p>
-          {activeLabel && <p>FILTER · {activeLabel.toUpperCase()}</p>}
         </div>
-      </div>
+      </aside>
 
-      <div
-        className="mt-7 grid flex-1 min-h-0 overflow-hidden grid-cols-12 gap-4"
-        style={{ gridAutoRows: 'minmax(min-content, 1fr)' }}
-      >
-        {questions.map((question, index) => (
-          <article
-            key={question.id}
-            className={`col-span-12 overflow-hidden ink-border flex flex-col ${
-              dense
-                ? 'p-4 justify-center gap-2'
-                : density <= 2
-                  ? 'p-5 justify-between'
-                  : 'p-4 justify-between'
-            }`}
-            style={{
-              background: question.highlighted ? 'var(--ink)' : 'var(--bone)',
-              color: question.highlighted ? 'var(--bone)' : 'var(--ink)',
-            }}
-          >
-            <div className="shrink-0 flex items-center justify-between gap-6">
-              <div className="flex items-baseline gap-4 min-w-0">
-                <span className="ticker text-[13px] tracking-widest opacity-70">
-                  #{String(index + 1).padStart(2, '0')}
-                </span>
-                {dense && (
-                  <QuestionMeta
-                    question={question}
-                    labels={labels}
-                    inverted={question.highlighted}
-                    compact
-                  />
-                )}
-              </div>
-              <ScorePill
-                question={question}
-                inverted={question.highlighted}
-                small={dense}
-                numberOnly
-                accent={question.score === topScore && topScore > 0}
+      <div className="flex flex-1 min-h-0 flex-col">
+        <div className="shrink-0 flex items-center justify-between ticker text-[12px] tracking-widest opacity-75">
+          <span>
+            {SORT_COPY[sort]}
+            {activeLabel ? ` · FILTER ${activeLabel.toUpperCase()}` : ''}
+          </span>
+          <span>{String(questionCount).padStart(2, '0')} QUESTIONS</span>
+        </div>
+
+        <div
+          className="mt-4 grid flex-1 min-h-0 overflow-hidden gap-3"
+          style={{ gridAutoRows: 'minmax(min-content, 1fr)' }}
+        >
+          {questions.map((question) => (
+            <QuestionCard
+              key={question.id}
+              question={question}
+              labels={labels}
+              dense={dense}
+              clampLines={clampLines}
+              fontSize={questionFontSize}
+              accent={question.score === topScore && topScore > 0}
+            />
+          ))}
+        </div>
+
+        {latest && (
+          <div className="shrink-0 mt-4">
+            <p className="ticker text-[11px] tracking-widest opacity-70 text-center">
+              LATEST QUESTION
+            </p>
+            <div className="mt-2 grid">
+              <QuestionCard
+                question={latest}
+                labels={labels}
+                dense
+                clampLines="line-clamp-2"
+                fontSize="clamp(16px, 1.6vw, 28px)"
+                accent={false}
               />
             </div>
-            <p
-              className={`font-editorial leading-tight shrink-0 ${dense ? '' : 'mt-2'} ${clampLines}`}
-              style={{ fontSize: questionFontSize }}
-            >
-              {question.text}
-            </p>
-            {!dense && (
-              <QuestionMeta
-                question={question}
-                labels={labels}
-                inverted={question.highlighted}
-                tight={density > 2}
-              />
-            )}
-          </article>
-        ))}
+          </div>
+        )}
       </div>
-
-      {ticker && (
-        <div className="shrink-0 mt-5 ticker text-[12px] tracking-widest opacity-75 overflow-hidden whitespace-nowrap">
-          {questions.map((question) => question.text).join('  ·  ')}
-        </div>
-      )}
     </div>
+  );
+}
+
+function QuestionCard({
+  question,
+  labels,
+  dense,
+  clampLines,
+  fontSize,
+  accent,
+}: {
+  question: QAPublicQuestion;
+  labels: Map<string, string>;
+  dense: boolean;
+  clampLines: string;
+  fontSize: string;
+  accent: boolean;
+}) {
+  return (
+    <article
+      className={`overflow-hidden ink-border flex flex-col justify-start ${
+        dense ? 'px-4 py-3 gap-1.5' : 'p-5 gap-2'
+      }`}
+      style={{
+        background: question.highlighted ? 'var(--ink)' : 'var(--bone)',
+        color: question.highlighted ? 'var(--bone)' : 'var(--ink)',
+      }}
+    >
+      <div className="shrink-0 flex items-center justify-between gap-6">
+        <QuestionMeta question={question} labels={labels} inverted={question.highlighted} compact />
+        <ScorePill
+          question={question}
+          inverted={question.highlighted}
+          small={dense}
+          numberOnly
+          accent={accent}
+        />
+      </div>
+      <p
+        className={`font-editorial leading-tight flex-1 min-h-0 ${clampLines}`}
+        style={{ fontSize }}
+      >
+        {question.text}
+      </p>
+    </article>
   );
 }
 
@@ -518,21 +601,19 @@ function QuestionMeta({
   inverted = false,
   centered = false,
   compact = false,
-  tight = false,
 }: {
   question: QAPublicQuestion;
   labels: Map<string, string>;
   inverted?: boolean;
   centered?: boolean;
   compact?: boolean;
-  tight?: boolean;
 }) {
   const visibleLabels = question.labelIds
     .map((labelId) => labels.get(labelId))
     .filter((label): label is string => Boolean(label));
   return (
     <div
-      className={`${compact ? 'min-w-0' : tight ? 'mt-2' : 'mt-5'} shrink-0 flex flex-wrap gap-2 ${centered ? 'justify-center' : 'items-center'}`}
+      className={`${compact ? 'min-w-0' : 'mt-5'} shrink-0 flex flex-wrap gap-2 ${centered ? 'justify-center' : 'items-center'}`}
     >
       <span className="ticker text-[12px] tracking-widest opacity-70">
         {question.authorDisplayName ?? 'ANONYMOUS'} · {question.upvotes} UP
