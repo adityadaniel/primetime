@@ -3408,7 +3408,7 @@ async function assertQaFullLifecycleCsvExport() {
       (await qaEmit(host, 'qa:host:label:assign', {
         pin,
         questionId: q1Id,
-        labelIds: [labelId],
+        labelId,
       })) as { ok: true } | { error: string },
       'assign label',
     );
