@@ -330,7 +330,7 @@ export const fixtures: Fixture[] = [
     label: 'Lobby — 150 players (cap)',
     category: 'shared',
     state: lobby150,
-    notes: 'Player cap reached (PLAYER_CAP=150).',
+    notes: 'Player cap reached (lib/constants.ts PLAYER_CAP=150).',
   },
 
   {

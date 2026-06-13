@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { Shape } from '@/components/Shape';
 
 const DIFFERENTIATORS: Array<{ index: string; title: string; body: string }> = [
@@ -56,14 +56,11 @@ export default function HomePage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden grain">
-      <CornerMarks />
-
       <header className="relative z-10 px-8 pt-6 flex items-center justify-between">
         <Chyron label="PRIMETIME / NETWORK MASTER" number="00" />
         <div className="flex items-center gap-6">
           <FrameCounter index={0} />
           <Clock />
-          <OnAir live={false} />
         </div>
       </header>
 

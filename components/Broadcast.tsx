@@ -15,56 +15,6 @@ export function FrameCounter({ index, dark = false }: { index: number; dark?: bo
   );
 }
 
-export function OnAir({ live = true, dark = false }: { live?: boolean; dark?: boolean }) {
-  return (
-    <div className="flex items-center gap-2">
-      {live ? (
-        <span className="live-dot" />
-      ) : (
-        <span
-          className="block w-[9px] h-[9px] rounded-full"
-          style={{ background: dark ? 'var(--ash)' : 'var(--ash)' }}
-        />
-      )}
-      <span
-        className="ticker tracking-widest text-[11px]"
-        style={{ color: dark ? 'var(--bone)' : 'var(--ink)' }}
-      >
-        {live ? 'ON AIR' : 'STANDBY'}
-      </span>
-    </div>
-  );
-}
-
-export function CornerMarks({ dark = false, fixed = false }: { dark?: boolean; fixed?: boolean }) {
-  const color = dark ? 'var(--bone)' : 'var(--ink)';
-  const base = fixed ? 'fixed' : 'absolute';
-  return (
-    <>
-      <span
-        className={`${base} top-3 left-3 w-3 h-3 border-t-2 border-l-2`}
-        style={{ borderColor: color }}
-        aria-hidden
-      />
-      <span
-        className={`${base} top-3 right-3 w-3 h-3 border-t-2 border-r-2`}
-        style={{ borderColor: color }}
-        aria-hidden
-      />
-      <span
-        className={`${base} bottom-3 left-3 w-3 h-3 border-b-2 border-l-2`}
-        style={{ borderColor: color }}
-        aria-hidden
-      />
-      <span
-        className={`${base} bottom-3 right-3 w-3 h-3 border-b-2 border-r-2`}
-        style={{ borderColor: color }}
-        aria-hidden
-      />
-    </>
-  );
-}
-
 export function Clock({ dark = false }: { dark?: boolean }) {
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {

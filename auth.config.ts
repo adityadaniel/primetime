@@ -3,7 +3,8 @@ import type { NextAuthConfig } from 'next-auth';
 export function isPublicHostDisplayPath(pathname: string) {
   return (
     /^\/host\/[^/]+\/display\/?$/.test(pathname) ||
-    /^\/host\/wordcloud\/[^/]+\/display\/?$/.test(pathname)
+    /^\/host\/wordcloud\/[^/]+\/display\/?$/.test(pathname) ||
+    /^\/host\/q-and-a\/[^/]+\/display\/?$/.test(pathname)
   );
 }
 

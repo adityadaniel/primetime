@@ -17,8 +17,8 @@ realtime transport behavior.
 ## Running
 
 ```bash
-# server (terminal 1) — cap must exceed the simulated player count
-PLAYER_CAP=150 ENABLE_SESSION_PERSISTENCE=false FANOUT_METRICS=1 npx tsx server.ts
+# server (terminal 1) — lib/constants.ts PLAYER_CAP must exceed the simulated player count
+ENABLE_SESSION_PERSISTENCE=false FANOUT_METRICS=1 npx tsx server.ts
 
 # socket-level fanout (terminal 2)
 PLAYERS=120 npx tsx scripts/load-fanout.ts

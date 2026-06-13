@@ -26,6 +26,7 @@ Traditional knowledge checks (polls, quizzes, tests) are passive and disengaging
 BROADCAST is not strictly a quiz product. Other activity types live in sister PRDs and reuse the same socket/PIN/host/player infrastructure:
 
 - **Word Cloud** (live typographic prompt) — see [`docs/wordcloud-prd.md`](docs/wordcloud-prd.md)
+- **Q&A** (live audience questions, voting, moderation, display) — see [`docs/q-and-a-prd.md`](docs/q-and-a-prd.md)
 
 ## 2. Users & Roles
 

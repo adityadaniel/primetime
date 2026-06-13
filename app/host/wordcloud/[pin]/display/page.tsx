@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { publicHost } from '@/lib/public-origin';
 import { useSocket } from '@/lib/socket';
 import { type LayoutPlacement, layoutWords } from '@/lib/wordcloud-layout';
@@ -84,14 +84,11 @@ export default function WordCloudDisplay({ params }: { params: Promise<{ pin: st
 
   return (
     <main className="relative min-h-screen w-full overflow-hidden grain">
-      <CornerMarks />
-
       <header className="px-8 pt-5 flex items-center justify-between">
         <Chyron label="LIVE FEED · WORD CLOUD" number="WC" />
         <div className="flex items-center gap-7">
           <FrameCounter index={Math.min(999, totalSubmissions)} />
           <Clock />
-          <OnAir live={live && !ended} />
         </div>
       </header>
       <SmpteBars className="h-2 mt-3" />

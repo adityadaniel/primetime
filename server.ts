@@ -36,8 +36,75 @@ import {
   startGame,
   submitAnswer,
 } from './lib/game';
+import {
+  DEFAULT_QA_DISPLAY_SETTINGS,
+  QA_DISPLAY_VISIBLE_COUNT_MAX,
+  type QAQuestionEntry,
+  type QAReplyEntry,
+  type QAState,
+  addHostReply as qaAddHostReply,
+  addParticipant as qaAddParticipant,
+  addParticipantReply as qaAddParticipantReply,
+  applyVote as qaApplyVote,
+  approveQuestion as qaApproveQuestion,
+  archiveQuestion as qaArchiveQuestion,
+  assignLabel as qaAssignLabel,
+  bindParticipantSocket as qaBindParticipantSocket,
+  createLabel as qaCreateLabel,
+  dismissQuestion as qaDismissQuestion,
+  editHostReply as qaEditHostReply,
+  editQuestion as qaEditQuestion,
+  highlightQuestion as qaHighlightQuestion,
+  hostState as qaHostState,
+  markAnswered as qaMarkAnswered,
+  personalState as qaPersonalState,
+  publicState as qaPublicState,
+  questionVoteCounts as qaQuestionVoteCounts,
+  removeVote as qaRemoveVote,
+  resolveJoinIdentity as qaResolveJoinIdentity,
+  restoreQuestion as qaRestoreQuestion,
+  setSessionStatus as qaSetSessionStatus,
+  setSubmissionsOpen as qaSetSubmissionsOpen,
+  setVotingOpen as qaSetVotingOpen,
+  submitQuestion as qaSubmitQuestion,
+  unassignLabel as qaUnassignLabel,
+  withdrawQuestion as qaWithdrawQuestion,
+} from './lib/qa';
+import { loadOrCreateState as loadOrCreateQaState } from './lib/qa-hydrate';
+import {
+  DuplicateLabelError,
+  addParticipant as qaRepoAddParticipant,
+  addQuestion as qaRepoAddQuestion,
+  addReply as qaRepoAddReply,
+  assignLabel as qaRepoAssignLabel,
+  createLabel as qaRepoCreateLabel,
+  editQuestionText as qaRepoEditQuestionText,
+  recordVote as qaRepoRecordVote,
+  removeVote as qaRepoRemoveVote,
+  setHighlightedQuestion as qaRepoSetHighlightedQuestion,
+  setQuestionStatus as qaRepoSetQuestionStatus,
+  setQuestionStatusWithModerationEvent as qaRepoSetQuestionStatusWithModerationEvent,
+  setSessionStatus as qaRepoSetSessionStatus,
+  setVotingOpen as qaRepoSetVotingOpen,
+  unassignLabel as qaRepoUnassignLabel,
+  updateReplyText as qaRepoUpdateReplyText,
+} from './lib/qa-repo';
 import { matchUploadsPath, resolveUploadFilePath, uploadContentType } from './lib/serve-upload';
-import type { AnswerIndex, Quiz } from './lib/types';
+import type {
+  AnswerIndex,
+  QADisplaySettings,
+  QADisplaySortMode,
+  QAHostState,
+  QAPersonalState,
+  QAPublicLabel,
+  QAPublicReply,
+  QAPublicState,
+  QAQuestionScore,
+  QAQuestionStatus,
+  QASessionStatus,
+  QAVoteType,
+  Quiz,
+} from './lib/types';
 import {
   addPlayerToCloud,
   isValidTransition,
@@ -216,29 +283,43 @@ void app.prepare().then(() => {
       }
       const cookieHeader = socket.handshake.headers.cookie ?? '';
       const cookies = parseRawCookieHeader(cookieHeader);
-      let token: string | null = null;
-      let salt = 'authjs.session-token';
+      // A browser can hold several session cookies at once (e.g. a stale
+      // authjs.session-token from an old dev secret next to the live
+      // __Secure-authjs.session-token), so try each candidate and keep the
+      // first one that actually decrypts instead of stopping at the first
+      // that exists.
+      let userId: string | null = null;
+      const failures: string[] = [];
       for (const cookieName of COOKIE_NAMES) {
-        token = readCookieValue(cookies, cookieName);
-        if (token) {
-          salt = cookieName;
-          break;
+        const token = readCookieValue(cookies, cookieName);
+        if (!token) continue;
+        try {
+          const decoded = await decodeAuthJwt({
+            token,
+            secret: authSecret,
+            salt: cookieName,
+          });
+          const id =
+            decoded && typeof decoded === 'object' ? (decoded as { id?: unknown }).id : null;
+          if (typeof id === 'string') {
+            userId = id;
+            break;
+          }
+        } catch (err) {
+          failures.push(`${cookieName}: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
-      if (!token) {
-        socket.data.userId = null;
-        return next();
+      // Stale cookies that fail to decrypt are routine (old dev secrets,
+      // other apps on localhost) as long as one candidate works — only warn
+      // when every present session cookie failed and the socket stays
+      // anonymous despite carrying credentials.
+      if (userId === null && failures.length > 0) {
+        console.warn(`[socket auth] no session cookie decrypted (${failures.join('; ')})`);
       }
-      const decoded = await decodeAuthJwt({
-        token,
-        secret: authSecret,
-        salt,
-      });
-      const id = decoded && typeof decoded === 'object' ? (decoded as { id?: unknown }).id : null;
-      socket.data.userId = typeof id === 'string' ? id : null;
+      socket.data.userId = userId;
       next();
     } catch (err) {
-      console.warn('[socket auth] decode failed:', err);
+      console.warn('[socket auth] unexpected failure:', err);
       socket.data.userId = null;
       next();
     }
@@ -252,6 +333,29 @@ void app.prepare().then(() => {
   const wcSocketToPin = new Map<string, { pin: string; role: 'host' | 'player' }>();
   const wcLastSubmitAt = new Map<string, number>();
   const WC_RATE_LIMIT_MS = 800;
+
+  const qaStates = new Map<string, QAState>();
+  const qaSessionControlQueues = new Map<string, Promise<void>>();
+  const qaSocketToPin = new Map<
+    string,
+    { pin: string; role: 'host' | 'display' | 'participant' }
+  >();
+  // Per-participant submit throttle (WC_RATE_LIMIT_MS pattern). Questions are
+  // longer-form than word-cloud words, so the window is wider: a human typing
+  // a real question never hits it, rapid-fire scripts do. Only accepted
+  // submissions arm the window so a typo'd empty submit doesn't burn it.
+  const qaLastSubmitAt = new Map<string, number>();
+  const QA_SUBMIT_RATE_LIMIT_MS = 1_000;
+  // Sanity cap on labels per submission (MID-340): a session never has more
+  // than a handful of labels, so anything past this is a hostile payload.
+  const QA_LABELS_PER_QUESTION_CAP = 20;
+
+  // Vote-burst fanout guard (MID-336, PRD §9): nothing public changes per
+  // vote except the affected questions' counts, so per-room dirty question
+  // ids coalesce into one compact `qa:scores` delta per tick instead of a
+  // full qa:state emit per vote. Clients patch scores and re-sort locally.
+  const qaPendingScoreFlushes = new Map<string, NodeJS.Timeout>();
+  const qaDirtyScores = new Map<string, Set<string>>();
 
   function isValidStatus(v: unknown): v is WordCloudStateStatus {
     return v === 'LOBBY' || v === 'LIVE' || v === 'PAUSED' || v === 'ENDED';
@@ -311,12 +415,133 @@ void app.prepare().then(() => {
     io.to(`wc:${state.pin}`).emit('wordcloud:state', wcSnapshot(state));
   }
 
+  // Public projection only: the qa:${pin} room mixes host, displays, and
+  // participants, so personal/private payloads must never go through here —
+  // they are targeted at a single participant socket instead.
+  function qaEmitPublicState(state: QAState) {
+    // A full snapshot carries the latest scores, so it supersedes (and
+    // cancels) any pending coalesced score delta for this room.
+    const pending = qaPendingScoreFlushes.get(state.pin);
+    if (pending) {
+      clearTimeout(pending);
+      qaPendingScoreFlushes.delete(state.pin);
+    }
+    qaDirtyScores.delete(state.pin);
+    io.to(`qa:${state.pin}`).emit('qa:state', qaPublicState(state));
+    // Anything that changes the public board also changes the host board.
+    qaEmitHostState(state);
+  }
+
+  // Host control projection (MID-337): includes IN_REVIEW questions and
+  // counts by state, so it is targeted at the host socket and never the
+  // mixed qa:${pin} room.
+  function qaEmitHostState(state: QAState) {
+    if (!state.hostSocketId) return;
+    io.to(state.hostSocketId).emit('qa:host:state', qaHostState(state));
+  }
+
+  function qaEmitDisplaySettings(state: QAState) {
+    io.to(`qa:${state.pin}`).emit('qa:display:settings', { ...state.displaySettings });
+    qaEmitHostState(state);
+  }
+
+  function qaClampDisplayVisibleCount(value: unknown): number | null {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+    return Math.min(QA_DISPLAY_VISIBLE_COUNT_MAX, Math.max(1, Math.round(value)));
+  }
+
+  function qaNormalizeDisplaySettingsPatch(
+    state: QAState,
+    p: Record<string, unknown>,
+  ): Partial<QADisplaySettings> | { error: string } {
+    const patch: Partial<QADisplaySettings> = {};
+    if (p.sort !== undefined) {
+      if (p.sort !== 'popular' && p.sort !== 'recent' && p.sort !== 'oldest')
+        return { error: 'invalid' };
+      patch.sort = p.sort as QADisplaySortMode;
+    }
+    if (p.labelFilter !== undefined) {
+      if (p.labelFilter === null || p.labelFilter === '') {
+        patch.labelFilter = null;
+      } else if (typeof p.labelFilter === 'string') {
+        const label = state.labels.get(p.labelFilter);
+        if (!label) return { error: 'unknown_label' };
+        if (!label.participantSelectable) return { error: 'private_label' };
+        patch.labelFilter = p.labelFilter;
+      } else {
+        return { error: 'invalid' };
+      }
+    }
+    if (p.visibleCount !== undefined) {
+      const visibleCount = qaClampDisplayVisibleCount(p.visibleCount);
+      if (visibleCount === null) return { error: 'invalid' };
+      patch.visibleCount = visibleCount;
+    }
+    if (p.showTicker !== undefined) {
+      if (typeof p.showTicker !== 'boolean') return { error: 'invalid' };
+      patch.showTicker = p.showTicker;
+    }
+    if (p.highlightFullscreen !== undefined) {
+      if (typeof p.highlightFullscreen !== 'boolean') return { error: 'invalid' };
+      patch.highlightFullscreen = p.highlightFullscreen;
+    }
+    return patch;
+  }
+
+  // Personal projection push (MID-338): when a host moderation action changes
+  // a participant's own question (approve/dismiss/restore), the owner's
+  // currently-bound socket(s) get a fresh personal state. Targeted emits
+  // only — personal state never goes through the mixed qa:${pin} room.
+  function qaEmitPersonalState(state: QAState, participantId: string) {
+    const personal = qaPersonalState(state, participantId);
+    if (!personal) return;
+    for (const [socketId, pid] of state.socketToParticipant.entries()) {
+      if (pid === participantId) io.to(socketId).emit('qa:personal', personal);
+    }
+  }
+
+  function qaFlushScores(pin: string) {
+    const dirty = qaDirtyScores.get(pin);
+    qaDirtyScores.delete(pin);
+    const state = qaStates.get(pin);
+    if (!state || !dirty || dirty.size === 0) return;
+    const scores: QAQuestionScore[] = [];
+    for (const questionId of dirty) {
+      const question = state.questions.get(questionId);
+      // Questions that left LIVE since the vote landed stay private.
+      if (!question || question.status !== 'LIVE') continue;
+      scores.push({ questionId, ...qaQuestionVoteCounts(question) });
+    }
+    if (scores.length === 0) return;
+    io.to(`qa:${pin}`).emit('qa:scores', { pin, scores });
+    recordBroadcast('other', io.sockets.adapter.rooms.get(`qa:${pin}`)?.size ?? 0, 0);
+  }
+
+  function qaScheduleScoreBroadcast(pin: string, questionId: string) {
+    let dirty = qaDirtyScores.get(pin);
+    if (!dirty) {
+      dirty = new Set();
+      qaDirtyScores.set(pin, dirty);
+    }
+    dirty.add(questionId);
+    if (qaPendingScoreFlushes.has(pin)) return;
+    const t = setTimeout(() => {
+      qaPendingScoreFlushes.delete(pin);
+      qaFlushScores(pin);
+    }, BROADCAST_COALESCE_MS);
+    qaPendingScoreFlushes.set(pin, t);
+  }
+
   // F2: a socket is authorized as host iff (a) it owns the host slot for this
   // state AND (b) the authenticated user matches state.hostUserId, OR the
   // session is anonymous (state.hostUserId === null) and any socket bound as
   // host can drive it. Trusting hostSocketId alone is insufficient because
   // sockets reconnect freely and another socket could race to claim the slot.
-  function isHostAuthorized(socket: Socket, state: WordCloudState): boolean {
+  // Structural param so word cloud and Q&A states share the same gate.
+  function isHostAuthorized(
+    socket: Socket,
+    state: { hostUserId: string | null; hostSocketId?: string },
+  ): boolean {
     const userId = (socket.data as { userId?: string | null }).userId ?? null;
     if (state.hostUserId === null) {
       return state.hostSocketId === socket.id;
@@ -860,6 +1085,1442 @@ void app.prepare().then(() => {
       );
     });
 
+    // Q&A socket foundation (MID-334): room lifecycle, host/display attach,
+    // participant join with privacy modes, reconnect-safe identity. Attach
+    // handlers are idempotent so an HMR/dev reconnect (new socket id, see
+    // docs/2026-06-05-socket-hmr-broadcast-bug.md) can simply re-emit attach
+    // and land back in qa:${pin} with fresh state.
+    socket.on('qa:host:attach', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:host:attach] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (
+        res:
+          | { pin: string; sessionId: string; state: QAPublicState; hostState: QAHostState }
+          | { error: string },
+      ) => void;
+      if (!payload || typeof payload !== 'object') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const p = payload as Record<string, unknown>;
+      if (!isPin(p.pin)) {
+        cb({ error: 'invalid_pin' });
+        return;
+      }
+      if (typeof p.sessionId !== 'string' || p.sessionId.length === 0) {
+        cb({ error: 'missing_session' });
+        return;
+      }
+      let state: QAState | null;
+      try {
+        state = await loadOrCreateQaState(qaStates, p.pin);
+      } catch (err) {
+        console.error('[qa-repo] loadOrCreateState (host attach)', err);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      if (!state) {
+        cb({ error: 'not_found' });
+        return;
+      }
+      if (state.sessionId !== p.sessionId) {
+        cb({ error: 'session_mismatch' });
+        return;
+      }
+      // Anonymous sessions (hostUserId === null) can be bound by any socket —
+      // smoke harness and dev flows. Owned sessions require the authenticated
+      // user to match the host.
+      const userId = (socket.data as { userId?: string | null }).userId ?? null;
+      if (state.hostUserId !== null && state.hostUserId !== userId) {
+        cb({ error: 'forbidden' });
+        return;
+      }
+      state.hostSocketId = socket.id;
+      qaSocketToPin.set(socket.id, { pin: state.pin, role: 'host' });
+      socket.join(`qa:${state.pin}`);
+      cb({
+        pin: state.pin,
+        sessionId: state.sessionId,
+        state: qaPublicState(state),
+        hostState: qaHostState(state),
+      });
+    });
+
+    socket.on('qa:display:attach', async (payload: unknown, ack: unknown) => {
+      const cb =
+        typeof ack === 'function'
+          ? (ack as (res: { state: QAPublicState } | { error: string }) => void)
+          : undefined;
+      const p = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
+      if (!isPin(p.pin)) {
+        cb?.({ error: 'invalid_pin' });
+        return;
+      }
+      let state: QAState | null;
+      try {
+        state = await loadOrCreateQaState(qaStates, p.pin);
+      } catch (err) {
+        console.error('[qa-repo] loadOrCreateState (display attach)', err);
+        cb?.({ error: 'persistence_failed' });
+        return;
+      }
+      if (!state) {
+        cb?.({ error: 'not_found' });
+        return;
+      }
+      state.displaySocketIds.add(socket.id);
+      qaSocketToPin.set(socket.id, { pin: state.pin, role: 'display' });
+      socket.join(`qa:${state.pin}`);
+      // Displays are public and get the public projection only.
+      const publicSnapshot = qaPublicState(state);
+      socket.emit('qa:state', publicSnapshot);
+      socket.emit('qa:display:settings', { ...state.displaySettings });
+      cb?.({ state: publicSnapshot });
+    });
+
+    socket.on('qa:participant:join', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:participant:join] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (
+        res:
+          | {
+              participantId: string;
+              reconnected: boolean;
+              state: QAPublicState;
+              personal: QAPersonalState;
+            }
+          | { error: string },
+      ) => void;
+      if (!payload || typeof payload !== 'object') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const p = payload as Record<string, unknown>;
+      if (!isPin(p.pin)) {
+        cb({ error: 'invalid_pin' });
+        return;
+      }
+      let state: QAState | null;
+      try {
+        state = await loadOrCreateQaState(qaStates, p.pin);
+      } catch (err) {
+        console.error('[qa-repo] loadOrCreateState (participant join)', err);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      if (!state) {
+        cb({ error: 'not_found' });
+        return;
+      }
+
+      // Reconnect path: a stored participantId from a prior socket (page
+      // refresh, mobile sleep, HMR) rebinds the new socket without creating a
+      // duplicate QAParticipant. Allowed even after the session ended so a
+      // returning participant can still view the final state.
+      const providedParticipantId = typeof p.participantId === 'string' ? p.participantId : null;
+      if (providedParticipantId && state.participants.has(providedParticipantId)) {
+        qaBindParticipantSocket(state, socket.id, providedParticipantId);
+        qaSocketToPin.set(socket.id, { pin: state.pin, role: 'participant' });
+        socket.join(`qa:${state.pin}`);
+        const personal = qaPersonalState(state, providedParticipantId);
+        if (!personal) {
+          cb({ error: 'unknown_participant' });
+          return;
+        }
+        // Personal state goes to the joining socket only — never the room.
+        cb({
+          participantId: providedParticipantId,
+          reconnected: true,
+          state: qaPublicState(state),
+          personal,
+        });
+        return;
+      }
+
+      const displayName = typeof p.displayName === 'string' ? p.displayName : null;
+      const identity = qaResolveJoinIdentity(state, displayName);
+      if (!identity.ok) {
+        cb({ error: identity.reason });
+        return;
+      }
+
+      // Persist BEFORE accepting so we never bind a participant whose row
+      // failed to write; the in-memory entry is keyed by the DB id so
+      // ownership and votes line up across restarts.
+      let participantId: string;
+      try {
+        const row = await qaRepoAddParticipant({
+          sessionId: state.sessionId,
+          displayName: identity.displayName,
+        });
+        participantId = row.id;
+      } catch (err) {
+        console.error('[qa-repo] addParticipant', err);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      const added = qaAddParticipant(state, {
+        displayName: identity.displayName,
+        participantId,
+      });
+      if (!added.ok) {
+        cb({ error: added.reason });
+        return;
+      }
+      qaBindParticipantSocket(state, socket.id, participantId);
+      qaSocketToPin.set(socket.id, { pin: state.pin, role: 'participant' });
+      socket.join(`qa:${state.pin}`);
+      const personal = qaPersonalState(state, participantId);
+      if (!personal) {
+        cb({ error: 'unknown_participant' });
+        return;
+      }
+      cb({
+        participantId,
+        reconnected: false,
+        state: qaPublicState(state),
+        personal,
+      });
+      // participantCount changed: refresh the room's public projection.
+      qaEmitPublicState(state);
+    });
+
+    // Shared preamble for participant question actions (MID-335): the acting
+    // socket must already be bound to a participant in this room via
+    // qa:participant:join, so no hydration is needed — if the state isn't in
+    // memory the participant can't be bound to it either.
+    function qaResolveParticipantAction(
+      payload: unknown,
+    ): { state: QAState; participantId: string; p: Record<string, unknown> } | { error: string } {
+      if (!payload || typeof payload !== 'object') return { error: 'invalid' };
+      const p = payload as Record<string, unknown>;
+      if (!isPin(p.pin)) return { error: 'invalid_pin' };
+      const state = qaStates.get(p.pin);
+      if (!state) return { error: 'not_found' };
+      const participantId = state.socketToParticipant.get(socket.id);
+      if (!participantId) return { error: 'unknown_participant' };
+      return { state, participantId, p };
+    }
+
+    // Ack shape for submit/withdraw/edit. `personal` rides in the ack so it
+    // only ever reaches the acting participant's socket — never the room.
+    type QaActionAck =
+      | { questionId: string; status: string; personal: QAPersonalState }
+      | { error: string };
+
+    socket.on('qa:participant:submit', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:participant:submit] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: QaActionAck) => void;
+      const resolved = qaResolveParticipantAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, participantId, p } = resolved;
+      if (typeof p.text !== 'string') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      // Optional participant-selected labels (MID-340). Shape-validated here;
+      // lib/qa.ts enforces that each id exists and is participant-selectable.
+      let labelIds: string[] | undefined;
+      if (p.labelIds !== undefined) {
+        if (
+          !Array.isArray(p.labelIds) ||
+          p.labelIds.length > QA_LABELS_PER_QUESTION_CAP ||
+          !p.labelIds.every((id) => typeof id === 'string' && id.length > 0)
+        ) {
+          cb({ error: 'invalid' });
+          return;
+        }
+        labelIds = p.labelIds as string[];
+      }
+      if (state.status === 'ENDED') {
+        cb({ error: 'session_ended' });
+        return;
+      }
+      if (!state.submissionsOpen) {
+        cb({ error: 'submissions_closed' });
+        return;
+      }
+      const now = Date.now();
+      const last = qaLastSubmitAt.get(participantId) ?? 0;
+      if (now - last < QA_SUBMIT_RATE_LIMIT_MS) {
+        cb({ error: 'rate_limited' });
+        return;
+      }
+
+      // In-memory accept first (validates submissions-open, text, privacy),
+      // then persist BEFORE broadcasting — wordcloud:player:submit pattern.
+      const result = qaSubmitQuestion(state, {
+        participantId,
+        text: p.text,
+        isAnonymous: typeof p.isAnonymous === 'boolean' ? p.isAnonymous : undefined,
+        labelIds,
+      });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      qaLastSubmitAt.set(participantId, now);
+      const question = result.question;
+      try {
+        const row = await qaRepoAddQuestion({
+          sessionId: state.sessionId,
+          participantId,
+          text: question.text,
+          isAnonymous: question.isAnonymous,
+          authorDisplayName: question.authorDisplayName,
+          status: question.status === 'IN_REVIEW' ? 'IN_REVIEW' : 'LIVE',
+          labelIds: [...question.labelIds],
+        });
+        // Re-key the in-memory entry to the DB id so ownership, votes, and
+        // personal projections line up across restarts (lib/qa-hydrate.ts
+        // keys everything by DB ids).
+        state.questions.delete(question.id);
+        question.id = row.id;
+        state.questions.set(row.id, question);
+      } catch (err) {
+        console.error('[qa-repo] addQuestion', err);
+        state.questions.delete(question.id);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      const personal = qaPersonalState(state, participantId);
+      if (!personal) {
+        cb({ error: 'unknown_participant' });
+        return;
+      }
+      cb({ questionId: question.id, status: question.status, personal });
+      // Moderated submissions are IN_REVIEW: nothing public changed, so the
+      // room gets no broadcast and the question stays invisible to displays.
+      // The host board still updates — targeted at the host socket only.
+      if (question.status === 'LIVE') qaEmitPublicState(state);
+      else qaEmitHostState(state);
+    });
+
+    socket.on('qa:participant:withdraw', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:participant:withdraw] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: QaActionAck) => void;
+      const resolved = qaResolveParticipantAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, participantId, p } = resolved;
+      if (typeof p.questionId !== 'string') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const prevHighlight = state.highlightedQuestionId;
+      const result = qaWithdrawQuestion(state, { questionId: p.questionId, participantId });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      const question = state.questions.get(p.questionId);
+      try {
+        await qaRepoSetQuestionStatus({ questionId: p.questionId, status: 'WITHDRAWN' });
+      } catch (err) {
+        console.error('[qa-repo] setQuestionStatus (withdraw)', err);
+        if (question) {
+          question.status = result.from;
+          question.withdrawnAt = null;
+        }
+        state.highlightedQuestionId = prevHighlight;
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      // If the withdrawn question was highlighted, the in-memory transition
+      // already cleared it and the repo write cleared the persisted pointer
+      // in the same transaction (lib/qa-repo.ts applyQuestionStatus).
+      const personal = qaPersonalState(state, participantId);
+      if (!personal) {
+        cb({ error: 'unknown_participant' });
+        return;
+      }
+      cb({ questionId: p.questionId, status: 'WITHDRAWN', personal });
+      // Only a withdrawal out of LIVE changes the public board; one out of
+      // IN_REVIEW still changes the host board (review count, search pool).
+      if (result.from === 'LIVE') qaEmitPublicState(state);
+      else if (result.from === 'IN_REVIEW') qaEmitHostState(state);
+    });
+
+    // Participant edit window (PRD §4.5): allowed while the question is
+    // IN_REVIEW or LIVE — no wall-clock cap in v1. Editing a LIVE question
+    // returns it to review when moderation is enabled (enforced in lib/qa.ts).
+    socket.on('qa:participant:edit', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:participant:edit] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: QaActionAck) => void;
+      const resolved = qaResolveParticipantAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, participantId, p } = resolved;
+      if (typeof p.questionId !== 'string' || typeof p.text !== 'string') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const question = state.questions.get(p.questionId);
+      const snapshot = question
+        ? {
+            text: question.text,
+            originalText: question.originalText,
+            status: question.status,
+            highlightedQuestionId: state.highlightedQuestionId,
+          }
+        : null;
+      const result = qaEditQuestion(state, {
+        questionId: p.questionId,
+        text: p.text,
+        editor: { role: 'participant', participantId },
+      });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      const edited = result.question;
+      const statusChanged = snapshot !== null && snapshot.status !== edited.status;
+      try {
+        await qaRepoEditQuestionText({ questionId: edited.id, text: edited.text });
+        if (statusChanged) {
+          await qaRepoSetQuestionStatus({ questionId: edited.id, status: edited.status });
+        }
+      } catch (err) {
+        console.error('[qa-repo] editQuestion (participant)', err);
+        // Full in-memory rollback. If the text write landed but the status
+        // write failed, the DB keeps the new text — hydration would surface
+        // it, which is benign next to lying to the participant about status.
+        if (snapshot) {
+          edited.text = snapshot.text;
+          edited.originalText = snapshot.originalText;
+          edited.status = snapshot.status;
+          state.highlightedQuestionId = snapshot.highlightedQuestionId;
+        }
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      const personal = qaPersonalState(state, participantId);
+      if (!personal) {
+        cb({ error: 'unknown_participant' });
+        return;
+      }
+      cb({ questionId: edited.id, status: edited.status, personal });
+      // Public board changed if the question was LIVE before the edit
+      // (text update, or moderated edit pulling it back to review). An
+      // IN_REVIEW-only edit still refreshes the host board text.
+      if (snapshot?.status === 'LIVE' || edited.status === 'LIVE') qaEmitPublicState(state);
+      else qaEmitHostState(state);
+    });
+
+    // Participant voting (MID-336). One vote per participant per question is
+    // enforced twice: the in-memory votes map keys on participantId, and the
+    // DB has @@unique([questionId, participantId]) behind an upsert — so a
+    // reconnect or second tab collapsing onto the same participantId can
+    // never double-count. `type: null` removes the vote. The ack carries the
+    // server-derived counts for the voter only; the room gets a coalesced
+    // qa:scores delta, never a per-vote full-state emit.
+    socket.on('qa:participant:vote', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:participant:vote] missing ack — ignoring');
+        return;
+      }
+      type QaVoteAck =
+        | {
+            questionId: string;
+            vote: QAVoteType | null;
+            score: number;
+            upvotes: number;
+            downvotes: number;
+          }
+        | { error: string };
+      const cb = ack as (res: QaVoteAck) => void;
+      const resolved = qaResolveParticipantAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, participantId, p } = resolved;
+      if (typeof p.questionId !== 'string') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const type =
+        p.type === 'UP' || p.type === 'DOWN' ? p.type : p.type === null ? null : undefined;
+      if (type === undefined) {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const question = state.questions.get(p.questionId);
+      const prevVote = question?.votes.get(participantId) ?? null;
+
+      if (type === null) {
+        const result = qaRemoveVote(state, { questionId: p.questionId, participantId });
+        if (!result.ok) {
+          cb({ error: result.reason });
+          return;
+        }
+        // Persist BEFORE acking/broadcasting; roll the in-memory vote back if
+        // the delete fails so memory and DB never disagree.
+        if (result.removed) {
+          try {
+            await qaRepoRemoveVote({ questionId: p.questionId, participantId });
+          } catch (err) {
+            console.error('[qa-repo] removeVote', err);
+            if (question && prevVote) question.votes.set(participantId, prevVote);
+            cb({ error: 'persistence_failed' });
+            return;
+          }
+        }
+        cb({
+          questionId: p.questionId,
+          vote: null,
+          score: result.score,
+          upvotes: result.upvotes,
+          downvotes: result.downvotes,
+        });
+        if (result.removed && question?.status === 'LIVE') {
+          qaScheduleScoreBroadcast(state.pin, p.questionId);
+        }
+        return;
+      }
+
+      const result = qaApplyVote(state, { questionId: p.questionId, participantId, type });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      // Idempotent repeat (same vote again, e.g. a second tab): nothing
+      // changed, so skip the DB write and the room delta.
+      if (prevVote !== type) {
+        try {
+          await qaRepoRecordVote({ questionId: p.questionId, participantId, type });
+        } catch (err) {
+          console.error('[qa-repo] recordVote', err);
+          if (question) {
+            if (prevVote) question.votes.set(participantId, prevVote);
+            else question.votes.delete(participantId);
+          }
+          cb({ error: 'persistence_failed' });
+          return;
+        }
+      }
+      cb({
+        questionId: p.questionId,
+        vote: type,
+        score: result.score,
+        upvotes: result.upvotes,
+        downvotes: result.downvotes,
+      });
+      if (prevVote !== type) qaScheduleScoreBroadcast(state.pin, p.questionId);
+    });
+
+    // --- Q&A host moderation queue (MID-338) ---
+
+    // Shared preamble for host moderation actions: the state must already be
+    // in memory (the host attached to get a control surface), and the acting
+    // socket must pass the same host gate as word cloud host actions. On top
+    // of that ownership gate, moderation requires the acting socket to BE the
+    // attached host control socket for this pin — a participant/display
+    // socket from the same logged-in host user must not be able to moderate.
+    function qaResolveHostAction(
+      payload: unknown,
+    ): { state: QAState; p: Record<string, unknown> } | { error: string } {
+      if (!payload || typeof payload !== 'object') return { error: 'invalid' };
+      const p = payload as Record<string, unknown>;
+      if (!isPin(p.pin)) return { error: 'invalid_pin' };
+      const state = qaStates.get(p.pin);
+      if (!state) return { error: 'not_found' };
+      if (!isHostAuthorized(socket, state)) return { error: 'forbidden' };
+      const link = qaSocketToPin.get(socket.id);
+      if (state.hostSocketId !== socket.id || link?.role !== 'host' || link.pin !== state.pin) {
+        return { error: 'forbidden' };
+      }
+      return { state, p };
+    }
+
+    type QaDisplaySettingsAck = { ok: true; settings: QADisplaySettings } | { error: string };
+
+    socket.on('qa:host:display-settings', (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:host:display-settings] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: QaDisplaySettingsAck) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      const patch = qaNormalizeDisplaySettingsPatch(state, p);
+      if ('error' in patch) {
+        cb(patch);
+        return;
+      }
+      const next: QADisplaySettings = {
+        ...DEFAULT_QA_DISPLAY_SETTINGS,
+        ...state.displaySettings,
+        ...patch,
+      };
+      if (next.labelFilter) {
+        const label = state.labels.get(next.labelFilter);
+        if (!label?.participantSelectable) next.labelFilter = null;
+      }
+      state.displaySettings = next;
+      cb({ ok: true, settings: { ...state.displaySettings } });
+      qaEmitDisplaySettings(state);
+    });
+
+    type QaSessionControlAck =
+      | { ok: true; status: QASessionStatus; submissionsOpen: boolean; votingOpen: boolean }
+      | { error: string };
+
+    function qaSessionControlSnapshot(
+      state: QAState,
+    ): Exclude<QaSessionControlAck, { error: string }> {
+      return {
+        ok: true,
+        status: state.status,
+        submissionsOpen: state.submissionsOpen,
+        votingOpen: state.votingOpen,
+      };
+    }
+
+    function qaSnapshotSessionControls(state: QAState) {
+      return {
+        status: state.status,
+        submissionsOpen: state.submissionsOpen,
+        votingOpen: state.votingOpen,
+      };
+    }
+
+    function qaRestoreSessionControls(
+      state: QAState,
+      snapshot: { status: QASessionStatus; submissionsOpen: boolean; votingOpen: boolean },
+    ) {
+      state.status = snapshot.status;
+      state.submissionsOpen = snapshot.submissionsOpen;
+      state.votingOpen = snapshot.votingOpen;
+    }
+
+    function isQaSessionStatus(value: unknown): value is QASessionStatus {
+      return value === 'OPEN' || value === 'CLOSED' || value === 'ENDED';
+    }
+
+    function qaEnqueueSessionControl(
+      payload: unknown,
+      eventName: string,
+      task: () => Promise<void>,
+    ) {
+      if (!payload || typeof payload !== 'object') {
+        void task();
+        return;
+      }
+      const pin = (payload as Record<string, unknown>).pin;
+      if (!isPin(pin)) {
+        void task();
+        return;
+      }
+      const previous = qaSessionControlQueues.get(pin) ?? Promise.resolve();
+      const next = previous
+        .catch(() => undefined)
+        .then(task)
+        .finally(() => {
+          if (qaSessionControlQueues.get(pin) === next) qaSessionControlQueues.delete(pin);
+        });
+      qaSessionControlQueues.set(pin, next);
+      void next.catch((err) => console.error(`[${eventName}] session control queue`, err));
+    }
+
+    async function qaHandleSetSubmissionsOpen(payload: unknown, ack: unknown, eventName: string) {
+      if (typeof ack !== 'function') {
+        console.warn(`[${eventName}] missing ack — ignoring`);
+        return;
+      }
+      const cb = ack as (res: QaSessionControlAck) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      if (typeof p.open !== 'boolean') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const snapshot = qaSnapshotSessionControls(state);
+      const result = qaSetSubmissionsOpen(state, p.open);
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      try {
+        await qaRepoSetSessionStatus({ sessionId: state.sessionId, status: state.status });
+      } catch (err) {
+        console.error('[qa-repo] setSessionStatus (submissions)', err);
+        qaRestoreSessionControls(state, snapshot);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      cb(qaSessionControlSnapshot(state));
+      qaEmitPublicState(state);
+    }
+
+    async function qaHandleSetVotingOpen(payload: unknown, ack: unknown, eventName: string) {
+      if (typeof ack !== 'function') {
+        console.warn(`[${eventName}] missing ack — ignoring`);
+        return;
+      }
+      const cb = ack as (res: QaSessionControlAck) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      if (typeof p.open !== 'boolean') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const previous = state.votingOpen;
+      const result = qaSetVotingOpen(state, p.open);
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      try {
+        await qaRepoSetVotingOpen({ sessionId: state.sessionId, votingOpen: state.votingOpen });
+      } catch (err) {
+        console.error('[qa-repo] setVotingOpen', err);
+        state.votingOpen = previous;
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      cb(qaSessionControlSnapshot(state));
+      qaEmitPublicState(state);
+    }
+
+    async function qaHandleSetSessionStatus(
+      payload: unknown,
+      ack: unknown,
+      eventName: string,
+      forcedStatus?: QASessionStatus,
+    ) {
+      if (typeof ack !== 'function') {
+        console.warn(`[${eventName}] missing ack — ignoring`);
+        return;
+      }
+      const cb = ack as (res: QaSessionControlAck) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      const status = forcedStatus ?? p.status;
+      if (!isQaSessionStatus(status)) {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const snapshot = qaSnapshotSessionControls(state);
+      const result = qaSetSessionStatus(state, status);
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      try {
+        await qaRepoSetSessionStatus({ sessionId: state.sessionId, status });
+      } catch (err) {
+        console.error('[qa-repo] setSessionStatus', err);
+        qaRestoreSessionControls(state, snapshot);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      cb(qaSessionControlSnapshot(state));
+      qaEmitPublicState(state);
+    }
+
+    socket.on('qa:host:set-submissions', (payload: unknown, ack: unknown) =>
+      qaEnqueueSessionControl(payload, 'qa:host:set-submissions', () =>
+        qaHandleSetSubmissionsOpen(payload, ack, 'qa:host:set-submissions'),
+      ),
+    );
+    socket.on('qa:host:set-submissions-open', (payload: unknown, ack: unknown) =>
+      qaEnqueueSessionControl(payload, 'qa:host:set-submissions-open', () =>
+        qaHandleSetSubmissionsOpen(payload, ack, 'qa:host:set-submissions-open'),
+      ),
+    );
+    socket.on('qa:host:set-voting', (payload: unknown, ack: unknown) =>
+      qaEnqueueSessionControl(payload, 'qa:host:set-voting', () =>
+        qaHandleSetVotingOpen(payload, ack, 'qa:host:set-voting'),
+      ),
+    );
+    socket.on('qa:host:set-voting-open', (payload: unknown, ack: unknown) =>
+      qaEnqueueSessionControl(payload, 'qa:host:set-voting-open', () =>
+        qaHandleSetVotingOpen(payload, ack, 'qa:host:set-voting-open'),
+      ),
+    );
+    socket.on('qa:host:end', (payload: unknown, ack: unknown) =>
+      qaEnqueueSessionControl(payload, 'qa:host:end', () =>
+        qaHandleSetSessionStatus(payload, ack, 'qa:host:end', 'ENDED'),
+      ),
+    );
+    socket.on('qa:host:set-session-status', (payload: unknown, ack: unknown) =>
+      qaEnqueueSessionControl(payload, 'qa:host:set-session-status', () =>
+        qaHandleSetSessionStatus(payload, ack, 'qa:host:set-session-status'),
+      ),
+    );
+
+    // Single id or bulk (`questionIds`) — both normalize to a list. Bulk is
+    // capped to keep one event from holding the loop on a huge board.
+    const QA_BULK_MODERATION_CAP = 100;
+    function qaParseQuestionIds(p: Record<string, unknown>): string[] | null {
+      if (typeof p.questionId === 'string' && p.questionId.length > 0) return [p.questionId];
+      if (
+        Array.isArray(p.questionIds) &&
+        p.questionIds.length > 0 &&
+        p.questionIds.length <= QA_BULK_MODERATION_CAP &&
+        p.questionIds.every((id) => typeof id === 'string' && id.length > 0)
+      ) {
+        return [...new Set(p.questionIds as string[])];
+      }
+      return null;
+    }
+
+    type QaModerationOutcome = {
+      transitioned: { questionId: string; from: QAQuestionStatus; to: QAQuestionStatus }[];
+      failed: { questionId: string; error: string }[];
+    };
+
+    // Applies one host status action across a list of questions with the
+    // persist-before-broadcast contract per question: in-memory transition,
+    // then ONE transactional DB write covering the status change AND its
+    // QAModerationEvent so the export/audit trail can always explain why a
+    // question disappeared (PRD §4.3). If the transaction fails, the
+    // in-memory transition rolls back and the id reports persistence_failed.
+    // Bulk is per-question best-effort: one bad id never blocks the rest.
+    async function qaModerateQuestions(
+      state: QAState,
+      action: 'approve' | 'dismiss' | 'restore' | 'answered' | 'archive',
+      questionIds: string[],
+      bulk: boolean,
+    ): Promise<QaModerationOutcome> {
+      const hostUserId = (socket.data as { userId?: string | null }).userId ?? null;
+      const outcome: QaModerationOutcome = { transitioned: [], failed: [] };
+      for (const questionId of questionIds) {
+        const question = state.questions.get(questionId);
+        if (!question) {
+          outcome.failed.push({ questionId, error: 'unknown_question' });
+          continue;
+        }
+        // Full rollback snapshot: transitionQuestion stamps status timestamps
+        // and may clear the highlight, so capture everything it can touch.
+        const snapshot = {
+          status: question.status,
+          approvedAt: question.approvedAt,
+          answeredAt: question.answeredAt,
+          archivedAt: question.archivedAt,
+          dismissedAt: question.dismissedAt,
+          withdrawnAt: question.withdrawnAt,
+          highlightedQuestionId: state.highlightedQuestionId,
+        };
+        // Restore is status-directed (PRD §4.3): DISMISSED -> IN_REVIEW keeps
+        // the MID-338 moderation-queue behavior; ANSWERED/ARCHIVED -> LIVE is
+        // the MID-339 host-board restore. LIVE/IN_REVIEW/WITHDRAWN restores
+        // are still rejected by the transition matrix in lib/qa.ts.
+        const result =
+          action === 'approve'
+            ? qaApproveQuestion(state, { questionId })
+            : action === 'dismiss'
+              ? qaDismissQuestion(state, { questionId })
+              : action === 'restore'
+                ? qaRestoreQuestion(state, { questionId })
+                : action === 'answered'
+                  ? qaMarkAnswered(state, { questionId })
+                  : qaArchiveQuestion(state, { questionId });
+        if (!result.ok) {
+          outcome.failed.push({ questionId, error: result.reason });
+          continue;
+        }
+        try {
+          await qaRepoSetQuestionStatusWithModerationEvent({
+            questionId,
+            status: result.to,
+            sessionId: state.sessionId,
+            hostUserId,
+            action,
+            reason: bulk ? 'bulk' : null,
+          });
+        } catch (err) {
+          console.error(`[qa-repo] setQuestionStatusWithModerationEvent (${action})`, err);
+          rollbackQaQuestion(state, question, snapshot);
+          outcome.failed.push({ questionId, error: 'persistence_failed' });
+          continue;
+        }
+        // If the question left LIVE while highlighted, the in-memory
+        // transition already cleared the highlight and the transactional
+        // repo write cleared the persisted QASession.highlightedQuestionId
+        // pointer alongside the status + moderation event, so a later
+        // restore + hydration can never resurrect the highlight.
+        outcome.transitioned.push({ questionId, from: result.from, to: result.to });
+      }
+      return outcome;
+    }
+
+    function rollbackQaQuestion(
+      state: QAState,
+      question: QAQuestionEntry,
+      snapshot: {
+        status: QAQuestionStatus;
+        approvedAt: number | null;
+        answeredAt: number | null;
+        archivedAt: number | null;
+        dismissedAt: number | null;
+        withdrawnAt: number | null;
+        highlightedQuestionId: string | null;
+      },
+    ) {
+      question.status = snapshot.status;
+      question.approvedAt = snapshot.approvedAt;
+      question.answeredAt = snapshot.answeredAt;
+      question.archivedAt = snapshot.archivedAt;
+      question.dismissedAt = snapshot.dismissedAt;
+      question.withdrawnAt = snapshot.withdrawnAt;
+      state.highlightedQuestionId = snapshot.highlightedQuestionId;
+    }
+
+    // Broadcast policy after moderation: anything that entered or left LIVE
+    // changes the public board (one full snapshot — supersedes score deltas);
+    // moves between private states (IN_REVIEW <-> DISMISSED) only refresh the
+    // host board. Owners always get a targeted personal push so their "my
+    // questions" panel tracks approve/dismiss/restore without a refresh.
+    // IN_REVIEW and DISMISSED never reach the mixed qa:${pin} room.
+    function qaBroadcastAfterModeration(state: QAState, outcome: QaModerationOutcome) {
+      if (outcome.transitioned.length === 0) return;
+      const touchedLive = outcome.transitioned.some((t) => t.from === 'LIVE' || t.to === 'LIVE');
+      if (touchedLive) qaEmitPublicState(state);
+      else qaEmitHostState(state);
+      const owners = new Set<string>();
+      for (const t of outcome.transitioned) {
+        const owner = state.questions.get(t.questionId)?.participantId;
+        if (owner) owners.add(owner);
+      }
+      for (const owner of owners) qaEmitPersonalState(state, owner);
+    }
+
+    // Explicit ack shapes (MID-338): single actions ack { ok, questionId,
+    // status } or { error }; bulk acks { ok, questionIds, failed } so the
+    // host UI can report partial success.
+    type QaModerationAck =
+      | { ok: true; questionId: string; status: QAQuestionStatus }
+      | { ok: true; questionIds: string[]; failed: { questionId: string; error: string }[] }
+      | { error: string };
+
+    function qaHostModerationHandler(
+      action: 'approve' | 'dismiss' | 'restore' | 'answered' | 'archive',
+    ) {
+      return async (payload: unknown, ack: unknown) => {
+        if (typeof ack !== 'function') {
+          console.warn(`[qa:host:${action}] missing ack — ignoring`);
+          return;
+        }
+        const cb = ack as (res: QaModerationAck) => void;
+        const resolved = qaResolveHostAction(payload);
+        if ('error' in resolved) {
+          cb(resolved);
+          return;
+        }
+        const { state, p } = resolved;
+        // Restore, answered, and archive are deliberately single-question:
+        // they are presenting/corrective actions, not queue-clearing ones
+        // (PRD §4.3). Only approve/dismiss take bulk ids.
+        const ids =
+          action === 'approve' || action === 'dismiss'
+            ? qaParseQuestionIds(p)
+            : typeof p.questionId === 'string' && p.questionId.length > 0
+              ? [p.questionId]
+              : null;
+        if (!ids) {
+          cb({ error: 'invalid' });
+          return;
+        }
+        const bulk = !('questionId' in p && typeof p.questionId === 'string');
+        const outcome = await qaModerateQuestions(state, action, ids, bulk);
+        if (!bulk) {
+          const [only] = ids;
+          const t = outcome.transitioned.find((x) => x.questionId === only);
+          if (t) cb({ ok: true, questionId: only, status: t.to });
+          else cb({ error: outcome.failed[0]?.error ?? 'invalid' });
+        } else {
+          cb({
+            ok: true,
+            questionIds: outcome.transitioned.map((t) => t.questionId),
+            failed: outcome.failed,
+          });
+        }
+        qaBroadcastAfterModeration(state, outcome);
+      };
+    }
+
+    socket.on('qa:host:approve', qaHostModerationHandler('approve'));
+    socket.on('qa:host:dismiss', qaHostModerationHandler('dismiss'));
+    socket.on('qa:host:restore', qaHostModerationHandler('restore'));
+
+    // --- Q&A host live-board actions (MID-339) ---
+
+    socket.on('qa:host:answered', qaHostModerationHandler('answered'));
+    socket.on('qa:host:archive', qaHostModerationHandler('archive'));
+
+    // Highlight the question currently being answered (PRD §4.3). One
+    // highlighted question at a time: the single highlightedQuestionId field
+    // holds the invariant, so highlighting a new question implicitly replaces
+    // the previous one; `questionId: null` un-highlights. Persisted to the
+    // session row so restart hydration restores the on-air marker.
+    socket.on('qa:host:highlight', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:host:highlight] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (
+        res: { ok: true; highlightedQuestionId: string | null } | { error: string },
+      ) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      const questionId =
+        p.questionId === null
+          ? null
+          : typeof p.questionId === 'string' && p.questionId.length > 0
+            ? p.questionId
+            : undefined;
+      if (questionId === undefined) {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const previous = state.highlightedQuestionId;
+      const result = qaHighlightQuestion(state, { questionId });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      if (state.highlightedQuestionId !== previous) {
+        try {
+          await qaRepoSetHighlightedQuestion({
+            sessionId: state.sessionId,
+            questionId: state.highlightedQuestionId,
+          });
+        } catch (err) {
+          console.error('[qa-repo] setHighlightedQuestion', err);
+          state.highlightedQuestionId = previous;
+          cb({ error: 'persistence_failed' });
+          return;
+        }
+      }
+      cb({ ok: true, highlightedQuestionId: state.highlightedQuestionId });
+      // Highlight is part of the public projection — every connected client
+      // (host, displays, participants) re-renders the on-air marker.
+      if (state.highlightedQuestionId !== previous) qaEmitPublicState(state);
+    });
+
+    // Host edit of a question's text (PRD §4.3). The first edit preserves the
+    // submitted text in originalText (in memory and in the DB) so export/audit
+    // can show what the participant actually wrote. Host edits never demote a
+    // LIVE question back to review — that rule is participant-edit-only.
+    socket.on('qa:host:edit', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:host:edit] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (
+        res: { ok: true; questionId: string; text: string } | { error: string },
+      ) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      if (
+        typeof p.questionId !== 'string' ||
+        p.questionId.length === 0 ||
+        typeof p.text !== 'string'
+      ) {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const question = state.questions.get(p.questionId);
+      const snapshot = question
+        ? { text: question.text, originalText: question.originalText }
+        : null;
+      const result = qaEditQuestion(state, {
+        questionId: p.questionId,
+        text: p.text,
+        editor: { role: 'host' },
+      });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      const edited = result.question;
+      try {
+        await qaRepoEditQuestionText({ questionId: edited.id, text: edited.text });
+      } catch (err) {
+        console.error('[qa-repo] editQuestionText (host)', err);
+        if (question && snapshot) {
+          question.text = snapshot.text;
+          question.originalText = snapshot.originalText;
+        }
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      cb({ ok: true, questionId: edited.id, text: edited.text });
+      // A LIVE question's text is public — everyone re-renders. An IN_REVIEW
+      // edit stays host-only. The owner always gets a personal push so their
+      // "my questions" panel shows the edited text without a refresh.
+      if (edited.status === 'LIVE') qaEmitPublicState(state);
+      else qaEmitHostState(state);
+      if (edited.participantId) qaEmitPersonalState(state, edited.participantId);
+    });
+
+    // --- Q&A labels (MID-340, PRD §4.1 / §4.3) ---
+
+    // Mid-session label creation. Same strict host gate as moderation: only
+    // the attached host control socket may create labels. In-memory create
+    // first (validates name + per-session uniqueness), persist BEFORE
+    // broadcasting, re-key to the DB id, roll back on failure.
+    socket.on('qa:host:label:create', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:host:label:create] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: { ok: true; label: QAPublicLabel } | { error: string }) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      if (typeof p.name !== 'string') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      if (p.participantSelectable !== undefined && typeof p.participantSelectable !== 'boolean') {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const result = qaCreateLabel(state, {
+        name: p.name,
+        participantSelectable: p.participantSelectable,
+      });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      let labelId = result.labelId;
+      try {
+        const row = await qaRepoCreateLabel({
+          sessionId: state.sessionId,
+          name: result.label.name,
+          participantSelectable: result.label.participantSelectable,
+        });
+        // Re-key to the DB id so assignments and hydration line up.
+        state.labels.delete(labelId);
+        state.labels.set(row.id, result.label);
+        labelId = row.id;
+      } catch (err) {
+        console.error('[qa-repo] createLabel', err);
+        state.labels.delete(labelId);
+        // A racing duplicate (e.g. a second control tab) surfaces as the
+        // same duplicate_label the in-memory check would have produced.
+        cb({
+          error: err instanceof DuplicateLabelError ? 'duplicate_label' : 'persistence_failed',
+        });
+        return;
+      }
+      cb({
+        ok: true,
+        label: {
+          id: labelId,
+          name: result.label.name,
+          participantSelectable: result.label.participantSelectable,
+        },
+      });
+      // The label list rides in the public projection (participants need new
+      // selectable labels for submission/filtering), so everyone refreshes.
+      qaEmitPublicState(state);
+    });
+
+    // Assign/unassign a label on a question. Idempotent both ways. Broadcast
+    // policy: chips on a LIVE question are public; label changes on private
+    // questions (IN_REVIEW/DISMISSED/…) refresh the host board only.
+    function qaHostLabelAssignmentHandler(action: 'assign' | 'unassign') {
+      return async (payload: unknown, ack: unknown) => {
+        if (typeof ack !== 'function') {
+          console.warn(`[qa:host:label:${action}] missing ack — ignoring`);
+          return;
+        }
+        const cb = ack as (
+          res: { ok: true; questionId: string; labelIds: string[] } | { error: string },
+        ) => void;
+        const resolved = qaResolveHostAction(payload);
+        if ('error' in resolved) {
+          cb(resolved);
+          return;
+        }
+        const { state, p } = resolved;
+        if (
+          typeof p.questionId !== 'string' ||
+          p.questionId.length === 0 ||
+          typeof p.labelId !== 'string' ||
+          p.labelId.length === 0
+        ) {
+          cb({ error: 'invalid' });
+          return;
+        }
+        const args = { questionId: p.questionId, labelId: p.labelId };
+        const result =
+          action === 'assign' ? qaAssignLabel(state, args) : qaUnassignLabel(state, args);
+        if (!result.ok) {
+          cb({ error: result.reason });
+          return;
+        }
+        const question = state.questions.get(p.questionId);
+        const changed =
+          ('assigned' in result && result.assigned) || ('removed' in result && result.removed);
+        if (changed) {
+          try {
+            if (action === 'assign') await qaRepoAssignLabel(args);
+            else await qaRepoUnassignLabel(args);
+          } catch (err) {
+            console.error(`[qa-repo] ${action}Label`, err);
+            if (question) {
+              if (action === 'assign') question.labelIds.delete(p.labelId);
+              else question.labelIds.add(p.labelId);
+            }
+            cb({ error: 'persistence_failed' });
+            return;
+          }
+        }
+        cb({ ok: true, questionId: p.questionId, labelIds: [...(question?.labelIds ?? [])] });
+        if (!changed) return;
+        if (question?.status === 'LIVE') qaEmitPublicState(state);
+        else qaEmitHostState(state);
+      };
+    }
+
+    socket.on('qa:host:label:assign', qaHostLabelAssignmentHandler('assign'));
+    socket.on('qa:host:label:unassign', qaHostLabelAssignmentHandler('unassign'));
+
+    // --- Q&A replies (MID-341, PRD §4.3 / §4.8) ---
+
+    type QaReplyAck = { ok: true; questionId: string; reply: QAPublicReply } | { error: string };
+
+    function qaPublicReply(reply: QAReplyEntry): QAPublicReply {
+      // Participant linkage stays server-side: only the host marker, text,
+      // and timestamp ever leave in acks/projections.
+      return {
+        id: reply.id,
+        isHostReply: reply.isHostReply,
+        text: reply.text,
+        createdAt: reply.createdAt,
+      };
+    }
+
+    // Reply fanout follows the question's current status: a thread on a LIVE
+    // question is public (one full snapshot — participants and displays both
+    // ride qa:state), while a thread on an IN_REVIEW question is private, so
+    // only the host board refreshes. The question's owner always gets a
+    // targeted personal push — that is how a private in-review reply reaches
+    // the submitter (and only the submitter).
+    function qaBroadcastAfterReply(state: QAState, question: QAQuestionEntry) {
+      if (question.status === 'LIVE') qaEmitPublicState(state);
+      else qaEmitHostState(state);
+      if (question.participantId) qaEmitPersonalState(state, question.participantId);
+    }
+
+    // Host written reply (PRD §4.3): public on LIVE questions, private to the
+    // submitter on IN_REVIEW questions (it becomes public when the question
+    // is approved, because approval moves the whole thread into qa:state).
+    socket.on('qa:host:reply', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:host:reply] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: QaReplyAck) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      if (
+        typeof p.questionId !== 'string' ||
+        p.questionId.length === 0 ||
+        typeof p.text !== 'string'
+      ) {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const result = qaAddHostReply(state, { questionId: p.questionId, text: p.text });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      const { reply, question } = result;
+      try {
+        const row = await qaRepoAddReply({
+          questionId: question.id,
+          isHostReply: true,
+          text: reply.text,
+        });
+        // Re-key to the DB id so reply edits and hydration line up.
+        reply.id = row.id;
+      } catch (err) {
+        console.error('[qa-repo] addReply (host)', err);
+        question.replies = question.replies.filter((r) => r !== reply);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      cb({ ok: true, questionId: question.id, reply: qaPublicReply(reply) });
+      qaBroadcastAfterReply(state, question);
+    });
+
+    // Host edits their own reply (PRD §4.3). Same privacy routing as posting:
+    // the question's current status decides public vs host-only fanout.
+    socket.on('qa:host:reply:edit', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:host:reply:edit] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: QaReplyAck) => void;
+      const resolved = qaResolveHostAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, p } = resolved;
+      if (
+        typeof p.questionId !== 'string' ||
+        p.questionId.length === 0 ||
+        typeof p.replyId !== 'string' ||
+        p.replyId.length === 0 ||
+        typeof p.text !== 'string'
+      ) {
+        cb({ error: 'invalid' });
+        return;
+      }
+      const previousText = state.questions
+        .get(p.questionId)
+        ?.replies.find((r) => r.id === p.replyId)?.text;
+      const result = qaEditHostReply(state, {
+        questionId: p.questionId,
+        replyId: p.replyId,
+        text: p.text,
+      });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      const { reply, question } = result;
+      try {
+        await qaRepoUpdateReplyText({ replyId: reply.id, text: reply.text });
+      } catch (err) {
+        console.error('[qa-repo] updateReplyText', err);
+        if (previousText !== undefined) reply.text = previousText;
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      cb({ ok: true, questionId: question.id, reply: qaPublicReply(reply) });
+      qaBroadcastAfterReply(state, question);
+    });
+
+    // Participant reply (PRD §4.8): only when the host enabled replies, only
+    // under LIVE questions, published immediately (no reply moderation queue
+    // in v1 — see DECISIONS.md). Shares the submit throttle so a participant
+    // can't machine-gun threads any faster than questions.
+    socket.on('qa:participant:reply', async (payload: unknown, ack: unknown) => {
+      if (typeof ack !== 'function') {
+        console.warn('[qa:participant:reply] missing ack — ignoring');
+        return;
+      }
+      const cb = ack as (res: QaReplyAck) => void;
+      const resolved = qaResolveParticipantAction(payload);
+      if ('error' in resolved) {
+        cb(resolved);
+        return;
+      }
+      const { state, participantId, p } = resolved;
+      if (
+        typeof p.questionId !== 'string' ||
+        p.questionId.length === 0 ||
+        typeof p.text !== 'string'
+      ) {
+        cb({ error: 'invalid' });
+        return;
+      }
+      if (state.status === 'ENDED') {
+        cb({ error: 'session_ended' });
+        return;
+      }
+      if (!state.submissionsOpen) {
+        cb({ error: 'submissions_closed' });
+        return;
+      }
+      const now = Date.now();
+      const last = qaLastSubmitAt.get(participantId) ?? 0;
+      if (now - last < QA_SUBMIT_RATE_LIMIT_MS) {
+        cb({ error: 'rate_limited' });
+        return;
+      }
+      const result = qaAddParticipantReply(state, {
+        questionId: p.questionId,
+        participantId,
+        text: p.text,
+      });
+      if (!result.ok) {
+        cb({ error: result.reason });
+        return;
+      }
+      qaLastSubmitAt.set(participantId, now);
+      const { reply, question } = result;
+      try {
+        const row = await qaRepoAddReply({
+          questionId: question.id,
+          participantId,
+          isHostReply: false,
+          text: reply.text,
+        });
+        reply.id = row.id;
+      } catch (err) {
+        console.error('[qa-repo] addReply (participant)', err);
+        question.replies = question.replies.filter((r) => r !== reply);
+        cb({ error: 'persistence_failed' });
+        return;
+      }
+      cb({ ok: true, questionId: question.id, reply: qaPublicReply(reply) });
+      // Participant replies only land on LIVE questions, so this is always a
+      // public-snapshot fanout plus the owner's personal push.
+      qaBroadcastAfterReply(state, question);
+    });
+
     socket.on('disconnect', () => {
       const wcLink = wcSocketToPin.get(socket.id);
       if (wcLink) {
@@ -868,6 +2529,24 @@ void app.prepare().then(() => {
         if (wcState) {
           if (wcLink.role === 'player') {
             wcState.socketToPlayer.delete(socket.id);
+          }
+        }
+      }
+
+      const qaLink = qaSocketToPin.get(socket.id);
+      if (qaLink) {
+        qaSocketToPin.delete(socket.id);
+        const qaState = qaStates.get(qaLink.pin);
+        if (qaState) {
+          if (qaLink.role === 'participant') {
+            qaState.socketToParticipant.delete(socket.id);
+          } else if (qaLink.role === 'display') {
+            qaState.displaySocketIds.delete(socket.id);
+          } else if (qaState.hostSocketId === socket.id) {
+            // Only clear if this socket still owns the slot: an HMR/dev
+            // reconnect attaches the new socket first, then the orphaned old
+            // socket disconnects — it must not unbind the new host.
+            qaState.hostSocketId = undefined;
           }
         }
       }

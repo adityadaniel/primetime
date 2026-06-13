@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AccountMenu from '@/components/AccountMenu';
-import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { publicUrl } from '@/lib/public-origin';
 import { useSocket } from '@/lib/socket';
 
@@ -182,7 +182,6 @@ export default function WordCloudControl({ params }: { params: Promise<{ pin: st
 
   return (
     <main className="relative min-h-screen pb-24">
-      <CornerMarks />
       {toast && (
         <div
           className="fixed top-4 left-1/2 -translate-x-1/2 z-50 ink-border stamp ticker text-[11px] tracking-widest px-3 py-2"
@@ -199,7 +198,6 @@ export default function WordCloudControl({ params }: { params: Promise<{ pin: st
         <div className="flex items-center gap-6">
           <FrameCounter index={Math.min(999, totalSubmissions)} />
           <Clock />
-          <OnAir live={live} />
           <AccountMenu />
         </div>
       </header>

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const gameFindUnique = vi.fn();
 const wcFindUnique = vi.fn();
+const qaFindUnique = vi.fn();
 
 vi.mock('./db', () => ({
   prisma: {
@@ -10,6 +11,9 @@ vi.mock('./db', () => ({
     },
     wordCloudSession: {
       findUnique: (args: unknown) => wcFindUnique(args),
+    },
+    qASession: {
+      findUnique: (args: unknown) => qaFindUnique(args),
     },
   },
 }));
@@ -24,6 +28,7 @@ import {
 beforeEach(() => {
   gameFindUnique.mockReset();
   wcFindUnique.mockReset();
+  qaFindUnique.mockReset();
   clearActivePinsProvidersForTesting();
 });
 
@@ -32,9 +37,10 @@ afterEach(() => {
 });
 
 describe('allocatePin', () => {
-  it('returns a 6-digit PIN that exists in neither table', async () => {
+  it('returns a 6-digit PIN that exists in no session table', async () => {
     gameFindUnique.mockResolvedValue(null);
     wcFindUnique.mockResolvedValue(null);
+    qaFindUnique.mockResolvedValue(null);
     const pin = await allocatePin();
     expect(pin).toMatch(/^\d{6}$/);
   });
@@ -47,6 +53,7 @@ describe('allocatePin', () => {
       return Promise.resolve(null);
     });
     wcFindUnique.mockResolvedValue(null);
+    qaFindUnique.mockResolvedValue(null);
     const pin = await allocatePin();
     expect(pin).toMatch(/^\d{6}$/);
     expect(calls).toBeGreaterThanOrEqual(2);
@@ -54,8 +61,23 @@ describe('allocatePin', () => {
 
   it('skips PINs that already exist in WordCloudSession', async () => {
     gameFindUnique.mockResolvedValue(null);
+    qaFindUnique.mockResolvedValue(null);
     let calls = 0;
     wcFindUnique.mockImplementation(() => {
+      calls += 1;
+      if (calls === 1) return Promise.resolve({ id: 'taken' });
+      return Promise.resolve(null);
+    });
+    const pin = await allocatePin();
+    expect(pin).toMatch(/^\d{6}$/);
+    expect(calls).toBeGreaterThanOrEqual(2);
+  });
+
+  it('skips PINs that already exist in QASession', async () => {
+    gameFindUnique.mockResolvedValue(null);
+    wcFindUnique.mockResolvedValue(null);
+    let calls = 0;
+    qaFindUnique.mockImplementation(() => {
       calls += 1;
       if (calls === 1) return Promise.resolve({ id: 'taken' });
       return Promise.resolve(null);
@@ -68,6 +90,7 @@ describe('allocatePin', () => {
   it('skips PINs registered as active in-memory', async () => {
     gameFindUnique.mockResolvedValue(null);
     wcFindUnique.mockResolvedValue(null);
+    qaFindUnique.mockResolvedValue(null);
     const taken = new Set<string>();
     registerActivePinsProvider(() => taken);
     // pin first call returns one we'll claim, second returns a different one
@@ -91,6 +114,7 @@ describe('allocatePin', () => {
   it('throws when no PIN is free after retry limit', async () => {
     gameFindUnique.mockResolvedValue({ id: 'always' });
     wcFindUnique.mockResolvedValue(null);
+    qaFindUnique.mockResolvedValue(null);
     await expect(allocatePin()).rejects.toThrow(/Could not allocate PIN/);
   });
 });

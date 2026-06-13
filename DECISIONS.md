@@ -10,6 +10,98 @@ and add a new entry below.
 
 ---
 
+## 2026-06-11 · Q&A edit window: unlimited for host, no time limit for participants (withdraw-and-resubmit model)
+
+**Status:** Accepted
+
+**Context:** PRD §4.5 says participants can edit their own questions. The
+implementation needed to decide whether edits have a time window (e.g., 5 min
+after submission) or are unlimited. A time-based window adds complexity
+(countdown UI, server-side expiry checks, timezone edge cases) and the primary
+abuse vector — editing a question after approval to inject inappropriate
+content — is already mitigated by the moderation flow: an edited LIVE question
+returns to IN_REVIEW status when moderation is enabled, giving the host a
+second approval gate.
+
+**Decision:** No time-based edit window. Participants can edit any question
+they own that is not WITHDRAWN. When moderation is enabled, edits on LIVE
+questions send the question back to IN_REVIEW (the original text is preserved
+server-side for audit/export). When moderation is disabled, edits take effect
+immediately. The host can always edit any question without restriction.
+Participants who want to fully retract use withdraw (terminal state) and
+resubmit.
+
+**Consequences:** Simpler implementation, no stale-timer UX. The trade-off is
+that unmoderated sessions could see late edits — acceptable for a v1 launch
+where the host can enable moderation if they need tighter control.
+
+---
+
+## 2026-06-11 · Q&A participant replies publish immediately — no reply moderation queue in v1
+
+**Status:** Accepted
+
+**Context:** PRD §4.8 leaves participant-reply moderation open: when question
+moderation is enabled, replies "may either go live immediately, or require
+review like questions", and the implementation must pick one and document it
+(MID-341). A reply review queue would need its own IN_REVIEW state on
+QAReply, a second moderation surface on the host board, and private-reply
+personal routing for non-owners — significant machinery for a v1 feature that
+is off by default.
+
+**Decision:** Participant replies are allowed only on LIVE questions and
+publish immediately when `participantRepliesEnabled` is true — even when
+question moderation is on. There is no separate reply moderation queue in v1.
+Guardrails instead of review: replies only thread under questions the host
+already approved (LIVE), they follow the session's question character limit
+(host replies get their own 1,000-char limit, `QA_HOST_REPLY_CHAR_LIMIT`),
+they share the participant submit throttle, and closing submissions
+(PRD §4.10) closes reply composers too — closed means no new participant
+content, while voting stays on its own switch.
+
+**Implication:** Reply privacy falls out of question-status projection, not
+per-reply flags: a host reply to an IN_REVIEW question is private because
+IN_REVIEW questions never enter `qa:state` (the submitter reads it from their
+targeted personal push), and approval makes the whole thread public at once.
+Dismissed questions keep prior private replies visible to their owner via
+personal state. Replies ride the public projection for LIVE questions, but
+projection displays must never RENDER them (PRD §4.8) — threads are a
+participant/host reading surface. If reply abuse shows up in practice, the
+v2 lever is a reply review queue, not silent filtering.
+
+---
+
+## 2026-06-10 · Q&A voting: self-votes allowed, vote fanout rides compact coalesced deltas
+
+**Status:** Accepted
+
+**Context:** Q&A voting (MID-336) needed two explicit calls. PRD §4.6 left
+self-upvote behavior as an implementation decision, and PRD §9 flags vote
+bursts as a fanout risk: at venue scale a popular question can attract many
+votes in a second, and a full `qa:state` emit per vote to the mixed
+`qa:${pin}` room recreates the O(N²) answer-fanout problem already solved for
+the quiz (see 2026-06-10 answer-phase fanout entry).
+
+**Decision:** Participants may vote on their own questions — same call as
+Slido; one self-vote per question cannot meaningfully skew ranking and
+blocking it would leak authorship of anonymous questions through a disabled
+button. One vote per participant per question is enforced twice: the
+in-memory `votes` map keys on participantId, and `QAVote` has
+`@@unique([questionId, participantId])` behind an upsert, so reconnects and
+second tabs collapse onto one vote. Vote bursts never emit full state:
+per-room dirty question ids coalesce into one compact `qa:scores` delta
+(`{ questionId, score, upvotes, downvotes }[]`) per 250ms tick; a full
+`qa:state` emit cancels any pending delta it would supersede. Clients patch
+scores and re-sort locally; the voter's own confirmation rides the ack.
+
+**Implication:** Surfaces that show the live board (participant page, and the
+upcoming host control/display tickets) must listen to `qa:scores` in addition
+to `qa:state`, and anything that wants per-vote realtime updates must ride
+the coalesced delta, not per-vote broadcasts. Revisit self-voting only if it
+demonstrably skews incentives.
+
+---
+
 ## 2026-06-09 · Public projection routes behind live.theprimetime.id
 
 **Status:** Accepted
@@ -457,5 +549,5 @@ back; reveal and later phases always render server truth.
 answer-burst traffic dropped ~38× (88,330 → 2,296 deliveries over 3 questions
 at 120 players). Anything that wants per-answer realtime updates mid-question
 (e.g. a live answer counter) must ride the coalesced tick, not per-answer
-broadcasts. `scripts/load-fanout.ts` is the measurement harness; server must
-run with `PLAYER_CAP >= PLAYERS`.
+broadcasts. `scripts/load-fanout.ts` is the measurement harness; the
+`PLAYER_CAP` constant in `lib/constants.ts` must be `>= PLAYERS`.

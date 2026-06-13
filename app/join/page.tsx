@@ -1,14 +1,15 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
-import { Clock, CornerMarks, DateStamp, OnAir, SmpteBars } from '@/components/Broadcast';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useRef, useState } from 'react';
+import { Clock, DateStamp, SmpteBars } from '@/components/Broadcast';
 import { useSocket } from '@/lib/socket';
 
-export default function JoinPage() {
+function JoinPageInner() {
   const router = useRouter();
+  const search = useSearchParams();
   const socket = useSocket();
-  const [pin, setPin] = useState('');
+  const [pin, setPin] = useState(() => (search.get('pin') ?? '').replace(/\D/g, '').slice(0, 6));
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
@@ -33,24 +34,24 @@ export default function JoinPage() {
     setPending(true);
 
     // Look up the session type FIRST so we know which player flow to follow.
-    // The /join socket event is quiz-only; a word-cloud PIN must redirect
-    // to /play/[pin]/wordcloud (which mounts its own socket join). Doing the
-    // lookup here over HTTP avoids a "is this a quiz or a wordcloud" guessing
-    // game at the socket layer (F1 from the codex review).
+    // The /join socket event is quiz-only; a word-cloud or Q&A PIN must
+    // redirect to its own player surface (which mounts its own socket join).
+    // Doing the lookup here over HTTP avoids a "which activity is this"
+    // guessing game at the socket layer (F1 from the codex review).
     fetch('/api/lookup-pin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin }),
     })
-      .then((r) => r.json() as Promise<{ type: 'quiz' | 'wordcloud' | null }>)
+      .then((r) => r.json() as Promise<{ type: 'quiz' | 'wordcloud' | 'q-and-a' | null }>)
       .then((res) => {
-        if (res.type === 'wordcloud') {
+        if (res.type === 'wordcloud' || res.type === 'q-and-a') {
           if (typeof window !== 'undefined') {
             sessionStorage.setItem(`bc:nick:${pin}`, nickname.trim());
           }
           inFlight.current = false;
           setPending(false);
-          router.push(`/play/${pin}/wordcloud`);
+          router.push(res.type === 'wordcloud' ? `/play/${pin}/wordcloud` : `/play/${pin}/q-and-a`);
           return;
         }
         // Either an explicit quiz or no DB row (in-memory anonymous quiz):
@@ -84,14 +85,12 @@ export default function JoinPage() {
 
   return (
     <main className="relative flex flex-col h-[100dvh] overflow-hidden">
-      <CornerMarks fixed />
       <header className="px-6 pt-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <DateStamp />
           <span className="ticker text-[11px] opacity-40">·</span>
           <Clock />
         </div>
-        <OnAir live={false} />
       </header>
       <SmpteBars className="h-1.5 mt-2" />
 
@@ -190,5 +189,13 @@ export default function JoinPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function JoinPage() {
+  return (
+    <Suspense fallback={null}>
+      <JoinPageInner />
+    </Suspense>
   );
 }

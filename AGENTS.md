@@ -126,3 +126,9 @@ Docs-only edits can use a lighter check, but still inspect the diff.
 - `/join` player entry
 - `/play/[pin]` player game
 - Word Cloud routes live under `/host/wordcloud/...`
+- Q&A routes:
+  - `/host/q-and-a/new` — create session
+  - `/host/q-and-a/[pin]/control` — host control room
+  - `/host/q-and-a/[pin]/display` — public projection / present mode
+  - `/host/q-and-a/[pin]/questions.csv` — CSV export (host-only)
+  - `/play/[pin]/q-and-a` — participant view

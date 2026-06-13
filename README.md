@@ -106,7 +106,6 @@ All flags default to the OSS path. **Unset = OSS default.** You only need to set
 | `EMAIL_PROVIDER` | `none` · `token-print` · `smtp` · `resend` | `none` | MID-215 | `token-print` logs reset URLs to server console (dev). `smtp` requires `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`. `resend` requires `RESEND_API_KEY`. |
 | `UPLOAD_PROVIDER` | `local` · `s3` · `uploadthing` | `local` | MID-217 | `local` = on-disk at `public/uploads/`. `s3` (incl. R2/MinIO) requires `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`. `uploadthing` requires `UPLOADTHING_TOKEN`. |
 | `BILLING_ENABLED` | `true` · `false` | `false` | MID-214 | OSS ships with no billing/upgrade flow. |
-| `PLAYER_CAP` | integer ≥ 1 | `10` | MID-216 | Max players per game. |
 | `UPLOAD_MAX_BYTES` | bytes (integer) | `5242880` (5 MB) | MID-217 | Max file upload size in bytes. |
 | `UPLOAD_DIR` | absolute path | `<cwd>/public/uploads` | MID-217 | Upload directory on disk. |
 | `AUTH_SECRET` | any non-empty string | — | MID-213 | **Required.** JWT session secret. Generate: `openssl rand -hex 32`. |
@@ -115,7 +114,7 @@ All flags default to the OSS path. **Unset = OSS default.** You only need to set
 | `NEXTAUTH_URL` | URL | `http://localhost:4321` | MID-213 | Your app's public URL. |
 | `NEXT_PUBLIC_SITE_URL` | URL | — | — | Public origin used by client-side QR, projection, and share links. Set to `https://live.theprimetime.id` for Cloudflare Tunnel live mode. |
 
-> **Self-hosting OSS?** Only `DATABASE_URL` and `AUTH_SECRET` are required. Leave everything else at defaults — password auth, no email, local uploads, no billing.
+> **Self-hosting OSS?** Only `DATABASE_URL` and `AUTH_SECRET` are required. Leave everything else at defaults — password auth, no email, local uploads, no billing. Max players per game is a code-level constant in `lib/constants.ts`.
 >
 > **Tunnel/live-origin note:** when hosting locally but projecting through a public tunnel, host auth cookies stay on `localhost`; public projection/display routes must stay public-by-PIN. See [`docs/live-origin-auth.md`](docs/live-origin-auth.md) before changing QR/projection URL generation or Auth.js middleware.
 
@@ -202,12 +201,13 @@ The timer auto-locks when it hits zero, and locks early once every connected pla
 - Distinct **PRIMETIME** visual identity executed across all five surfaces
 - **Player reconnect grace window** — disconnected players have 30 s to rejoin and reclaim their score, nickname, and socket binding
 - **Host disconnect grace pause** — game pauses for 60 s on host drop; resumes seamlessly if the host returns, otherwise ends with `host-left`
-- **Player cap enforcement** — a single, env-driven cap (`PLAYER_CAP`, default 10). The host lobby shows current/max; a join past the cap is rejected with the `full` code and the player sees a "room is full" message. No tiers, no upgrade prompts.
+- **Player cap enforcement** — a single code-level cap (`PLAYER_CAP` in `lib/constants.ts`). The host lobby shows current/max; a join past the cap is rejected with the `full` code and the player sees a "room is full" message. No tiers, no upgrade prompts.
 - **CSV export of session results** — `GET /host/[pin]/results.csv` once the game is in `final`; includes rank, nickname, score, correct count, total questions, average response time
 - **Light profanity filter** for nicknames — rejects with `nickname-rejected` code so the join page can show a friendly retry
 - Smoke test extended to cover reconnect, host pause, cap enforcement, CSV export, and profanity rejection: `npm run smoke`
 - Word Cloud activity (alternative to quiz): host posts a prompt, players submit words, real-time projection cloud with CSV export
-- **OSS configuration surface** — password auth, email, uploads, billing, player cap all configurable via env vars. Defaults require zero SaaS accounts.
+- **Q&A live activity** (Slido-style): host creates a session, participants submit/vote on questions, host moderates/highlights/answers, public display/present mode with board + fullscreen highlight, labels, replies, session controls (close/reopen/end), and CSV export of all questions with votes/labels/replies
+- **OSS configuration surface** — password auth, email, uploads, and billing are configurable via env vars; the player cap is a code-level constant. Defaults require zero SaaS accounts.
 - **Local file upload** — `POST /api/upload` for on-disk file uploads (quiz covers, etc.) with size and MIME validation
 - **Password reset** — optional SMTP or token-print reset flow for OSS self-hosters
 
@@ -243,6 +243,7 @@ components/
   Shape.tsx                      4 answer shapes (triangle / diamond / circle / square)
 lib/
   config.ts                      OSS ⇄ SaaS config surface (env flags)
+  constants.ts                   code-level product constants
   game.ts                        in-memory game state + scoring
   socket.ts                      browser socket singleton hook
   types.ts                       shared types
@@ -314,7 +315,7 @@ What it does for you:
   between tests, so order never matters.
 - **Boots the server.** Playwright's `webServer` runs `db:e2e:reset` then
   `npm run dev`, pinning a known OSS profile via env (`EMAIL_PROVIDER=token-print`,
-  `UPLOAD_PROVIDER=local`, `PLAYER_CAP=3`, session persistence on). Locally it
+  `UPLOAD_PROVIDER=local`, code-level player cap, session persistence on). Locally it
   reuses an already-running server on `:4321`; in CI it always boots a fresh one.
 - **No SaaS, no real email.** Password-reset links are captured from the
   `devUrl` the reset endpoint returns in non-production mode — no SMTP, no log

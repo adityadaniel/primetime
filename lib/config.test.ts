@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ConfigError, loadConfig } from './config';
+import { PLAYER_CAP } from './constants';
 
 // Each case passes an explicit env bag so the suite never depends on the
 // ambient process environment.
@@ -11,7 +12,7 @@ describe('loadConfig — OSS defaults', () => {
     expect(c.emailProvider).toBe('none');
     expect(c.uploadProvider).toBe('local');
     expect(c.billingEnabled).toBe(false);
-    expect(c.playerCap).toBe(10);
+    expect(c.playerCap).toBe(PLAYER_CAP);
     expect(c.uploadMaxBytes).toBe(5 * 1024 * 1024);
     expect(c.uploadDir).toContain('uploads');
     expect(c.oauthEnabled).toBe(false);
@@ -25,13 +26,12 @@ describe('loadConfig — OSS defaults', () => {
       EMAIL_PROVIDER: '',
       UPLOAD_PROVIDER: '',
       BILLING_ENABLED: '',
-      PLAYER_CAP: '',
     });
     expect(c.authMode).toBe('password');
     expect(c.emailProvider).toBe('none');
     expect(c.uploadProvider).toBe('local');
     expect(c.billingEnabled).toBe(false);
-    expect(c.playerCap).toBe(10);
+    expect(c.playerCap).toBe(PLAYER_CAP);
   });
 });
 
@@ -69,22 +69,10 @@ describe('loadConfig — enum validation', () => {
   });
 });
 
-describe('loadConfig — PLAYER_CAP', () => {
-  it('parses a valid integer string', () => {
-    expect(loadConfig({ PLAYER_CAP: '50' }).playerCap).toBe(50);
-  });
-
-  it('rejects a non-numeric value', () => {
-    expect(() => loadConfig({ PLAYER_CAP: 'lots' })).toThrow(/PLAYER_CAP must be an integer/);
-  });
-
-  it('rejects a non-integer value', () => {
-    expect(() => loadConfig({ PLAYER_CAP: '10.5' })).toThrow(/PLAYER_CAP must be an integer/);
-  });
-
-  it('rejects values below the minimum', () => {
-    expect(() => loadConfig({ PLAYER_CAP: '0' })).toThrow(/at least 1/);
-    expect(() => loadConfig({ PLAYER_CAP: '-3' })).toThrow(/at least 1/);
+describe('loadConfig — player cap constant', () => {
+  it('uses the code-level PLAYER_CAP constant, not process env', () => {
+    expect(loadConfig({}).playerCap).toBe(PLAYER_CAP);
+    expect(loadConfig({ PLAYER_CAP: '50' }).playerCap).toBe(PLAYER_CAP);
   });
 });
 

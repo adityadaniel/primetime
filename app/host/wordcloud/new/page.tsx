@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import AccountMenu from '@/components/AccountMenu';
-import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 
 const PROMPT_MAX = 140;
 
@@ -73,13 +73,11 @@ export default function WordCloudNew() {
 
   return (
     <main className="relative min-h-screen pb-24">
-      <CornerMarks />
       <header className="px-8 pt-6 flex items-center justify-between">
         <Chyron label="DIRECTOR · NEW WORD CLOUD" number="WC" />
         <div className="flex items-center gap-6">
           <FrameCounter index={0} />
           <Clock />
-          <OnAir live={false} />
           <AccountMenu />
         </div>
       </header>

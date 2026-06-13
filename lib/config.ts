@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { z } from 'zod';
+import { PLAYER_CAP } from './constants';
 
 // ============================================================================
 // OSS ⇄ SaaS configuration surface (MID-214 · OSS-CONFIG-01)
@@ -39,7 +39,7 @@ export interface AppConfig {
   uploadProvider: UploadProvider;
   /** BILLING_ENABLED — `false` by default (OSS ships with no billing). */
   billingEnabled: boolean;
-  /** PLAYER_CAP — max players per game. Integer ≥ 1, default 10. */
+  /** Max players per game. Code-level constant in lib/constants.ts. */
   playerCap: number;
   /** UPLOAD_MAX_BYTES — max upload file size in bytes. Default 5 MB. */
   uploadMaxBytes: number;
@@ -91,11 +91,6 @@ function enumOr<T extends readonly string[]>(
   return v as T[number];
 }
 
-const PLAYER_CAP_SCHEMA = z.coerce
-  .number({ message: 'PLAYER_CAP must be an integer' })
-  .int('PLAYER_CAP must be an integer')
-  .min(1, 'PLAYER_CAP must be at least 1');
-
 /** Require every var in `vars` to be present & non-empty, else fail fast. */
 function requireVars(
   provider: string,
@@ -122,13 +117,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const uploadProvider = enumOr('UPLOAD_PROVIDER', env.UPLOAD_PROVIDER, UPLOAD_PROVIDERS, 'local');
   const billingEnabled = parseBool(env.BILLING_ENABLED, false);
 
-  const capRaw = env.PLAYER_CAP === undefined || env.PLAYER_CAP === '' ? 10 : env.PLAYER_CAP;
-  const capParsed = PLAYER_CAP_SCHEMA.safeParse(capRaw);
-  if (!capParsed.success) {
-    const reason = capParsed.error.issues[0]?.message ?? 'invalid';
-    throw new ConfigError(`${reason} (got "${env.PLAYER_CAP}")`);
-  }
-  const playerCap = capParsed.data;
+  const playerCap = PLAYER_CAP;
 
   // Upload settings
   const uploadMaxBytesRaw = env.UPLOAD_MAX_BYTES ?? '';

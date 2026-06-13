@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Chyron, Clock, CornerMarks, FrameCounter, OnAir, SmpteBars } from '@/components/Broadcast';
+import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { useSocket } from '@/lib/socket';
 import { validateWordInput, WORDCLOUD_INPUT_MAX } from '@/lib/wordcloud-input';
 
@@ -264,8 +264,6 @@ export default function WordCloudPlayerPage({ params }: { params: Promise<{ pin:
 
   return (
     <main className="relative min-h-[100dvh] pb-10 flex flex-col">
-      <CornerMarks />
-
       {toast && (
         <div
           className="fixed top-4 left-1/2 -translate-x-1/2 z-50 ink-border stamp ticker text-[11px] tracking-widest px-3 py-2"
@@ -282,7 +280,6 @@ export default function WordCloudPlayerPage({ params }: { params: Promise<{ pin:
         <div className="flex items-center gap-4">
           <FrameCounter index={mySubmissions.length} />
           <Clock />
-          <OnAir live={liveOrPaused && !ended} />
         </div>
       </header>
       <SmpteBars className="h-1.5 mt-3" />
