@@ -2961,7 +2961,7 @@ async function assertQaDisplayPresentMode() {
       JSON.stringify({
         sort: 'popular',
         labelFilter: null,
-        visibleCount: 4,
+        visibleCount: 10,
         showTicker: true,
         highlightFullscreen: true,
       })
@@ -3077,13 +3077,13 @@ async function assertQaDisplayPresentMode() {
       (settings) =>
         settings.sort === 'recent' &&
         settings.labelFilter === publicLabel.id &&
-        settings.visibleCount === 6 &&
+        settings.visibleCount === 10 &&
         !settings.showTicker &&
         !settings.highlightFullscreen,
     );
     const mirrorSawSettings = qaWaitForDisplaySettings(
       mirrorDisplay,
-      (settings) => settings.labelFilter === publicLabel.id && settings.visibleCount === 6,
+      (settings) => settings.labelFilter === publicLabel.id && settings.visibleCount === 10,
     );
     const settingsAck = qaOk<Exclude<QaDisplaySettingsAck, { error: string }>>(
       (await qaEmit(host, 'qa:host:display-settings', {
@@ -3097,7 +3097,7 @@ async function assertQaDisplayPresentMode() {
       'update display settings',
     );
     if (
-      settingsAck.settings.visibleCount !== 6 ||
+      settingsAck.settings.visibleCount !== 10 ||
       settingsAck.settings.labelFilter !== publicLabel.id
     ) {
       throw new Error(`display settings were not normalized: ${JSON.stringify(settingsAck)}`);
@@ -3113,7 +3113,7 @@ async function assertQaDisplayPresentMode() {
     if (
       reattach.state.displaySettings.sort !== 'recent' ||
       reattach.state.displaySettings.labelFilter !== publicLabel.id ||
-      reattach.state.displaySettings.visibleCount !== 6 ||
+      reattach.state.displaySettings.visibleCount !== 10 ||
       reattach.state.labels.some((label) => label.id === privateLabel.id)
     ) {
       throw new Error(`bad display settings hydration: ${JSON.stringify(reattach.state)}`);

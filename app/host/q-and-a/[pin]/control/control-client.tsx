@@ -912,7 +912,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
               </button>
             </div>
             <p className="mt-2 ticker text-[10px] tracking-widest opacity-60">
-              Projection shows LIVE questions only · public labels only · max 06 rows
+              Projection shows LIVE questions only · public labels only · max 10 rows
             </p>
           </div>
         </div>

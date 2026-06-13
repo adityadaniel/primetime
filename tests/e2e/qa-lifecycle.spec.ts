@@ -92,11 +92,12 @@ test.describe('Q&A host lifecycle', () => {
     expect(submitAck).toHaveProperty('questionId');
     const questionId = (submitAck as { questionId: string }).questionId;
 
-    // 6. Host approves (IN_REVIEW → LIVE)
-    const approveAck = await emitAck<{ ok: true } | { error: string }>(host, 'qa:host:moderate', {
+    // 6. Host approves (IN_REVIEW → LIVE). The server exposes discrete
+    // moderation events (qa:host:approve/dismiss/answered/archive), not a
+    // single qa:host:moderate{action} — match what the client actually emits.
+    const approveAck = await emitAck<{ ok: true } | { error: string }>(host, 'qa:host:approve', {
       pin,
       questionId,
-      action: 'approve',
     });
     expect(approveAck).toHaveProperty('ok', true);
 
