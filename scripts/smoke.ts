@@ -3352,20 +3352,18 @@ async function assertQaFullLifecycleCsvExport() {
     if (!('questionId' in submitAck2)) throw new Error('submit2 failed');
     const q2Id = submitAck2.questionId;
 
-    // 6. Host approves both questions (moderate: IN_REVIEW -> LIVE)
+    // 6. Host approves both questions (IN_REVIEW -> LIVE)
     qaOk(
-      (await qaEmit(host, 'qa:host:moderate', {
+      (await qaEmit(host, 'qa:host:approve', {
         pin,
         questionId: q1Id,
-        action: 'approve',
       })) as { ok: true } | { error: string },
       'approve q1',
     );
     qaOk(
-      (await qaEmit(host, 'qa:host:moderate', {
+      (await qaEmit(host, 'qa:host:approve', {
         pin,
         questionId: q2Id,
-        action: 'approve',
       })) as { ok: true } | { error: string },
       'approve q2',
     );
@@ -3437,10 +3435,9 @@ async function assertQaFullLifecycleCsvExport() {
 
     // 11. Host marks q1 as answered
     qaOk(
-      (await qaEmit(host, 'qa:host:moderate', {
+      (await qaEmit(host, 'qa:host:answered', {
         pin,
         questionId: q1Id,
-        action: 'answer',
       })) as { ok: true } | { error: string },
       'mark answered',
     );
