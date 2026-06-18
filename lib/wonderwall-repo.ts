@@ -19,10 +19,13 @@ import {
 } from '@prisma/client';
 import { prisma } from './db';
 import { parseLinkedInPostUrl, type WonderWallParseResult } from './wonderwall-input';
+import {
+  WONDERWALL_DESCRIPTION_MAX,
+  WONDERWALL_INSTRUCTIONS_MAX,
+  WONDERWALL_TITLE_MAX,
+} from './wonderwall-limits';
 
-export const WONDERWALL_TITLE_MAX = 100;
-export const WONDERWALL_DESCRIPTION_MAX = 200;
-export const WONDERWALL_INSTRUCTIONS_MAX = 240;
+export { WONDERWALL_DESCRIPTION_MAX, WONDERWALL_INSTRUCTIONS_MAX, WONDERWALL_TITLE_MAX };
 export const WONDERWALL_POST_LIMIT = 100;
 
 // Public display/player DTO. Intentionally excludes every review-only field
