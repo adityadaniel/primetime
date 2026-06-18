@@ -50,12 +50,13 @@ const URN_ALTERNATION = URN_TYPES.join('|');
 // pathname by the URL parser. Only numeric ids are accepted.
 const FEED_URN_RE = new RegExp(`^urn:li:(${URN_ALTERNATION}):(\\d+)$`);
 
-// `/posts/<vanity>_<type>-<digits>-<suffix>` — extract the `<type>-<digits>`
-// token from the slug. Only numeric ids are accepted, and the token must sit at
-// the start of the slug or after LinkedIn's vanity separator (`_`). The id must
+// `/posts/<slug>` — extract the `<type>-<digits>` token from the slug. Only
+// numeric ids are accepted. LinkedIn slugs can prefix the token with either the
+// vanity separator (`_`) or a keyword separator (`-`), e.g.
+// `person_activity-123-suffix` and `person_topic-share-123-suffix`. The id must
 // be followed by LinkedIn's suffix separator (`-`) or the slug end so malformed
 // prefixes like `activity-123abc` are not treated as valid post ids.
-const POSTS_TOKEN_RE = new RegExp(`(?:^|_)(${URN_ALTERNATION})-(\\d+)(?:-|$)`);
+const POSTS_TOKEN_RE = new RegExp(`(?:^|[_-])(${URN_ALTERNATION})-(\\d+)(?:-|$)`);
 
 function buildUrn(type: UrnType, id: string): LinkedInPostUrn {
   return `urn:li:${type}:${id}` as LinkedInPostUrn;

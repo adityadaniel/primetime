@@ -36,6 +36,17 @@ describe('parseLinkedInPostUrl — supported post URLs', () => {
     expect(result.ok && result.urn).toBe(`urn:li:share:${ID}`);
   });
 
+  it('parses LinkedIn iOS shared posts whose share token is hyphen-delimited in the slug', () => {
+    const url =
+      'https://www.linkedin.com/posts/vadim-krutov_swiftui-iosdev-swiftlang-share-7472241865027735552-QsZF/?utm_source=social_share_send&utm_medium=ios_app&rcm=ACoAAA_XkkIBwu4gsQnVrkQSuO3-n9PZWRiphTU&utm_campaign=copy_link';
+    const result = parseLinkedInPostUrl(url);
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.urn).toBe('urn:li:share:7472241865027735552');
+    expect(result.ok && result.embedUrl).toBe(
+      'https://www.linkedin.com/embed/feed/update/urn:li:share:7472241865027735552',
+    );
+  });
+
   it('parses the stretch feed/update ugcPost urn form', () => {
     const url = `https://www.linkedin.com/feed/update/urn:li:ugcPost:${ID}`;
     const result = parseLinkedInPostUrl(url);
