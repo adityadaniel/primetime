@@ -240,6 +240,10 @@ export async function submitPost(args: {
   if (session.status === 'ENDED' || session.status === 'ARCHIVED') {
     throw new WonderWallSubmissionError('submissions_closed');
   }
+  const currentPostCount = await prisma.wonderWallPost.count({ where: { sessionId: session.id } });
+  if (currentPostCount >= WONDERWALL_POST_LIMIT) {
+    throw new WonderWallSubmissionError('submissions_closed');
+  }
   const parsed = parseLinkedInPostUrl(args.url);
   if (!parsed.ok) throw new WonderWallSubmissionError(parsed.reason);
   return prisma.wonderWallPost.create({

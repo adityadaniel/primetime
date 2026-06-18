@@ -9,6 +9,7 @@ const postFindMany = vi.fn();
 const postFindFirst = vi.fn();
 const postUpdate = vi.fn();
 const postAggregate = vi.fn();
+const postCount = vi.fn();
 
 vi.mock('./db', () => {
   const prisma: Record<string, unknown> = {
@@ -24,6 +25,7 @@ vi.mock('./db', () => {
       findFirst: (args: unknown) => postFindFirst(args),
       update: (args: unknown) => postUpdate(args),
       aggregate: (args: unknown) => postAggregate(args),
+      count: (args: unknown) => postCount(args),
     },
   };
   // Interactive-transaction mock: run the callback against the same mocked
@@ -59,7 +61,9 @@ beforeEach(() => {
   postFindFirst.mockReset();
   postUpdate.mockReset();
   postAggregate.mockReset();
+  postCount.mockReset();
   postFindFirst.mockResolvedValue(null);
+  postCount.mockResolvedValue(0);
   // Default: update echoes back the data it was given merged with the id.
   postUpdate.mockImplementation((args: { where: { id: string }; data: Record<string, unknown> }) =>
     Promise.resolve({ id: args.where.id, ...args.data }),
@@ -289,6 +293,17 @@ describe('submitPost', () => {
     await expect(
       submitPost({ pin: '123456', url: 'https://www.linkedin.com/feed/update/urn:li:activity:1/' }),
     ).rejects.toMatchObject({ reason: 'submissions_closed' });
+    expect(postCount).not.toHaveBeenCalled();
+    expect(postCreate).not.toHaveBeenCalled();
+  });
+
+  it('throws submissions_closed when the post cap is reached', async () => {
+    sessionFindUnique.mockResolvedValueOnce({ id: 'ww_1', status: 'LIVE' });
+    postCount.mockResolvedValueOnce(100);
+    await expect(
+      submitPost({ pin: '123456', url: 'https://www.linkedin.com/feed/update/urn:li:activity:1/' }),
+    ).rejects.toMatchObject({ reason: 'submissions_closed' });
+    expect(postCount).toHaveBeenCalledWith({ where: { sessionId: 'ww_1' } });
     expect(postCreate).not.toHaveBeenCalled();
   });
 });
