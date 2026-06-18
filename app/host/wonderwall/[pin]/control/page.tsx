@@ -2,10 +2,11 @@
 // auth + ownership guard the shell established (host session required, wrong
 // host → notFound so the wall's existence isn't leaked), loads the FULL host
 // state (every status, not just displayable) via getHostStateByPin, and hands a
-// serialized, host-safe post list to the client review queue. The display link
-// and CSV export are placeholders here — those land with their own tickets; this
-// ticket owns the review/approve/reject/hide/restore/reorder surface only.
-// See docs/wonderwall-iframe-plan.md §8.3 and §10.1.
+// serialized, host-safe post list to the client review queue. The EXPORT
+// SUBMISSIONS CSV action (MID-403) links to the host-only GET export route,
+// which re-checks auth + ownership and streams every submission across statuses.
+// The display link remains a placeholder pending its own ticket.
+// See docs/wonderwall-iframe-plan.md §8.3, §6.8 and §10.1.
 
 import { notFound } from 'next/navigation';
 import { auth } from '@/auth';
@@ -94,13 +95,19 @@ export default async function WonderWallControlPage({
           >
             DISPLAY ROUTE COMING NEXT
           </span>
-          <span
-            aria-disabled="true"
-            className="ink-border stamp px-5 py-3 ticker tracking-widest text-[12px] text-center opacity-60"
-            style={{ background: 'var(--ash)', color: 'var(--bone)' }}
+          {/* Host-only CSV audit export (MID-403). Plain download anchor — the
+              GET route enforces host auth + ownership and streams every
+              submission (all statuses), not just displayable posts. `download`
+              hints the filename; the route's Content-Disposition is the source
+              of truth. */}
+          <a
+            href={`/api/wonderwall/${state.pin}/export`}
+            download={`wonderwall-${state.pin}-submissions.csv`}
+            className="ink-border stamp px-5 py-3 ticker tracking-widest text-[12px] text-center"
+            style={{ background: 'var(--ink)', color: 'var(--bone)' }}
           >
-            EXPORT SUBMISSIONS CSV COMING NEXT
-          </span>
+            EXPORT SUBMISSIONS CSV ↓
+          </a>
         </div>
 
         <WonderWallControlClient pin={state.pin} initialPosts={posts} />
