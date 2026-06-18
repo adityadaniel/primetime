@@ -2,16 +2,17 @@
 // auth + ownership guard the shell established (host session required, wrong
 // host → notFound so the wall's existence isn't leaked), loads the FULL host
 // state (every status, not just displayable) via getHostStateByPin, and hands a
-// serialized, host-safe post list to the client review queue. The EXPORT
-// SUBMISSIONS CSV action (MID-403) links to the host-only GET export route,
-// which re-checks auth + ownership and streams every submission across statuses.
-// The display link remains a placeholder pending its own ticket.
-// See docs/wonderwall-iframe-plan.md §8.3, §6.8 and §10.1.
+// serialized, host-safe post list to the client review queue. The public display
+// action opens the PIN-addressed projector route; the EXPORT SUBMISSIONS CSV
+// action (MID-403) links to the host-only GET export route, which re-checks auth
+// + ownership and streams every submission across statuses.
+// See docs/wonderwall-iframe-plan.md §8.3, §6.8, §8.4 and §10.1.
 
 import { notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import AccountMenu from '@/components/AccountMenu';
 import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
+import { publicUrl } from '@/lib/public-origin';
 import { getHostStateByPin, WonderWallOwnershipError } from '@/lib/wonderwall-repo';
 import WonderWallControlClient, { type ControlPost } from './control-client';
 
@@ -38,6 +39,7 @@ export default async function WonderWallControlPage({
 
   const pendingCount = state.posts.filter((post) => post.status === 'PENDING').length;
   const displayableCount = state.posts.filter((post) => post.canDisplay).length;
+  const displayUrl = publicUrl(`/host/wonderwall/${state.pin}/display`);
 
   // Host-safe serialization (Dates → ISO so the row data can cross to the
   // client). The host owns the wall, so review fields are fine to ship here.
@@ -88,13 +90,17 @@ export default async function WonderWallControlPage({
         </div>
 
         <div className="mt-8 flex flex-col sm:flex-row gap-3">
-          <span
-            aria-disabled="true"
-            className="ink-border stamp px-5 py-3 ticker tracking-widest text-[12px] text-center opacity-60"
-            style={{ background: 'var(--ash)', color: 'var(--bone)' }}
+          {/* Public projector route: no host cookie required, so use publicUrl()
+              to prefer NEXT_PUBLIC_SITE_URL when a tunnel/live origin is configured. */}
+          <a
+            href={displayUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ink-border stamp px-5 py-3 ticker tracking-widest text-[12px] text-center"
+            style={{ background: 'var(--vermilion)', color: 'var(--bone)' }}
           >
-            DISPLAY ROUTE COMING NEXT
-          </span>
+            OPEN DISPLAY ↗
+          </a>
           {/* Host-only CSV audit export (MID-403). Plain download anchor — the
               GET route enforces host auth + ownership and streams every
               submission (all statuses), not just displayable posts. `download`
