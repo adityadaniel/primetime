@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { type LinkedInPostUrn, parseLinkedInPostUrl, toLinkedInEmbedUrl } from './wonderwall-input';
+import {
+  type LinkedInPostUrn,
+  parseLinkedInPostUrl,
+  toCollapsedLinkedInEmbedUrl,
+  toLinkedInEmbedUrl,
+} from './wonderwall-input';
 
 const ID = '1234567890123456789';
 
@@ -194,16 +199,34 @@ describe('parseLinkedInPostUrl — rejections', () => {
 });
 
 describe('toLinkedInEmbedUrl', () => {
-  it('builds the exact LinkedIn embed URL for a URN', () => {
+  it('builds the exact canonical LinkedIn embed URL for a URN', () => {
     const urn: LinkedInPostUrn = `urn:li:activity:${ID}`;
     expect(toLinkedInEmbedUrl(urn)).toBe(
       `https://www.linkedin.com/embed/feed/update/urn:li:activity:${ID}`,
     );
   });
 
-  it('matches the embedUrl returned by the parser', () => {
+  it('matches the canonical embedUrl returned by the parser', () => {
     const url = `https://www.linkedin.com/feed/update/urn:li:share:${ID}`;
     const result = parseLinkedInPostUrl(url);
     expect(result.ok && result.embedUrl).toBe(toLinkedInEmbedUrl(`urn:li:share:${ID}`));
+  });
+});
+
+describe('toCollapsedLinkedInEmbedUrl', () => {
+  it('adds collapsed=1 to the official LinkedIn iframe URL', () => {
+    expect(
+      toCollapsedLinkedInEmbedUrl(
+        `https://www.linkedin.com/embed/feed/update/urn:li:activity:${ID}`,
+      ),
+    ).toBe(`https://www.linkedin.com/embed/feed/update/urn:li:activity:${ID}?collapsed=1`);
+  });
+
+  it('preserves existing query params while forcing collapsed=1', () => {
+    expect(
+      toCollapsedLinkedInEmbedUrl(
+        `https://www.linkedin.com/embed/feed/update/urn:li:share:${ID}?foo=bar&collapsed=0`,
+      ),
+    ).toBe(`https://www.linkedin.com/embed/feed/update/urn:li:share:${ID}?foo=bar&collapsed=1`);
   });
 });

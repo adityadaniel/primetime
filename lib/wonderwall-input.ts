@@ -77,6 +77,16 @@ export function toLinkedInEmbedUrl(urn: LinkedInPostUrn): string {
   return `https://www.linkedin.com/embed/feed/update/${urn}`;
 }
 
+// LinkedIn's official iframe supports `collapsed=1`, which mirrors the home
+// timeline behavior for long text posts: show a shortened body with the native
+// `…more` expander inside LinkedIn's own iframe. Apply this at display time so
+// existing DB rows with canonical embed URLs also collapse without migration.
+export function toCollapsedLinkedInEmbedUrl(embedUrl: string): string {
+  const url = new URL(embedUrl);
+  url.searchParams.set('collapsed', '1');
+  return url.toString();
+}
+
 export function parseLinkedInPostUrl(input: string): WonderWallParseResult {
   if (typeof input !== 'string') return { ok: false, reason: 'invalid_url' };
 

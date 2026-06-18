@@ -17,6 +17,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useState } from 'react';
 import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { publicHost, publicUrl } from '@/lib/public-origin';
+import { toCollapsedLinkedInEmbedUrl } from '@/lib/wonderwall-input';
 
 const REFRESH_INTERVAL_MS = 8000;
 
@@ -122,7 +123,7 @@ export default function WonderWallDisplayClient({
         {posts.length === 0 ? (
           <EmptyState pin={pin} joinLabel={joinLabel} />
         ) : (
-          <div className="columns-1 md:columns-2 2xl:columns-3 gap-5 [column-fill:_balance]">
+          <div className="columns-1 md:columns-3 gap-5 [column-fill:_balance]">
             {posts.map((post) => (
               <PostCard key={post.id} post={post} />
             ))}
@@ -137,9 +138,9 @@ function PostCard({ post }: { post: DisplayPost }) {
   return (
     <article className="mb-5 break-inside-avoid ink-border bg-white overflow-hidden">
       <iframe
-        src={post.embedUrl}
+        src={toCollapsedLinkedInEmbedUrl(post.embedUrl)}
         width="504"
-        height="700"
+        height="620"
         title="Embedded LinkedIn post"
         allowFullScreen
         loading="lazy"
