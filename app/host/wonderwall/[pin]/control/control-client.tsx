@@ -9,9 +9,23 @@
 // the reorder endpoint. Each row states CAN DISPLAY: YES/NO explicitly so the
 // host is never guessing whether a post is on air. An optional collapsed iframe
 // preview is available per row for spot-checking before approval.
-// See docs/wonderwall-iframe-plan.md §8.3.
+//
+// Refresh (MID-405): the queue keeps optimistic local state for snappy review,
+// but it also polls router.refresh() so submissions participants send AFTER the
+// page mounted surface as new PENDING rows without a manual reload — the server
+// component re-runs against the DB (the source of truth) and hands fresh rows in
+// as initialPosts, which the sync effect below reconciles into local state. This
+// is the documented polling fallback; no Socket.IO and no in-memory WonderWall
+// state machine are introduced. See docs/wonderwall-iframe-plan.md §8.3.
 
-import { useCallback, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+// Poll cadence for the host queue. 8s matches the projector display
+// (display-client.tsx): brisk enough that new submissions appear within a few
+// seconds, slow enough that the auth'd page re-render and DB read stay cheap for
+// a single host tab. Mutations stay HTTP + DB; this only re-reads.
+const REFRESH_INTERVAL_MS = 8000;
 
 type PostStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'HIDDEN' | 'FAILED';
 
@@ -59,12 +73,43 @@ export default function WonderWallControlClient({
   pin: string;
   initialPosts: ControlPost[];
 }) {
+  const router = useRouter();
   const [posts, setPosts] = useState<ControlPost[]>(initialPosts);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+
+  // True while a review/reorder PATCH is in flight. Read by the sync effect so
+  // an in-flight poll can't clobber an optimistic update with a row it fetched a
+  // moment before the host acted (the mutation already persisted to the DB, so
+  // the next poll reconciles to the same result).
+  const busyRef = useRef(false);
+  useEffect(() => {
+    busyRef.current = busyId !== null;
+  }, [busyId]);
+
+  // Reconcile server-refreshed rows into local state. router.refresh() (and any
+  // navigation) re-runs the page server component with fresh DB rows handed in
+  // as initialPosts; without this the optimistic local copy would never pick up
+  // posts participants submit after mount. Form-only UI state (rejectReason,
+  // rejectingId, previewId) lives outside `posts`, so a sync never disturbs a
+  // reject reason the host is mid-typing.
+  useEffect(() => {
+    if (busyRef.current) return;
+    setPosts(initialPosts);
+  }, [initialPosts]);
+
+  // Light polling stand-in for full realtime refresh (MID-405): re-run the
+  // server component so participant submissions surface as PENDING rows on their
+  // own. Skip while a mutation is in flight to avoid a stale-read flicker.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (!busyRef.current) router.refresh();
+    }, REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [router]);
 
   const pending = useMemo(() => posts.filter((p) => p.status === 'PENDING'), [posts]);
   const onAir = useMemo(() => displayOrder(posts), [posts]);
@@ -98,13 +143,17 @@ export default function WonderWallControlClient({
         replacePost(data.post);
         setRejectingId(null);
         setRejectReason('');
+        // Re-sync with the DB so a status change (e.g. approve assigning a
+        // display position) reflects authoritative server state immediately
+        // rather than waiting for the next poll tick.
+        router.refresh();
       } catch {
         setError('Network error — reload and try again.');
       } finally {
         setBusyId(null);
       }
     },
-    [pin, replacePost],
+    [pin, replacePost, router],
   );
 
   const move = useCallback(
@@ -136,13 +185,16 @@ export default function WonderWallControlClient({
             positionById.has(p.id) ? { ...p, position: positionById.get(p.id)! } : p,
           ),
         );
+        // Re-sync with the DB so the authoritative reorder result lands without
+        // waiting for the next poll tick.
+        router.refresh();
       } catch {
         setError('Network error — reload and try again.');
       } finally {
         setBusyId(null);
       }
     },
-    [pin, posts],
+    [pin, posts, router],
   );
 
   return (
