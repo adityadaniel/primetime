@@ -2,6 +2,11 @@
 const nextConfig = {
   reactStrictMode: true,
   devIndicators: false,
+  // The local dev server is commonly accessed through the Cloudflare tunnel
+  // during iPhone/Safari QA. Next.js 15 warns today — and will block in a
+  // future major — unless that public dev origin is explicitly allowed for
+  // /_next/* assets and HMR requests.
+  allowedDevOrigins: ['live.theprimetime.id'],
   images: {
     // Serve modern formats for quiz stills (uploaded under /uploads). AVIF/WebP
     // are far smaller than the source PNG/JPEG, which matters most in tunnel
