@@ -1,15 +1,18 @@
-// WonderWall host control shell (MID-398). This prevents the create flow from
-// persisting a session and then landing on a 404. The full review queue and
-// mutation controls are implemented in MID-401; this page only performs the
-// same ownership guard the full control room will need and gives the host a
-// working landing page after creation.
+// WonderWall host control room (MID-401). Server component: it runs the same
+// auth + ownership guard the shell established (host session required, wrong
+// host → notFound so the wall's existence isn't leaked), loads the FULL host
+// state (every status, not just displayable) via getHostStateByPin, and hands a
+// serialized, host-safe post list to the client review queue. The display link
+// and CSV export are placeholders here — those land with their own tickets; this
+// ticket owns the review/approve/reject/hide/restore/reorder surface only.
+// See docs/wonderwall-iframe-plan.md §8.3 and §10.1.
 
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import AccountMenu from '@/components/AccountMenu';
 import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { getHostStateByPin, WonderWallOwnershipError } from '@/lib/wonderwall-repo';
+import WonderWallControlClient, { type ControlPost } from './control-client';
 
 export default async function WonderWallControlPage({
   params,
@@ -35,10 +38,27 @@ export default async function WonderWallControlPage({
   const pendingCount = state.posts.filter((post) => post.status === 'PENDING').length;
   const displayableCount = state.posts.filter((post) => post.canDisplay).length;
 
+  // Host-safe serialization (Dates → ISO so the row data can cross to the
+  // client). The host owns the wall, so review fields are fine to ship here.
+  const posts: ControlPost[] = state.posts.map((post) => ({
+    id: post.id,
+    originalUrl: post.originalUrl,
+    urn: post.urn,
+    embedUrl: post.embedUrl,
+    status: post.status,
+    canDisplay: post.canDisplay,
+    position: post.position,
+    submitterName: post.submitterName,
+    submitterKey: post.submitterKey,
+    rejectionReason: post.rejectionReason,
+    failureReason: post.failureReason,
+    createdAt: post.createdAt.toISOString(),
+  }));
+
   return (
     <main className="relative min-h-screen pb-24">
       <header className="px-8 pt-6 flex items-center justify-between">
-        <Chyron label="DIRECTOR · WONDERWALL CONTROL" number="WW" />
+        <Chyron label="DIRECTOR · WONDERWALL" number="WW" />
         <div className="flex items-center gap-6">
           <FrameCounter index={1} />
           <Clock />
@@ -66,31 +86,24 @@ export default async function WonderWallControlPage({
           <Metric label="CAN DISPLAY" value={displayableCount} />
         </div>
 
-        <div className="mt-8 ink-border p-6" style={{ background: 'var(--bone)' }}>
-          <p className="chyron" style={{ color: 'var(--vermilion)' }}>
-            REVIEW QUEUE COMING NEXT
-          </p>
-          <p className="font-editorial italic mt-3 text-lg opacity-80">
-            The WonderWall session is ready. Participant submission, review actions, ordering,
-            export, and live display controls land in the next WonderWall tickets. For now, this
-            shell keeps the successful create path working and ownership-guarded.
-          </p>
-          <div className="mt-6 flex flex-col sm:flex-row gap-3">
-            <span
-              aria-disabled="true"
-              className="ink-border stamp px-5 py-3 ticker tracking-widest text-[12px] text-center opacity-60"
-              style={{ background: 'var(--ash)', color: 'var(--bone)' }}
-            >
-              DISPLAY ROUTE COMING NEXT
-            </span>
-            <Link
-              href="/host/wonderwall/new"
-              className="ink-border stamp px-5 py-3 ticker tracking-widest text-[12px] text-center"
-            >
-              CREATE ANOTHER WALL
-            </Link>
-          </div>
+        <div className="mt-8 flex flex-col sm:flex-row gap-3">
+          <span
+            aria-disabled="true"
+            className="ink-border stamp px-5 py-3 ticker tracking-widest text-[12px] text-center opacity-60"
+            style={{ background: 'var(--ash)', color: 'var(--bone)' }}
+          >
+            DISPLAY ROUTE COMING NEXT
+          </span>
+          <span
+            aria-disabled="true"
+            className="ink-border stamp px-5 py-3 ticker tracking-widest text-[12px] text-center opacity-60"
+            style={{ background: 'var(--ash)', color: 'var(--bone)' }}
+          >
+            EXPORT SUBMISSIONS CSV COMING NEXT
+          </span>
         </div>
+
+        <WonderWallControlClient pin={state.pin} initialPosts={posts} />
       </section>
     </main>
   );
