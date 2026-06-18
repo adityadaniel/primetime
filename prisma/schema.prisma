@@ -31,6 +31,7 @@ model User {
   hostedSessions     GameSession[]
   wordCloudSessions  WordCloudSession[]
   qaSessions         QASession[]
+  wonderWallSessions WonderWallSession[]
   quizzes            Quiz[]
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
@@ -393,4 +394,78 @@ model QAModerationEvent {
   createdAt  DateTime    @default(now())
 
   @@index([sessionId, createdAt])
+}
+
+enum WonderWallStatus {
+  DRAFT
+  LIVE
+  ENDED
+  ARCHIVED
+}
+
+enum WonderWallPostStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  HIDDEN
+  FAILED
+}
+
+model WonderWallSession {
+  id           String           @id @default(cuid())
+  pin          String           @unique
+  title        String           @db.VarChar(100)
+  description  String?          @db.VarChar(200)
+  instructions String?          @db.VarChar(240)
+  status       WonderWallStatus @default(DRAFT)
+  hostUserId   String?
+  hostUser     User?            @relation(fields: [hostUserId], references: [id], onDelete: SetNull)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  endedAt      DateTime?
+  posts        WonderWallPost[]
+
+  @@index([hostUserId, createdAt])
+  @@index([status])
+}
+
+model WonderWallPost {
+  id              String               @id @default(cuid())
+  sessionId       String
+  session         WonderWallSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  originalUrl     String               @db.Text
+  urn             String               @db.VarChar(120)
+  embedUrl        String               @db.Text
+  status          WonderWallPostStatus @default(PENDING)
+  // Explicit projector gate requested by product review: display surfaces must
+  // render only posts where canDisplay=true. Parsing a URL is not enough; the
+  // host has to approve it first.
+  canDisplay      Boolean              @default(false)
+  // Display ordering for approved/displayable posts. Null until approved.
+  position        Int?
+  // Submitter feedback metadata. submitterKey is an opaque browser-scoped id
+  // used to correlate participant feedback; it is not a security boundary.
+  submitterName   String?              @db.VarChar(40)
+  submitterKey    String?              @db.VarChar(120)
+  // Host-provided, user-facing reason shown to a rejected submitter.
+  rejectionReason String?              @db.VarChar(240)
+  // Parser/embed validation failure reason when status=FAILED.
+  failureReason   String?              @db.VarChar(240)
+  // Review/audit metadata. reviewedAt tracks the latest host action; the
+  // per-action timestamps preserve approval/rejection/hide/restore history.
+  reviewedAt           DateTime?
+  reviewedByHostUserId String?
+  approvedAt           DateTime?
+  rejectedAt           DateTime?
+  hiddenAt             DateTime?
+  restoredAt           DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  // Intentionally not unique in v1. A rejected/failed URL may be resubmitted
+  // later with a cleaner link; the control surface can group duplicates
+  // visually instead.
+  @@index([sessionId, position])
+  @@index([sessionId, status])
+  @@index([sessionId, canDisplay, position])
 }
