@@ -9,6 +9,8 @@ describe('auth route visibility', () => {
     expect(isPublicHostDisplayPath('/host/wordcloud/123456/display/')).toBe(true);
     expect(isPublicHostDisplayPath('/host/q-and-a/123456/display')).toBe(true);
     expect(isPublicHostDisplayPath('/host/q-and-a/123456/display/')).toBe(true);
+    expect(isPublicHostDisplayPath('/host/wonderwall/123456/display')).toBe(true);
+    expect(isPublicHostDisplayPath('/host/wonderwall/123456/display/')).toBe(true);
   });
 
   it('keeps builder and control-room routes protected', () => {
@@ -19,6 +21,8 @@ describe('auth route visibility', () => {
     expect(isPublicHostDisplayPath('/host/wordcloud/123456/control')).toBe(false);
     expect(isPublicHostDisplayPath('/host/q-and-a/new')).toBe(false);
     expect(isPublicHostDisplayPath('/host/q-and-a/123456/control')).toBe(false);
+    expect(isPublicHostDisplayPath('/host/wonderwall/new')).toBe(false);
+    expect(isPublicHostDisplayPath('/host/wonderwall/123456/control')).toBe(false);
   });
 
   it('lets Auth.js middleware pass unauthenticated display pages only', async () => {
