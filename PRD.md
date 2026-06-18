@@ -27,6 +27,7 @@ BROADCAST is not strictly a quiz product. Other activity types live in sister PR
 
 - **Word Cloud** (live typographic prompt) — see [`docs/wordcloud-prd.md`](docs/wordcloud-prd.md)
 - **Q&A** (live audience questions, voting, moderation, display) — see [`docs/q-and-a-prd.md`](docs/q-and-a-prd.md)
+- **WonderWall** (moderated wall of public LinkedIn posts via official iframe embeds — participants submit URLs, host approves, only `APPROVED` + `canDisplay=true` posts project) — see [`docs/wonderwall-prd.md`](docs/wonderwall-prd.md)
 
 ## 2. Users & Roles
 

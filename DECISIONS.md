@@ -10,6 +10,52 @@ and add a new entry below.
 
 ---
 
+## 2026-06-19 · WonderWall v1: official LinkedIn iframe embeds only — no scraping, no LinkedIn API, no screenshot fallback
+
+**Status:** Accepted
+
+**Context:** WonderWall (the fourth standalone activity, MID-395 → MID-408)
+projects public LinkedIn posts on the room display. There were several ways to
+render a post: scrape the LinkedIn page HTML, drive a logged-in/headless
+account, call a LinkedIn API for post/member data, generate a server-side
+screenshot, or use LinkedIn's official public iframe embed. Most of those carry
+compliance, maintenance, and privacy cost: scraping and automation fight
+LinkedIn's access controls and rate limits, an API integration needs partner
+access we do not have, and screenshots mean rendering and storing post content.
+Separately, because participants — not just the host — submit URLs, there was a
+risk that a public submission endpoint could put unreviewed content on the
+projector.
+
+**Decision:** v1 uses **only** LinkedIn's official public iframe embed
+(`https://www.linkedin.com/embed/feed/update/${urn}`), built from a URL parsed
+and normalized by the pure helper `lib/wonderwall-input.ts`. PRIMETIME does
+**not** scrape LinkedIn, does **not** use a logged-in/headless automation
+account, does **not** call any LinkedIn API for member/post data, and does
+**not** generate screenshots. It stores **only** the original URL, normalized
+URN, generated embed URL, submitter feedback metadata, and review/display
+status/ordering — never LinkedIn post body, author/profile data, reactions,
+comments, or images. Participant-submitted URLs enter a host review queue as
+`PENDING` / `canDisplay=false` and are **never** shown on the public display
+until a host approves them; the display query returns only
+`status=APPROVED AND canDisplay=true` rows (see `docs/wonderwall-prd.md` §5).
+When LinkedIn refuses to render an embed, the card shows an "OPEN ON LINKEDIN"
+link rather than any scraping/screenshot fallback. The host-only CSV export
+carries the same metadata-only set and never post content.
+
+**Consequences:** WonderWall stays inside LinkedIn's sanctioned public-embed
+surface with minimal compliance/maintenance risk, and no unreviewed content can
+reach the projector. The trade-offs accepted: cross-origin iframes have a fixed
+height (700px in v1) and their failure cannot be reliably detected client-side
+(mitigated by the manual LinkedIn link); some posts may refuse to embed; and
+many iframes are heavy, so a per-wall submission cap (`WONDERWALL_POST_LIMIT =
+100`) applies. Screenshots, card-height controls, and multi-platform support are
+explicitly deferred (plan §15). Any future agent tempted to add scraping, a
+LinkedIn API call, headless automation, or a screenshot fallback must revisit
+this entry first — these are deliberate non-goals, not gaps. Authoritative
+detail lives in `docs/wonderwall-iframe-plan.md` and `docs/wonderwall-prd.md`.
+
+---
+
 ## 2026-06-11 · Q&A edit window: unlimited for host, no time limit for participants (withdraw-and-resubmit model)
 
 **Status:** Accepted

@@ -1,9 +1,11 @@
 # WonderWall — LinkedIn iframe Implementation Plan
 
-> **Status:** Draft for review / comments
-> **Date:** 2026-06-18
+> **Status:** Implemented (v1) — this is the authoritative build plan; `docs/wonderwall-prd.md` is the concise product/behavior reference, and `DECISIONS.md` (2026-06-19) records the durable iframe/no-scraping decision.
+> **Date:** 2026-06-18 (plan) · v1 landed on `feat/wonderwall-iframe`
 > **Scope:** Add a fourth standalone PRIMETIME activity that renders public LinkedIn posts in a waterfall dashboard using official LinkedIn iframe embeds.
 > **Primary goal:** Let users submit LinkedIn post URLs, let the host approve what is displayable, and project only approved LinkedIn-native post cards alongside Quiz, Word Cloud, and Q&A.
+>
+> **As-built deltas vs. this plan:** (1) Light realtime refresh shipped as **polling** — the display client calls `router.refresh()` on an interval (8 s) and the participant page polls `my-posts`; the Socket.IO refresh event (§9.2, §15 Task 15) is deferred and `server.ts` has **no** WonderWall events. (2) The participant submission path persists only valid URLs as `PENDING`; a `FAILED` audit row from a parse failure is not written from the public endpoint (the `FAILED` status is reachable via host review). Everything else below matches the shipped code.
 
 ---
 
@@ -122,7 +124,7 @@ V1 should be deliberately conservative:
 6. Always keep a path back to LinkedIn, e.g. card link or “Open on LinkedIn”.
 7. If LinkedIn refuses to render a post, show a graceful placeholder instead of attempting fallback scraping.
 
-Decision to later record in `DECISIONS.md`:
+Decision recorded in `DECISIONS.md` (2026-06-19 · WonderWall v1 entry):
 
 > WonderWall v1 uses official LinkedIn public iframe embeds only. User-submitted LinkedIn URLs enter a host review queue and are not shown on the public display until approved. PRIMETIME does not scrape LinkedIn, does not use a logged-in automation account, does not call LinkedIn APIs for member data, and does not store LinkedIn post content. Screenshots and API integrations are explicitly deferred.
 
@@ -911,6 +913,8 @@ V1B: socket refresh event
 ```
 
 But since PRIMETIME is a live display product, I recommend the socket refresh event.
+
+> **Shipped in v1:** V1A (polling). The display polls via `router.refresh()` every 8 s and the participant page polls `my-posts`; `server.ts` was not touched. The socket refresh event (V1B) remains the recommended follow-up (MID-405).
 
 ---
 

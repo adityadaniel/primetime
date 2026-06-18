@@ -7,7 +7,7 @@ PRIMETIME is a real-time live quiz / word-cloud platform with a vintage broadcas
 Read in this order:
 
 1. `PRD.md` — product requirements and route semantics.
-2. `docs/wordcloud-prd.md` — Word Cloud product scope.
+2. `docs/wordcloud-prd.md` — Word Cloud product scope; `docs/q-and-a-prd.md` — Q&A; `docs/wonderwall-prd.md` — WonderWall (LinkedIn iframe wall).
 3. `DESIGN.md` — visual identity, palette, type, motion rules; preserve the PRIMETIME broadcast identity.
 4. `DECISIONS.md` — durable architecture/product decisions; append, do not rewrite history.
 5. `README.md` — setup, env vars, deployment, and current feature surface.
@@ -63,14 +63,25 @@ Protected host surfaces require a host session:
 - `/host/[pin]/control`
 - `/host/wordcloud/new`
 - `/host/wordcloud/[pin]/control`
+- `/host/wonderwall/new`
+- `/host/wonderwall/[pin]/control`
 
 Public room surfaces are reachable by PIN and must not require a host cookie:
 
 - `/host/[pin]/display`
 - `/host/wordcloud/[pin]/display`
+- `/host/wonderwall/[pin]/display`
 - `/join`
 - `/play/[pin]`
 - `/play/[pin]/wordcloud`
+- `/play/[pin]/wonderwall`
+
+Host-only API routes that share a public route family must enforce auth +
+ownership at the route level, not via a blanket matcher. WonderWall's
+`GET /api/wonderwall/[pin]/export` is host-only (it returns the full
+moderation/audit CSV), while its siblings `GET /api/wonderwall/[pin]`,
+`POST .../posts`, and `GET .../my-posts` stay public-by-PIN — so do **not** add
+`/api/wonderwall/:path*` to the Auth.js middleware.
 
 See `docs/live-origin-auth.md` before changing public URL generation, Auth.js middleware, projection windows, QR codes, or join links.
 
@@ -132,3 +143,10 @@ Docs-only edits can use a lighter check, but still inspect the diff.
   - `/host/q-and-a/[pin]/display` — public projection / present mode
   - `/host/q-and-a/[pin]/questions.csv` — CSV export (host-only)
   - `/play/[pin]/q-and-a` — participant view
+- WonderWall routes (moderated LinkedIn iframe wall — see `docs/wonderwall-prd.md`):
+  - `/host/wonderwall/new` — create wall
+  - `/host/wonderwall/[pin]/control` — review queue (approve/reject/hide/restore/reorder, CSV export)
+  - `/host/wonderwall/[pin]/display` — public waterfall projection; renders only `APPROVED` + `canDisplay=true` posts
+  - `/play/[pin]/wonderwall` — participant submission view
+  - `GET /api/wonderwall/[pin]/export` — submissions CSV export (host-only)
+  - Display invariant: a participant URL becomes `PENDING` on submit and is never projected until a host approves it (`canDisplay=true`).
