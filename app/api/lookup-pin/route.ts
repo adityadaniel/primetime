@@ -1,6 +1,7 @@
 // PIN-type lookup. Used by /join to decide whether to route the player to
-// the quiz, word-cloud, or Q&A client BEFORE emitting any socket event
-// (F1 from the codex review). Quiz wins ties, mirroring app/play/[pin]/page.tsx.
+// the quiz, word-cloud, Q&A, or WonderWall client BEFORE emitting any socket
+// event (F1 from the codex review). Quiz wins ties, mirroring
+// app/play/[pin]/page.tsx.
 
 import { type NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
@@ -17,10 +18,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'invalid_pin' }, { status: 400 });
   }
 
-  const [quiz, wc, qa] = await Promise.all([
+  const [quiz, wc, qa, ww] = await Promise.all([
     prisma.gameSession.findUnique({ where: { pin }, select: { id: true } }),
     prisma.wordCloudSession.findUnique({ where: { pin }, select: { id: true, status: true } }),
     prisma.qASession.findUnique({ where: { pin }, select: { id: true, status: true } }),
+    prisma.wonderWallSession.findUnique({ where: { pin }, select: { id: true, status: true } }),
   ]);
 
   if (quiz) return NextResponse.json({ type: 'quiz' as const });
@@ -29,6 +31,9 @@ export async function POST(req: NextRequest) {
   }
   if (qa) {
     return NextResponse.json({ type: 'q-and-a' as const, status: qa.status });
+  }
+  if (ww) {
+    return NextResponse.json({ type: 'wonderwall' as const, status: ww.status });
   }
   // No DB row yet — most likely an in-memory quiz session created via the
   // anonymous /host flow. Default to quiz so the existing socket join flow

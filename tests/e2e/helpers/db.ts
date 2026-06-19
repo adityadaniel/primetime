@@ -13,6 +13,8 @@ export const db = new PrismaClient({
 // resets sequences. Table names are Prisma's PascalCase defaults (no @@map),
 // so they must be double-quoted.
 const TABLES = [
+  'WonderWallPost',
+  'WonderWallSession',
   'SessionAnswer',
   'SessionPlayer',
   'GameSession',

@@ -182,6 +182,12 @@ The timer auto-locks when it hits zero, and locks early once every connected pla
 | `/host/[pin]/display` | Audience | On-air feed (fullscreen on projector) — PIN, question, shapes-only, podium |
 | `/join` | Player | PIN + nickname |
 | `/play/[pin]` | Player | Lobby → answer → reveal → final |
+| `/host/wonderwall/new` | Host | Create a WonderWall (LinkedIn iframe wall) |
+| `/host/wonderwall/[pin]/control` | Host | Review queue — approve/reject/hide/restore/reorder, export submissions CSV |
+| `/host/wonderwall/[pin]/display` | Audience | Public waterfall of approved LinkedIn iframe posts |
+| `/play/[pin]/wonderwall` | Participant | Paste public LinkedIn post URLs, see review feedback |
+
+> Word Cloud, Q&A, and WonderWall reuse the same PIN/host/player/display model. See `docs/wordcloud-prd.md`, `docs/q-and-a-prd.md`, and `docs/wonderwall-prd.md`.
 
 ---
 
@@ -207,6 +213,7 @@ The timer auto-locks when it hits zero, and locks early once every connected pla
 - Smoke test extended to cover reconnect, host pause, cap enforcement, CSV export, and profanity rejection: `npm run smoke`
 - Word Cloud activity (alternative to quiz): host posts a prompt, players submit words, real-time projection cloud with CSV export
 - **Q&A live activity** (Slido-style): host creates a session, participants submit/vote on questions, host moderates/highlights/answers, public display/present mode with board + fullscreen highlight, labels, replies, session controls (close/reopen/end), and CSV export of all questions with votes/labels/replies
+- **WonderWall activity** (moderated LinkedIn iframe wall): participants paste public LinkedIn post URLs by PIN, the host reviews each submission (approve/reject with feedback/hide/restore/reorder), and the public display projects **only** approved posts (`status=APPROVED` + `canDisplay=true`) as a waterfall of official LinkedIn iframe embeds. Host-only CSV export of all submissions across statuses with formula-injection-safe escaping. No scraping, no LinkedIn API, no screenshots, and no post-content storage — only URL/URN/embed/review metadata. See `docs/wonderwall-prd.md`.
 - **OSS configuration surface** — password auth, email, uploads, and billing are configurable via env vars; the player cap is a code-level constant. Defaults require zero SaaS accounts.
 - **Local file upload** — `POST /api/upload` for on-disk file uploads (quiz covers, etc.) with size and MIME validation
 - **Password reset** — optional SMTP or token-print reset flow for OSS self-hosters

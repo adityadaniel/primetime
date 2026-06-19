@@ -10,6 +10,121 @@ and add a new entry below.
 
 ---
 
+## 2026-06-19 · WonderWall author label: store the embedded post's author name (host-only)
+
+**Status:** Accepted — narrows (does not reverse) the WonderWall v1 entry below.
+
+**Context:** In the host control room, posts are listed by submitter. When one
+participant submits several LinkedIn posts, the rows are hard to tell apart (same
+submitter name, only a long opaque URN to distinguish them). The natural
+differentiator is the embedded post's **author** — but the v1 boundary stores
+"never author/profile data". We already render the official embed headless to
+measure card height (see the dynamic-height entry below), so the author display
+name is already in front of us at measure time; the only question is whether to
+persist it.
+
+**Decision:** We store the embedded post's **actor display name only**
+(`WonderWallPost.authorName`, ≤120 chars), captured opportunistically during the
+existing height measurement (the first non-empty anchor in the embed article).
+Hard limits: **display name only** — no headline/title, profile URL, avatar,
+connection degree, reactions, comments, or post body. It is **host-only**: shown
+on the control surface to differentiate submissions, and deliberately **not**
+added to the public projector DTO (`WonderWallPublicPost`), the participant
+`my-posts` payload, or the CSV export. Null until measured and on measurement
+failure (login-gated posts), where the UI falls back to submitter/URN.
+
+**Consequences:** This narrows the "never author/profile data" line to a single
+host-only display-name field, captured from a page LinkedIn already serves for
+embedding — the rest of that boundary (no body, no profile/contact data, no
+images, no reactions/comments, nothing on public surfaces) stands. An agent
+tempted to store any further profile/post content, or to surface authorName on a
+public/participant surface, must open a new entry first.
+
+---
+
+## 2026-06-19 · WonderWall dynamic-height: headless measurement of the official embed, narrowed
+
+**Status:** Accepted — narrows (does not reverse) the WonderWall v1 entry below.
+
+**Context:** The masonry/waterfall display wants a per-post card height, but the
+embed is a cross-origin iframe: the parent cannot read its rendered height, and
+an empirical probe (`scripts/measure-embed.ts` against a real post) confirmed
+LinkedIn ships a height `postMessage` in its embed bundle but does **not** emit
+it to third-party embedders. The only ways to obtain an accurate height are
+(a) a human eyeballing each post in review, or (b) rendering the official public
+embed in a context we control and measuring it. The v1 entry below lists
+"headless automation" as a deliberate non-goal and asks any future agent to
+revisit this decision before adding it — this entry is that revisit.
+
+**Decision:** We permit **headless rendering of the official public embed URL**
+(`/embed/feed/update/<urn>?collapsed=1`) for the **sole** purpose of measuring
+rendered layout height (a single integer), via `lib/wonderwall-measure.ts`.
+Hard constraints, all preserved from v1: **no login/session**, **no LinkedIn
+API**, **only** official `/embed/feed/update/` URLs, **no content stored or
+extracted** beyond the height integer (no body, author, reactions, comments, or
+images), host-triggered on approval, rate-limited, and fail-soft (a measurement
+failure or fallback page falls back to the fixed default height and a host can
+override). A host can always set/override the height manually
+(`overrideHeight`), so the projector never depends solely on automation.
+
+**Consequences:** The "no scraping, no logged-in automation, no LinkedIn API, no
+screenshot fallback, store only metadata" boundary stands in full — this entry
+relaxes **only** the "no headless rendering" letter, narrowly, to measure layout
+of a page LinkedIn already serves for embedding. Trade-offs accepted: the
+measurement runtime must host headless Chromium (v1 runs it in-process in
+`server.ts`, so `playwright` moves from a dev to a runtime dependency), and
+measured height refines a card a few seconds after approval (the display's 8s
+poll picks it up). Storing or extracting any post **content** via the headless
+context remains prohibited; an agent tempted to do so must open a new entry.
+
+---
+
+## 2026-06-19 · WonderWall v1: official LinkedIn iframe embeds only — no scraping, no LinkedIn API, no screenshot fallback
+
+**Status:** Accepted
+
+**Context:** WonderWall (the fourth standalone activity, MID-395 → MID-408)
+projects public LinkedIn posts on the room display. There were several ways to
+render a post: scrape the LinkedIn page HTML, drive a logged-in/headless
+account, call a LinkedIn API for post/member data, generate a server-side
+screenshot, or use LinkedIn's official public iframe embed. Most of those carry
+compliance, maintenance, and privacy cost: scraping and automation fight
+LinkedIn's access controls and rate limits, an API integration needs partner
+access we do not have, and screenshots mean rendering and storing post content.
+Separately, because participants — not just the host — submit URLs, there was a
+risk that a public submission endpoint could put unreviewed content on the
+projector.
+
+**Decision:** v1 uses **only** LinkedIn's official public iframe embed
+(`https://www.linkedin.com/embed/feed/update/${urn}`), built from a URL parsed
+and normalized by the pure helper `lib/wonderwall-input.ts`. PRIMETIME does
+**not** scrape LinkedIn, does **not** use a logged-in/headless automation
+account, does **not** call any LinkedIn API for member/post data, and does
+**not** generate screenshots. It stores **only** the original URL, normalized
+URN, generated embed URL, submitter feedback metadata, and review/display
+status/ordering — never LinkedIn post body, author/profile data, reactions,
+comments, or images. Participant-submitted URLs enter a host review queue as
+`PENDING` / `canDisplay=false` and are **never** shown on the public display
+until a host approves them; the display query returns only
+`status=APPROVED AND canDisplay=true` rows (see `docs/wonderwall-prd.md` §5).
+When LinkedIn refuses to render an embed, the card shows an "OPEN ON LINKEDIN"
+link rather than any scraping/screenshot fallback. The host-only CSV export
+carries the same metadata-only set and never post content.
+
+**Consequences:** WonderWall stays inside LinkedIn's sanctioned public-embed
+surface with minimal compliance/maintenance risk, and no unreviewed content can
+reach the projector. The trade-offs accepted: cross-origin iframes have a fixed
+height (700px in v1) and their failure cannot be reliably detected client-side
+(mitigated by the manual LinkedIn link); some posts may refuse to embed; and
+many iframes are heavy, so a per-wall submission cap (`WONDERWALL_POST_LIMIT =
+100`) applies. Screenshots, card-height controls, and multi-platform support are
+explicitly deferred (plan §15). Any future agent tempted to add scraping, a
+LinkedIn API call, headless automation, or a screenshot fallback must revisit
+this entry first — these are deliberate non-goals, not gaps. Authoritative
+detail lives in `docs/wonderwall-iframe-plan.md` and `docs/wonderwall-prd.md`.
+
+---
+
 ## 2026-06-11 · Q&A edit window: unlimited for host, no time limit for participants (withdraw-and-resubmit model)
 
 **Status:** Accepted

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const gameFindUnique = vi.fn();
 const wcFindUnique = vi.fn();
 const qaFindUnique = vi.fn();
+const wwFindUnique = vi.fn();
 
 vi.mock('./db', () => ({
   prisma: {
@@ -14,6 +15,9 @@ vi.mock('./db', () => ({
     },
     qASession: {
       findUnique: (args: unknown) => qaFindUnique(args),
+    },
+    wonderWallSession: {
+      findUnique: (args: unknown) => wwFindUnique(args),
     },
   },
 }));
@@ -29,6 +33,7 @@ beforeEach(() => {
   gameFindUnique.mockReset();
   wcFindUnique.mockReset();
   qaFindUnique.mockReset();
+  wwFindUnique.mockReset();
   clearActivePinsProvidersForTesting();
 });
 
@@ -41,6 +46,7 @@ describe('allocatePin', () => {
     gameFindUnique.mockResolvedValue(null);
     wcFindUnique.mockResolvedValue(null);
     qaFindUnique.mockResolvedValue(null);
+    wwFindUnique.mockResolvedValue(null);
     const pin = await allocatePin();
     expect(pin).toMatch(/^\d{6}$/);
   });
@@ -54,6 +60,7 @@ describe('allocatePin', () => {
     });
     wcFindUnique.mockResolvedValue(null);
     qaFindUnique.mockResolvedValue(null);
+    wwFindUnique.mockResolvedValue(null);
     const pin = await allocatePin();
     expect(pin).toMatch(/^\d{6}$/);
     expect(calls).toBeGreaterThanOrEqual(2);
@@ -62,6 +69,7 @@ describe('allocatePin', () => {
   it('skips PINs that already exist in WordCloudSession', async () => {
     gameFindUnique.mockResolvedValue(null);
     qaFindUnique.mockResolvedValue(null);
+    wwFindUnique.mockResolvedValue(null);
     let calls = 0;
     wcFindUnique.mockImplementation(() => {
       calls += 1;
@@ -76,8 +84,24 @@ describe('allocatePin', () => {
   it('skips PINs that already exist in QASession', async () => {
     gameFindUnique.mockResolvedValue(null);
     wcFindUnique.mockResolvedValue(null);
+    wwFindUnique.mockResolvedValue(null);
     let calls = 0;
     qaFindUnique.mockImplementation(() => {
+      calls += 1;
+      if (calls === 1) return Promise.resolve({ id: 'taken' });
+      return Promise.resolve(null);
+    });
+    const pin = await allocatePin();
+    expect(pin).toMatch(/^\d{6}$/);
+    expect(calls).toBeGreaterThanOrEqual(2);
+  });
+
+  it('skips PINs that already exist in WonderWallSession', async () => {
+    gameFindUnique.mockResolvedValue(null);
+    wcFindUnique.mockResolvedValue(null);
+    qaFindUnique.mockResolvedValue(null);
+    let calls = 0;
+    wwFindUnique.mockImplementation(() => {
       calls += 1;
       if (calls === 1) return Promise.resolve({ id: 'taken' });
       return Promise.resolve(null);
@@ -91,6 +115,7 @@ describe('allocatePin', () => {
     gameFindUnique.mockResolvedValue(null);
     wcFindUnique.mockResolvedValue(null);
     qaFindUnique.mockResolvedValue(null);
+    wwFindUnique.mockResolvedValue(null);
     const taken = new Set<string>();
     registerActivePinsProvider(() => taken);
     // pin first call returns one we'll claim, second returns a different one
@@ -115,6 +140,7 @@ describe('allocatePin', () => {
     gameFindUnique.mockResolvedValue({ id: 'always' });
     wcFindUnique.mockResolvedValue(null);
     qaFindUnique.mockResolvedValue(null);
+    wwFindUnique.mockResolvedValue(null);
     await expect(allocatePin()).rejects.toThrow(/Could not allocate PIN/);
   });
 });

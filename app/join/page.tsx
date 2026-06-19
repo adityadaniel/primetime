@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useRef, useState } from 'react';
 import { Clock, DateStamp, SmpteBars } from '@/components/Broadcast';
 import { useSocket } from '@/lib/socket';
+import { newSubmitterKey, submitterStorageKey } from '@/lib/wonderwall-submitter';
 
 function JoinPageInner() {
   const router = useRouter();
@@ -43,15 +44,34 @@ function JoinPageInner() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin }),
     })
-      .then((r) => r.json() as Promise<{ type: 'quiz' | 'wordcloud' | 'q-and-a' | null }>)
+      .then(
+        (r) =>
+          r.json() as Promise<{ type: 'quiz' | 'wordcloud' | 'q-and-a' | 'wonderwall' | null }>,
+      )
       .then((res) => {
-        if (res.type === 'wordcloud' || res.type === 'q-and-a') {
+        if (res.type === 'wordcloud' || res.type === 'q-and-a' || res.type === 'wonderwall') {
           if (typeof window !== 'undefined') {
             sessionStorage.setItem(`bc:nick:${pin}`, nickname.trim());
+            // WonderWall correlates a browser's submissions with an opaque,
+            // browser-scoped submitter key (not a security boundary — just so
+            // the participant can see feedback on their own posts). Mint it here
+            // before navigating so the participant page can submit immediately.
+            if (res.type === 'wonderwall') {
+              const storageKey = submitterStorageKey(pin);
+              if (!sessionStorage.getItem(storageKey)) {
+                sessionStorage.setItem(storageKey, newSubmitterKey());
+              }
+            }
           }
           inFlight.current = false;
           setPending(false);
-          router.push(res.type === 'wordcloud' ? `/play/${pin}/wordcloud` : `/play/${pin}/q-and-a`);
+          const dest =
+            res.type === 'wordcloud'
+              ? `/play/${pin}/wordcloud`
+              : res.type === 'q-and-a'
+                ? `/play/${pin}/q-and-a`
+                : `/play/${pin}/wonderwall`;
+          router.push(dest);
           return;
         }
         // Either an explicit quiz or no DB row (in-memory anonymous quiz):

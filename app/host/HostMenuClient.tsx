@@ -123,6 +123,38 @@ export default function HostMenuClient({ initialQuizzes }: { initialQuizzes: Qui
               ▸ START ACTIVITY
             </span>
           </Link>
+
+          <Link
+            href="/host/wonderwall/new"
+            className="ink-border stamp p-5 flex flex-col gap-3 transition-transform hover:-translate-y-[2px] focus:-translate-y-[2px] outline-none focus:shadow-[6px_6px_0_0_var(--vermilion)]"
+            style={{ background: 'var(--bone)', color: 'var(--ink)' }}
+          >
+            <div className="flex items-center justify-between">
+              <span
+                className="ticker tracking-widest text-[10px] px-2 py-[2px] ink-border"
+                style={{ background: 'var(--ink)', color: 'var(--bone)' }}
+              >
+                WONDERWALL · LINKEDIN POSTS
+              </span>
+              <span className="ticker tracking-widest text-[10px] opacity-60">NEW</span>
+            </div>
+            <h3
+              className="font-editorial leading-[0.95]"
+              style={{ fontSize: 'clamp(28px, 3.2vw, 40px)' }}
+            >
+              Run a WonderWall.
+            </h3>
+            <p className="font-editorial italic text-[15px] leading-snug opacity-80">
+              Turn the room into a feed. Players draft LinkedIn-style posts, you review the queue,
+              the best ones go up on the wall.
+            </p>
+            <span
+              className="mt-auto ticker tracking-widest text-[11px] inline-flex items-center gap-2"
+              style={{ color: 'var(--vermilion)' }}
+            >
+              ▸ START ACTIVITY
+            </span>
+          </Link>
         </div>
       </section>
 
