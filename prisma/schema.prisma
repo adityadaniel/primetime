@@ -451,6 +451,21 @@ model WonderWallPost {
   rejectionReason String?              @db.VarChar(240)
   // Parser/embed validation failure reason when status=FAILED.
   failureReason   String?              @db.VarChar(240)
+  // Dynamic-height masonry (DECISIONS.md 2026-06-19 "WonderWall dynamic-height").
+  // measuredHeight: px from a headless render of the OFFICIAL embed; null until
+  // measured. overrideHeight: host-set px, wins over measuredHeight. These are
+  // the only embed-derived values stored — never post content. measureStatus is
+  // 'PENDING' | 'OK' | 'FAILED'.
+  measuredHeight  Int?
+  overrideHeight  Int?
+  measuredAt      DateTime?
+  measureStatus   String?              @db.VarChar(16)
+  // Embedded post's actor display name, captured during height measurement and
+  // shown ONLY on the host control surface to differentiate one submitter's
+  // multiple posts (DECISIONS.md 2026-06-19 "WonderWall author label"). Display
+  // name only — no headline, profile URL, avatar, or post content; never exposed
+  // on the public projector/participant surfaces.
+  authorName      String?              @db.VarChar(120)
   // Review/audit metadata. reviewedAt tracks the latest host action; the
   // per-action timestamps preserve approval/rejection/hide/restore history.
   reviewedAt           DateTime?

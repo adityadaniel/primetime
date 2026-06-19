@@ -39,6 +39,7 @@ function publicState(overrides: Partial<WonderWallPublicState> = {}): WonderWall
         status: 'APPROVED',
         canDisplay: true,
         position: 0,
+        displayHeight: 620,
       },
     ],
     ...overrides,
@@ -72,7 +73,16 @@ describe('GET /api/wonderwall/[pin]', () => {
     expect(body.posts.every((p) => p.status === 'APPROVED' && p.canDisplay === true)).toBe(true);
     // The DTO carries only the public-safe field set — no review/audit leakage.
     expect(Object.keys(body.posts[0]).sort()).toEqual(
-      ['canDisplay', 'embedUrl', 'id', 'originalUrl', 'position', 'status', 'urn'].sort(),
+      [
+        'canDisplay',
+        'displayHeight',
+        'embedUrl',
+        'id',
+        'originalUrl',
+        'position',
+        'status',
+        'urn',
+      ].sort(),
     );
     for (const post of body.posts) {
       for (const leaked of [

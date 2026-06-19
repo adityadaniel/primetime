@@ -3,6 +3,8 @@ import { WonderWallNotFoundError, WonderWallOwnershipError } from '@/lib/wonderw
 
 const authMock = vi.fn();
 const reviewPostMock = vi.fn();
+const setPostHeightMock = vi.fn();
+const measureBgMock = vi.fn();
 
 vi.mock('@/auth', () => ({
   auth: () => authMock(),
@@ -13,6 +15,10 @@ vi.mock('@/lib/wonderwall-repo', async (importOriginal) => {
   return {
     ...actual,
     reviewPost: (...args: unknown[]) => reviewPostMock(...args),
+    setPostHeight: (...args: unknown[]) => setPostHeightMock(...args),
+    // Stub the fire-and-forget measurer so approvals don't hit the DB / launch
+    // a headless browser during unit tests.
+    measurePostHeightInBackground: (...args: unknown[]) => measureBgMock(...args),
   };
 });
 
@@ -59,11 +65,18 @@ const approvedPost = {
   restoredAt: null,
   createdAt,
   updatedAt: reviewedAt,
+  measuredHeight: 540,
+  overrideHeight: null,
+  measureStatus: 'OK' as const,
+  measuredAt: reviewedAt,
+  authorName: 'Ada Lovelace',
 };
 
 beforeEach(() => {
   authMock.mockReset();
   reviewPostMock.mockReset();
+  setPostHeightMock.mockReset();
+  measureBgMock.mockReset();
   authMock.mockResolvedValue(hostSession);
 });
 
@@ -89,6 +102,11 @@ describe('PATCH /api/wonderwall/[pin]/posts/[postId]', () => {
         failureReason: null,
         createdAt: '2026-06-18T00:00:00.000Z',
         reviewedAt: '2026-06-18T12:00:00.000Z',
+        measuredHeight: 540,
+        overrideHeight: null,
+        measureStatus: 'OK',
+        displayHeight: 540,
+        authorName: 'Ada Lovelace',
       },
     });
     expect(reviewPostMock).toHaveBeenCalledWith({
@@ -97,6 +115,58 @@ describe('PATCH /api/wonderwall/[pin]/posts/[postId]', () => {
       hostUserId: 'host-1',
       action: 'approve',
     });
+    // Already measured OK → no re-measure.
+    expect(measureBgMock).not.toHaveBeenCalled();
+  });
+
+  it('kicks off background measurement when approving an unmeasured post', async () => {
+    reviewPostMock.mockResolvedValue({
+      ...approvedPost,
+      measureStatus: null,
+      measuredHeight: null,
+    });
+    const res = await PATCH(patchReq({ action: 'approve' }), ctx('123456', 'wwp_1'));
+    expect(res.status).toBe(200);
+    expect(measureBgMock).toHaveBeenCalledWith('wwp_1');
+  });
+
+  it('sets a drag-to-fit height override', async () => {
+    setPostHeightMock.mockResolvedValue({ ...approvedPost, overrideHeight: 712 });
+    const res = await PATCH(
+      patchReq({ action: 'set_height', height: 712 }),
+      ctx('123456', 'wwp_1'),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { post: { overrideHeight: number; displayHeight: number } };
+    expect(body.post.overrideHeight).toBe(712);
+    expect(body.post.displayHeight).toBe(712);
+    expect(setPostHeightMock).toHaveBeenCalledWith({
+      postId: 'wwp_1',
+      pin: '123456',
+      hostUserId: 'host-1',
+      height: 712,
+    });
+    // A height change is not a review action.
+    expect(reviewPostMock).not.toHaveBeenCalled();
+  });
+
+  it('clears the override when height is null', async () => {
+    setPostHeightMock.mockResolvedValue({ ...approvedPost, overrideHeight: null });
+    const res = await PATCH(
+      patchReq({ action: 'set_height', height: null }),
+      ctx('123456', 'wwp_1'),
+    );
+    expect(res.status).toBe(200);
+    expect(setPostHeightMock).toHaveBeenCalledWith(
+      expect.objectContaining({ postId: 'wwp_1', height: null }),
+    );
+  });
+
+  it('returns 400 for an out-of-range height', async () => {
+    const res = await PATCH(patchReq({ action: 'set_height', height: 50 }), ctx('123456', 'wwp_1'));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'invalid_height' });
+    expect(setPostHeightMock).not.toHaveBeenCalled();
   });
 
   it('forwards an optional rejection reason', async () => {

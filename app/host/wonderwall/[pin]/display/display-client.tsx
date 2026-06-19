@@ -17,6 +17,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useState } from 'react';
 import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { publicHost, publicUrl } from '@/lib/public-origin';
+import { WONDERWALL_RENDER_WIDTH } from '@/lib/wonderwall-height';
 import { toCollapsedLinkedInEmbedUrl } from '@/lib/wonderwall-input';
 
 const REFRESH_INTERVAL_MS = 8000;
@@ -25,6 +26,8 @@ export type DisplayPost = {
   id: string;
   originalUrl: string;
   embedUrl: string;
+  // Resolved per-post card height (px) for the masonry wall.
+  displayHeight: number;
 };
 
 export default function WonderWallDisplayClient({
@@ -136,15 +139,21 @@ export default function WonderWallDisplayClient({
 
 function PostCard({ post }: { post: DisplayPost }) {
   return (
-    <article className="mb-5 break-inside-avoid ink-border bg-white overflow-hidden">
+    <article
+      className="mb-5 break-inside-avoid ink-border bg-white overflow-hidden mx-auto"
+      style={{ width: WONDERWALL_RENDER_WIDTH, maxWidth: '100%' }}
+    >
+      {/* Width is pinned to WONDERWALL_RENDER_WIDTH so the rendered height
+          matches the height we measured at that same width (text reflow is
+          width-bound). The per-post height drives the masonry waterfall. */}
       <iframe
         src={toCollapsedLinkedInEmbedUrl(post.embedUrl)}
-        width="504"
-        height="620"
+        width={WONDERWALL_RENDER_WIDTH}
+        height={post.displayHeight}
         title="Embedded LinkedIn post"
         allowFullScreen
         loading="lazy"
-        className="block w-full bg-white"
+        className="block bg-white max-w-full"
       />
       {/* Cross-origin iframes can silently fail to render and PRIMETIME cannot
           detect that, so every card keeps a manual path back to LinkedIn. */}

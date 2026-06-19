@@ -18,6 +18,7 @@ import {
   type WonderWallStatus,
 } from '@prisma/client';
 import { prisma } from './db';
+import { resolveDisplayHeight } from './wonderwall-height';
 import { parseLinkedInPostUrl, type WonderWallParseResult } from './wonderwall-input';
 import {
   WONDERWALL_DESCRIPTION_MAX,
@@ -41,6 +42,9 @@ export type WonderWallPublicPost = {
   status: 'APPROVED';
   canDisplay: true;
   position: number;
+  // Resolved card height for the masonry wall (override ?? measured ?? default).
+  // A plain integer — never post content. See lib/wonderwall-height.ts.
+  displayHeight: number;
 };
 
 export type WonderWallPublicState = {
@@ -174,6 +178,7 @@ export async function getPublicStateByPin(pin: string): Promise<WonderWallPublic
       canDisplay: true as const,
       // Approved/displayable rows always carry a position; coerce defensively.
       position: post.position ?? 0,
+      displayHeight: resolveDisplayHeight(post),
     })),
   };
 }
@@ -297,6 +302,23 @@ async function displayPositionIsFree(
   return occupied === null;
 }
 
+// Insert a newly approved post at the TOP of the wall: shift every existing
+// displayable post in the session down by one and give the new post position 0.
+// This keeps the "latest submission on top" default while leaving the
+// position-ascending display/control ordering and the reorder endpoint
+// unchanged (the host can still nudge posts up/down from the top).
+async function topDisplayPosition(
+  tx: Prisma.TransactionClient,
+  sessionId: string,
+  exceptPostId: string,
+): Promise<number> {
+  await tx.wonderWallPost.updateMany({
+    where: { sessionId, canDisplay: true, NOT: { id: exceptPostId } },
+    data: { position: { increment: 1 } },
+  });
+  return 0;
+}
+
 async function displayPositionForPost(
   tx: Prisma.TransactionClient,
   post: WonderWallPost,
@@ -367,7 +389,8 @@ export async function reviewPost(
 
     switch (args.action) {
       case 'approve': {
-        const position = await displayPositionForPost(tx, post);
+        // Newest approval goes to the top of the wall (latest submission first).
+        const position = await topDisplayPosition(tx, post.sessionId, post.id);
         return tx.wonderWallPost.update({
           where: { id: post.id },
           data: {
@@ -433,6 +456,77 @@ export async function reviewPost(
           },
         });
     }
+  });
+}
+
+// Host drag-to-fit override (DECISIONS.md 2026-06-19 "WonderWall dynamic-height").
+// Persists overrideHeight, which wins over the auto-measured height. height=null
+// clears the override (falls back to measured/default). Ownership-guarded like
+// reviewPost. Clamped defensively; the route validates first.
+const OVERRIDE_HEIGHT_MIN = 140;
+const OVERRIDE_HEIGHT_MAX = 4000;
+
+export async function setPostHeight(args: {
+  postId: string;
+  pin: string;
+  hostUserId: string;
+  height: number | null;
+}): Promise<WonderWallPost> {
+  const height =
+    args.height === null
+      ? null
+      : Math.round(Math.min(OVERRIDE_HEIGHT_MAX, Math.max(OVERRIDE_HEIGHT_MIN, args.height)));
+  return serializableWonderWallWrite(async (tx) => {
+    const post = await tx.wonderWallPost.findUnique({
+      where: { id: args.postId },
+      include: { session: { select: { pin: true, hostUserId: true } } },
+    });
+    if (!post) throw new WonderWallNotFoundError(args.postId);
+    if (post.session.pin !== args.pin) throw new WonderWallNotFoundError(args.postId);
+    if (post.session.hostUserId !== args.hostUserId) throw new WonderWallOwnershipError(args.pin);
+    return tx.wonderWallPost.update({
+      where: { id: post.id },
+      data: { overrideHeight: height },
+    });
+  });
+}
+
+// Auto-measure a post's card height by headless-rendering the OFFICIAL embed.
+// The Playwright/Chromium dependency is loaded via a DYNAMIC import so it never
+// enters the bundle of the public display page or the API routes that import
+// this module statically. Sets measureStatus=PENDING first so the control room
+// can show "measuring…", then writes the OK/FAILED result. Never throws.
+export async function measureAndStorePostHeight(postId: string): Promise<void> {
+  const post = await prisma.wonderWallPost.findUnique({
+    where: { id: postId },
+    select: { id: true, embedUrl: true },
+  });
+  if (!post) return;
+  await prisma.wonderWallPost.update({
+    where: { id: postId },
+    data: { measureStatus: 'PENDING', measuredAt: new Date() },
+  });
+  const { measureEmbedHeight } = await import('./wonderwall-measure');
+  const result = await measureEmbedHeight(post.embedUrl);
+  await prisma.wonderWallPost.update({
+    where: { id: postId },
+    data: {
+      measuredHeight: result.status === 'OK' ? result.height : null,
+      measureStatus: result.status,
+      measuredAt: new Date(),
+      // Keep a prior authorName if this measure failed (don't clobber a good
+      // label with null when LinkedIn served the logged-out wall).
+      ...(result.status === 'OK' ? { authorName: result.author } : {}),
+    },
+  });
+}
+
+// Fire-and-forget wrapper for the approval path: kicks off measurement without
+// blocking the host's HTTP response. Safe in the long-running custom Node server
+// (server.ts); the next control/display poll picks up the stored height.
+export function measurePostHeightInBackground(postId: string): void {
+  void measureAndStorePostHeight(postId).catch((err) => {
+    console.error(`[wonderwall] background height measure failed for ${postId}:`, err);
   });
 }
 

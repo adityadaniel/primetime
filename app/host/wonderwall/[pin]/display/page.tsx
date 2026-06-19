@@ -42,6 +42,7 @@ export default async function WonderWallDisplayPage({
         id: post.id,
         originalUrl: post.originalUrl,
         embedUrl: post.embedUrl,
+        displayHeight: post.displayHeight,
       }))}
     />
   );

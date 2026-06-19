@@ -13,6 +13,7 @@ import { auth } from '@/auth';
 import AccountMenu from '@/components/AccountMenu';
 import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { publicUrl } from '@/lib/public-origin';
+import { resolveDisplayHeight } from '@/lib/wonderwall-height';
 import { getHostStateByPin, WonderWallOwnershipError } from '@/lib/wonderwall-repo';
 import WonderWallControlClient, { type ControlPost } from './control-client';
 
@@ -56,6 +57,11 @@ export default async function WonderWallControlPage({
     rejectionReason: post.rejectionReason,
     failureReason: post.failureReason,
     createdAt: post.createdAt.toISOString(),
+    measureStatus: post.measureStatus,
+    measuredHeight: post.measuredHeight,
+    overrideHeight: post.overrideHeight,
+    displayHeight: resolveDisplayHeight(post),
+    authorName: post.authorName,
   }));
 
   return (
@@ -70,7 +76,7 @@ export default async function WonderWallControlPage({
       </header>
       <SmpteBars className="h-2 mt-4" />
 
-      <section className="px-6 sm:px-8 pt-10 max-w-[920px] mx-auto">
+      <section className="px-6 sm:px-8 pt-10 max-w-[1180px] mx-auto">
         <p className="chyron mb-3" style={{ color: 'var(--vermilion)' }}>
           PIN · {state.pin} · {state.status}
         </p>

@@ -1,6 +1,8 @@
 # WonderWall — LinkedIn iframe PRD
 
-Version: 1.0 · Status: Implemented · Last Updated: June 2026 · Owner: Aditya Daniel
+Version: 1.1 · Status: Implemented · Last Updated: June 2026 · Owner: Aditya Daniel
+
+> v1.1 adds dynamic-height masonry: cards render at a per-post measured height instead of one fixed height. See §5 "Dynamic card height", §6 data model, §11 compliance, and the DECISIONS.md 2026-06-19 "WonderWall dynamic-height" entry.
 
 Sister document to `PRD.md`, `docs/wordcloud-prd.md`, and `docs/q-and-a-prd.md`. Defines the fourth standalone activity type in PRIMETIME: a moderated wall of public LinkedIn posts rendered with official LinkedIn iframe embeds, reusing PRIMETIME's existing PIN / host / player / display architecture.
 
@@ -20,10 +22,10 @@ Let a host open a PIN-backed wall, let participants submit public LinkedIn post 
 
 ### 1.3 Non-goals (v1)
 
-- No scraping LinkedIn pages or logged-in/headless automation.
+- No scraping LinkedIn pages or logged-in/headless automation — **except** a narrowly-scoped headless render of the official public embed used solely to measure a card's layout height (an integer), no login and no content stored (see §5 "Dynamic card height" and DECISIONS.md 2026-06-19).
 - No LinkedIn API integration.
 - No screenshot generation or screenshot fallback when an embed fails.
-- No storing LinkedIn post content (body, author, profile, reactions, comments, images).
+- No storing LinkedIn post content (body, profile data, reactions, comments, images) — **except** the embedded post's author **display name**, stored host-only to differentiate submissions on the control surface (see §6 and DECISIONS.md 2026-06-19 "WonderWall author label"). Never shown on public/projector/participant surfaces.
 - No unmoderated participant submissions — every link flows through a host review queue.
 - No AI summarization/OCR, no automatic feed syncing.
 - No generalized multi-platform support yet (the name and data model leave room for it).
@@ -56,7 +58,7 @@ API routes:
 | `/api/wonderwall` | `POST` | Host | Create a PIN-backed wall |
 | `/api/wonderwall/[pin]` | `GET` | Public-by-PIN | Public state — `APPROVED` + `canDisplay=true` posts only |
 | `/api/wonderwall/[pin]/posts` | `POST` | Public-by-PIN | Participant submission — creates a `PENDING` row only |
-| `/api/wonderwall/[pin]/posts/[postId]` | `PATCH` | Host (owner) | `approve` / `reject` / `hide` / `restore` |
+| `/api/wonderwall/[pin]/posts/[postId]` | `PATCH` | Host (owner) | `approve` / `reject` / `hide` / `restore` / `set_height` (drag-to-fit override; `height:null` clears it). `approve`/`restore` also kick off background height measurement. |
 | `/api/wonderwall/[pin]/posts/reorder` | `POST` | Host (owner) | Reorder approved/displayable posts |
 | `/api/wonderwall/[pin]/my-posts` | `GET` | Public-by-PIN | Per-browser submission feedback, scoped by `submitterKey` |
 | `/api/wonderwall/[pin]/export` | `GET` | Host (owner) | CSV of all submissions across statuses |
@@ -112,6 +114,15 @@ The projector renders **only posts where `status = APPROVED` and `canDisplay = t
 
 Session lifecycle enum `WonderWallStatus` is `DRAFT` / `LIVE` / `ENDED` / `ARCHIVED`; walls are created as `DRAFT` and can display immediately.
 
+### Dynamic card height (masonry)
+
+The display is a Pinterest-style waterfall (CSS multi-column, 3 columns on desktop) where each card renders at a **per-post height** instead of one fixed height. Because the embed is a cross-origin iframe, the parent page cannot read its rendered height, and an empirical probe confirmed LinkedIn does **not** emit a height `postMessage` to third-party embedders (`scripts/measure-embed.ts`). So height is obtained two ways, resolved as `overrideHeight ?? measuredHeight ?? 620`:
+
+- **Auto-measure (`measuredHeight`):** on `approve`/`restore`, the server renders the official public embed (`?collapsed=1`) in headless Chromium at the fixed projector width (`WONDERWALL_RENDER_WIDTH = 504`) and stores the rendered height. It runs **in the background** (fire-and-forget) so approval is instant; the card refines from the 620 default to the measured height on the next display poll. Cards are pinned to 504px wide so the measured height stays correct on every projector resolution (text reflow is width-bound). Lives in `lib/wonderwall-measure.ts`; Playwright is loaded via a dynamic import so it never enters the display/route bundle.
+- **Host override (`overrideHeight`):** the control room's per-post preview is a **drag-to-fit** panel — the host drags the card's bottom edge and saves an exact height, which wins over the measured value (`RESET TO AUTO` clears it). This is the manual path for posts that measure wrong or can't be measured.
+
+Measurement is **fail-soft**: if LinkedIn serves the logged-out sign-in/language wall (some posts are gated to logged-in viewers) or the render fails, `measureStatus = FAILED`, height falls back to 620, and the control room shows a **"⚠ MAY NEED LOGIN TO DISPLAY"** badge — a useful signal that the post may also show that wall to a logged-out projector audience (the "OPEN ON LINKEDIN" link remains the graceful fallback per §11). We never log in or evade bot-detection to force a measurement.
+
 ---
 
 ## 6. Data model
@@ -125,9 +136,10 @@ Session lifecycle enum `WonderWallStatus` is `DRAFT` / `LIVE` / `ENDED` / `ARCHI
 - review/display status and `canDisplay`,
 - `position` ordering,
 - optional `rejectionReason` / `failureReason`,
-- review metadata (`reviewedAt`, `reviewedByHostUserId`).
+- review metadata (`reviewedAt`, `reviewedByHostUserId`),
+- dynamic-height fields: `measuredHeight` (auto-measured px), `overrideHeight` (host drag-to-fit px), `measureStatus` (`PENDING` / `OK` / `FAILED`), `measuredAt` — all nullable integers/bookkeeping, never post content.
 
-It does **not** store LinkedIn post body, author/profile data, reactions, comments, or images.
+It does **not** store LinkedIn post body, profile data, reactions, comments, or images. The height fields are layout measurements (pixels), not content. The one content field is `authorName` — the embedded post's author **display name only** (≤120 chars), captured during height measurement and used **host-only** on the control surface to differentiate one submitter's multiple posts. It is null until measured (and on login-gated failures), and is deliberately excluded from the public projector DTO, the participant `my-posts` payload, and the CSV export (DECISIONS.md 2026-06-19 "WonderWall author label").
 
 Input limits (`lib/wonderwall-limits.ts`): title ≤ 100, description ≤ 200, instructions ≤ 240. Per-wall submission cap: `WONDERWALL_POST_LIMIT = 100` in `lib/wonderwall-repo.ts`.
 
@@ -189,7 +201,7 @@ Feedback states: `PENDING` (waiting for approval), `APPROVED` (may appear on dis
 
 ## 10. Realtime refresh
 
-v1 ships a light polling refresh, not a Socket.IO state machine. The display client calls `router.refresh()` on an interval (8 s) so newly approved posts appear without a manual reload; the participant page polls `my-posts` for feedback. Because the DB is the source of truth and the public query only returns approved/displayable rows, a stale poll can never display unapproved content. A socket-driven refresh event was scoped (plan §9, MID-405) but the shipped v1 uses polling; `server.ts` has no WonderWall events.
+v1 ships a light polling refresh, not a Socket.IO state machine. The display client calls `router.refresh()` on an interval (8 s) so newly approved posts appear without a manual reload; the participant page polls `my-posts` for feedback. Because the DB is the source of truth and the public query only returns approved/displayable rows, a stale poll can never display unapproved content. A socket-driven refresh event was scoped (plan §9, MID-405) but the shipped v1 uses polling; `server.ts` has no WonderWall events. The same poll also surfaces a card's dynamic height: background measurement (§5) writes `measuredHeight` a few seconds after approval, and the next display refresh re-renders the card from the 620 default to its measured height.
 
 ---
 
@@ -197,8 +209,8 @@ v1 ships a light polling refresh, not a Socket.IO state machine. The display cli
 
 1. Only public LinkedIn post URLs supplied by participants/host.
 2. Rendered via LinkedIn-hosted iframe embeds.
-3. No scraping, no logged-in automation, no LinkedIn API, no screenshot fallback.
-4. Store only URL/URN/embed/review metadata — never post content.
+3. No scraping, no logged-in automation, no LinkedIn API, no screenshot fallback. The one carve-out (DECISIONS.md 2026-06-19): a headless render of the **official public embed** purely to measure card height — no login, no bot-detection evasion, only `/embed/feed/update/` URLs, and only a height integer is stored (never content).
+4. Store only URL/URN/embed/review metadata, layout-height integers, and the embedded post's author **display name** (host-only, for control-surface differentiation) — never other post content (body, profile data, reactions, comments, images), and never the author name on a public/participant surface.
 5. Always keep a path back to LinkedIn ("OPEN ON LINKEDIN" per approved card). A blank/failed cross-origin iframe is not auto-detected; the manual link is the graceful path.
 
-See `DECISIONS.md` (2026-06-19 WonderWall iframe entry) for the durable record.
+See `DECISIONS.md` (2026-06-19 "WonderWall v1" iframe entry, "WonderWall dynamic-height" entry, and "WonderWall author label" entry) for the durable record.

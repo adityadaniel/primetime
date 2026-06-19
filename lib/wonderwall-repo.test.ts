@@ -8,6 +8,7 @@ const postFindUnique = vi.fn();
 const postFindMany = vi.fn();
 const postFindFirst = vi.fn();
 const postUpdate = vi.fn();
+const postUpdateMany = vi.fn();
 const postAggregate = vi.fn();
 const postCount = vi.fn();
 
@@ -24,6 +25,7 @@ vi.mock('./db', () => {
       findMany: (args: unknown) => postFindMany(args),
       findFirst: (args: unknown) => postFindFirst(args),
       update: (args: unknown) => postUpdate(args),
+      updateMany: (args: unknown) => postUpdateMany(args),
       aggregate: (args: unknown) => postAggregate(args),
       count: (args: unknown) => postCount(args),
     },
@@ -60,10 +62,12 @@ beforeEach(() => {
   postFindMany.mockReset();
   postFindFirst.mockReset();
   postUpdate.mockReset();
+  postUpdateMany.mockReset();
   postAggregate.mockReset();
   postCount.mockReset();
   postFindFirst.mockResolvedValue(null);
   postCount.mockResolvedValue(0);
+  postUpdateMany.mockResolvedValue({ count: 0 });
   // Default: update echoes back the data it was given merged with the id.
   postUpdate.mockImplementation((args: { where: { id: string }; data: Record<string, unknown> }) =>
     Promise.resolve({ id: args.where.id, ...args.data }),
@@ -147,6 +151,9 @@ describe('getPublicStateByPin', () => {
           status: 'APPROVED',
           canDisplay: true,
           position: 0,
+          // Height state resolves to displayHeight (override ?? measured ?? default).
+          measuredHeight: 480,
+          overrideHeight: null,
           // Review-only fields that must NOT appear in the public DTO.
           submitterKey: 'browser-abc',
           rejectionReason: 'should not leak',
@@ -170,6 +177,7 @@ describe('getPublicStateByPin', () => {
           status: 'APPROVED',
           canDisplay: true,
           position: 0,
+          displayHeight: 480,
         },
       ],
     });
@@ -311,7 +319,7 @@ describe('submitPost', () => {
 const ownedReviewSession = { pin: '123456', hostUserId: 'u_1' };
 
 describe('reviewPost', () => {
-  it('approve assigns the next position and sets canDisplay=true', async () => {
+  it('approve puts the post on top (position 0) and shifts the rest down', async () => {
     postFindUnique.mockResolvedValueOnce({
       id: 'p_1',
       sessionId: 'ww_1',
@@ -321,29 +329,29 @@ describe('reviewPost', () => {
       approvedAt: null,
       session: ownedReviewSession,
     });
-    postAggregate.mockResolvedValueOnce({ _max: { position: 2 } });
     const out = await reviewPost({
       postId: 'p_1',
       pin: '123456',
       hostUserId: 'u_1',
       action: 'approve',
     });
-    expect(postAggregate).toHaveBeenCalledWith({
-      where: { sessionId: 'ww_1', canDisplay: true },
-      _max: { position: true },
+    // Every other displayable post in the wall is bumped down by one.
+    expect(postUpdateMany).toHaveBeenCalledWith({
+      where: { sessionId: 'ww_1', canDisplay: true, NOT: { id: 'p_1' } },
+      data: { position: { increment: 1 } },
     });
     const data = postUpdate.mock.calls[0][0].data;
     expect(data.status).toBe('APPROVED');
     expect(data.canDisplay).toBe(true);
-    expect(data.position).toBe(3);
+    expect(data.position).toBe(0);
     expect(data.rejectionReason).toBeNull();
     expect(data.failureReason).toBeNull();
     expect(data.reviewedByHostUserId).toBe('u_1');
     expect(data.approvedAt).toBeInstanceOf(Date);
-    expect(out.position).toBe(3);
+    expect(out.position).toBe(0);
   });
 
-  it('approve starts positions at 0 when nothing is displayable yet', async () => {
+  it('approve still lands at position 0 when nothing is displayable yet', async () => {
     postFindUnique.mockResolvedValueOnce({
       id: 'p_1',
       sessionId: 'ww_1',
@@ -351,7 +359,6 @@ describe('reviewPost', () => {
       approvedAt: null,
       session: ownedReviewSession,
     });
-    postAggregate.mockResolvedValueOnce({ _max: { position: null } });
     await reviewPost({ postId: 'p_1', pin: '123456', hostUserId: 'u_1', action: 'approve' });
     expect(postUpdate.mock.calls[0][0].data.position).toBe(0);
   });
