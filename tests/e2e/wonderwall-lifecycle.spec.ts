@@ -19,8 +19,22 @@ async function submitPost(page: import('@playwright/test').Page, url: string) {
   await expect(page.getByText('Submitted for host review')).toBeVisible({ timeout: 10_000 });
 }
 
-async function rowForUrn(page: import('@playwright/test').Page, id: string) {
-  return page.locator('article').filter({ hasText: `urn:li:activity:${id}` });
+// Master-detail control room: click a post's row in the LEFT sidebar (<aside>)
+// to select it, then act in the RIGHT detail pane (the single <article>). The
+// sidebar row carries the URN when the submission has no nickname (the anonymous
+// e2e flow). After selecting, wait for the detail pane to reflect the choice so
+// actions never fire against the previously-selected post.
+async function selectPost(page: import('@playwright/test').Page, id: string) {
+  await page
+    .locator('aside')
+    .getByRole('button')
+    .filter({ hasText: `urn:li:activity:${id}` })
+    .click();
+  await expect(page.locator('article')).toContainText(`urn:li:activity:${id}`);
+}
+
+function detailPane(page: import('@playwright/test').Page) {
+  return page.locator('article');
 }
 
 test.describe('WonderWall release flow', () => {
@@ -86,10 +100,11 @@ test.describe('WonderWall release flow', () => {
     await page.reload();
     await expect(page.getByRole('heading', { name: 'PENDING REVIEW' })).toBeVisible();
 
-    const rejectedRow = await rowForUrn(page, rejectedId);
-    await rejectedRow.getByRole('button', { name: 'REJECT' }).click();
-    await rejectedRow.getByPlaceholder(/optional reason/i).fill('Off-topic for this wall');
-    await rejectedRow.getByRole('button', { name: 'CONFIRM REJECT' }).click();
+    await selectPost(page, rejectedId);
+    const rejectDetail = detailPane(page);
+    await rejectDetail.getByRole('button', { name: 'REJECT' }).click();
+    await rejectDetail.getByPlaceholder(/optional reason/i).fill('Off-topic for this wall');
+    await rejectDetail.getByRole('button', { name: 'CONFIRM REJECT' }).click();
     await expect(page.getByText('Reason: Off-topic for this wall')).toBeVisible({
       timeout: 10_000,
     });
@@ -104,10 +119,11 @@ test.describe('WonderWall release flow', () => {
     ).toBeVisible();
     await expect(participantPage.getByText('↑ PASTE A NEW LINK ABOVE TO TRY AGAIN')).toBeVisible();
 
-    const approvedRow = await rowForUrn(page, approvedId);
-    await approvedRow.getByRole('button', { name: 'APPROVE' }).click();
-    await expect(approvedRow.getByText('APPROVED')).toBeVisible({ timeout: 10_000 });
-    await expect(approvedRow.getByText('CAN DISPLAY: YES')).toBeVisible();
+    await selectPost(page, approvedId);
+    const approveDetail = detailPane(page);
+    await approveDetail.getByRole('button', { name: 'APPROVE' }).click();
+    await expect(approveDetail.getByText('APPROVED')).toBeVisible({ timeout: 10_000 });
+    await expect(approveDetail.getByText('CAN DISPLAY: YES')).toBeVisible();
 
     await displayPage.reload();
     await expect(displayPage.getByText('ON AIR · 01 APPROVED POSTS')).toBeVisible({
@@ -135,11 +151,12 @@ test.describe('WonderWall release flow', () => {
     const hiddenId = '1000000000000000004';
     await submitPost(participantPage, linkedInUrl(hiddenId));
     await page.reload();
-    const hiddenRow = await rowForUrn(page, hiddenId);
-    await hiddenRow.getByRole('button', { name: 'APPROVE' }).click();
-    await expect(hiddenRow.getByText('APPROVED')).toBeVisible({ timeout: 10_000 });
-    await hiddenRow.getByRole('button', { name: 'HIDE' }).click();
-    await expect(hiddenRow.getByText('HIDDEN')).toBeVisible({ timeout: 10_000 });
+    await selectPost(page, hiddenId);
+    const hiddenDetail = detailPane(page);
+    await hiddenDetail.getByRole('button', { name: 'APPROVE' }).click();
+    await expect(hiddenDetail.getByText('APPROVED')).toBeVisible({ timeout: 10_000 });
+    await hiddenDetail.getByRole('button', { name: 'HIDE' }).click();
+    await expect(hiddenDetail.getByText('HIDDEN')).toBeVisible({ timeout: 10_000 });
 
     const failedId = '1000000000000000005';
     await db.wonderWallPost.create({
