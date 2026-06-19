@@ -117,8 +117,13 @@ test.describe('WonderWall release flow', () => {
     await expect(iframe).toHaveCount(1);
     await expect(iframe).toHaveAttribute(
       'src',
-      `https://www.linkedin.com/embed/feed/update/urn:li:activity:${approvedId}`,
+      `https://www.linkedin.com/embed/feed/update/urn:li:activity:${approvedId}?collapsed=1`,
     );
+    await expect(iframe).toHaveAttribute('height', '620');
+    await expect(
+      displayPage.locator('.columns-1.md\\:columns-3'),
+      'display waterfall should use three columns on desktop',
+    ).toHaveCSS('column-count', '3');
     await expect(displayPage.getByRole('link', { name: /open on linkedin/i })).toHaveAttribute(
       'href',
       linkedInUrl(approvedId),
