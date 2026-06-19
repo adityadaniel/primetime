@@ -22,6 +22,13 @@ import { toCollapsedLinkedInEmbedUrl } from '@/lib/wonderwall-input';
 
 const REFRESH_INTERVAL_MS = 8000;
 
+// The wall is capped to exactly three 504px columns + two 10px gaps (matching the
+// `gap-2.5` column-gap) so columns equal the card width with no centering slack.
+// The header (title + QR) shares this width so its left/right edges line up with
+// the wall's outer columns.
+const WALL_COLUMN_GAP = 10;
+const WALL_MAX_WIDTH = 3 * WONDERWALL_RENDER_WIDTH + 2 * WALL_COLUMN_GAP;
+
 export type DisplayPost = {
   id: string;
   originalUrl: string;
@@ -63,18 +70,21 @@ export default function WonderWallDisplayClient({
   const joinLabel = joinHost ? `${joinHost}/join` : '/join';
 
   return (
-    <main className="relative min-h-[100dvh] flex flex-col grain pb-12">
+    <main className="ink-bg relative min-h-[100dvh] flex flex-col grain pb-12">
       <header className="shrink-0 px-8 pt-5 flex items-center justify-between">
-        <Chyron label="LIVE FEED · WONDERWALL · LINKEDIN" number="WW" />
+        <Chyron label="LIVE FEED · WONDERWALL · LINKEDIN" number="WW" dark />
         <div className="flex items-center gap-7">
-          <FrameCounter index={Math.min(999, posts.length)} />
-          <Clock />
+          <FrameCounter index={Math.min(999, posts.length)} dark />
+          <Clock dark />
         </div>
       </header>
       <SmpteBars className="h-2 mt-3 shrink-0" />
 
       <section className="px-8 sm:px-10 pt-7 max-w-[1800px] w-full mx-auto">
-        <div className="flex flex-wrap items-start justify-between gap-8">
+        <div
+          className="flex flex-wrap items-start justify-between gap-8 mx-auto"
+          style={{ maxWidth: WALL_MAX_WIDTH }}
+        >
           <div className="min-w-0">
             <p className="chyron mb-3" style={{ color: 'var(--vermilion)' }}>
               ON AIR · {String(posts.length).padStart(2, '0')} APPROVED POSTS
@@ -100,7 +110,12 @@ export default function WonderWallDisplayClient({
             )}
           </div>
 
-          <div className="ink-border p-4 shrink-0" style={{ background: 'var(--bone)' }}>
+          {/* Keep the QR/PIN card light on the dark wall so the code stays
+              scannable; force ink text so the PIN reads on the bone box. */}
+          <div
+            className="ink-border p-4 shrink-0"
+            style={{ background: 'var(--bone)', color: 'var(--ink)' }}
+          >
             {joinUrl ? (
               <QRCodeSVG
                 value={joinUrl}
@@ -126,7 +141,13 @@ export default function WonderWallDisplayClient({
         {posts.length === 0 ? (
           <EmptyState pin={pin} joinLabel={joinLabel} />
         ) : (
-          <div className="columns-1 md:columns-3 gap-5 [column-fill:_balance]">
+          // Capped to WALL_MAX_WIDTH so each column equals the 504px card width
+          // (no `mx-auto` slack) and the only horizontal space between cards is
+          // the 10px column-gap. The header above shares this exact width.
+          <div
+            className="columns-1 md:columns-3 gap-2.5 [column-fill:_balance] mx-auto"
+            style={{ maxWidth: WALL_MAX_WIDTH }}
+          >
             {posts.map((post) => (
               <PostCard key={post.id} post={post} />
             ))}
@@ -140,7 +161,7 @@ export default function WonderWallDisplayClient({
 function PostCard({ post }: { post: DisplayPost }) {
   return (
     <article
-      className="mb-5 break-inside-avoid ink-border bg-white overflow-hidden mx-auto"
+      className="mb-2.5 break-inside-avoid ink-border bg-white overflow-hidden mx-auto"
       style={{ width: WONDERWALL_RENDER_WIDTH, maxWidth: '100%' }}
     >
       {/* Width is pinned to WONDERWALL_RENDER_WIDTH so the rendered height
