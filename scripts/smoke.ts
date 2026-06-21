@@ -1253,6 +1253,22 @@ type QaPublicSnapshot = {
   }[];
 };
 
+type QaQuestionsDelta = {
+  pin: string;
+  questions: {
+    id: string;
+    text: string;
+    isAnonymous: boolean;
+    authorDisplayName: string | null;
+    score: number;
+    upvotes: number;
+    downvotes: number;
+    labelIds: string[];
+    highlighted: boolean;
+  }[];
+  questionCount: number;
+};
+
 type QaJoinAck =
   | {
       participantId: string;
@@ -1300,6 +1316,22 @@ function qaWaitForState(sock: ReturnType<typeof io>, predicate: (s: QaPublicSnap
         sock.off('qa:state', onState);
         clearTimeout(t);
         resolve(s);
+      }
+    });
+  });
+}
+
+function qaWaitForQuestions(
+  sock: ReturnType<typeof io>,
+  predicate: (d: QaQuestionsDelta) => boolean,
+) {
+  return new Promise<QaQuestionsDelta>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('no matching qa:questions broadcast')), 3000);
+    sock.on('qa:questions', function onQuestions(d: QaQuestionsDelta) {
+      if (predicate(d)) {
+        sock.off('qa:questions', onQuestions);
+        clearTimeout(t);
+        resolve(d);
       }
     });
   });
@@ -1550,7 +1582,10 @@ async function assertQaParticipantFlow() {
     );
 
     // anonymous submit: live immediately, no author name in the public state
-    const displaySawQ1 = qaWaitForState(display, (s) => s.questionCount === 1);
+    const displaySawQ1 = qaWaitForQuestions(
+      display,
+      (d) => d.questionCount === 1 && d.questions.some((q) => q.text === 'What is the roadmap?'),
+    );
     const sub1 = qaOk<Exclude<QaActionAck, { error: string }>>(
       (await qaEmit(alice, 'qa:participant:submit', {
         pin,
@@ -1578,7 +1613,10 @@ async function assertQaParticipantFlow() {
 
     // after the window, a named submit carries the display name publicly
     await sleep(1100);
-    const displaySawQ2 = qaWaitForState(display, (s) => s.questionCount === 2);
+    const displaySawQ2 = qaWaitForQuestions(
+      display,
+      (d) => d.questionCount === 2 && d.questions.some((q) => q.text === 'Named question?'),
+    );
     const sub2 = qaOk<Exclude<QaActionAck, { error: string }>>(
       (await qaEmit(alice, 'qa:participant:submit', {
         pin,
@@ -2046,16 +2084,24 @@ async function assertQaVoting() {
 
 // --- scenario 21 (MID-338): Q&A moderation queue ---
 
+type QaHostCounts = {
+  live: number;
+  inReview: number;
+  answered: number;
+  archived: number;
+  dismissed: number;
+};
+
 type QaHostSnapshot = {
   pin: string;
-  counts: {
-    live: number;
-    inReview: number;
-    answered: number;
-    archived: number;
-    dismissed: number;
-  };
+  counts: QaHostCounts;
   questions: { id: string; text: string; status: string }[];
+};
+
+type QaHostQuestionsDelta = {
+  pin: string;
+  questions: { id: string; text: string; status: string }[];
+  counts: QaHostCounts;
 };
 
 type QaModerationAck =
@@ -2074,6 +2120,22 @@ function qaWaitForHostState(
         sock.off('qa:host:state', onState);
         clearTimeout(t);
         resolve(s);
+      }
+    });
+  });
+}
+
+function qaWaitForHostQuestions(
+  sock: ReturnType<typeof io>,
+  predicate: (d: QaHostQuestionsDelta) => boolean,
+) {
+  return new Promise<QaHostQuestionsDelta>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('no matching qa:host:questions broadcast')), 3000);
+    sock.on('qa:host:questions', function onQuestions(d: QaHostQuestionsDelta) {
+      if (predicate(d)) {
+        sock.off('qa:host:questions', onQuestions);
+        clearTimeout(t);
+        resolve(d);
       }
     });
   });
@@ -2126,7 +2188,7 @@ async function assertQaModerationQueue() {
 
     // moderated submit lands IN_REVIEW: the host board updates (targeted
     // emit), the public room stays silent
-    const hostSawQ1 = qaWaitForHostState(host, (s) => s.counts.inReview === 1);
+    const hostSawQ1 = qaWaitForHostQuestions(host, (d) => d.counts.inReview === 1);
     const sub1 = qaOk<Exclude<QaActionAck, { error: string }>>(
       (await qaEmit(alice, 'qa:participant:submit', {
         pin,
@@ -2666,7 +2728,7 @@ async function assertQaSessionControls() {
       'bob join',
     );
 
-    const displaySawQuestion = qaWaitForState(display, (s) => s.questionCount === 1);
+    const displaySawQuestion = qaWaitForQuestions(display, (d) => d.questionCount === 1);
     const submit = qaOk<Exclude<QaActionAck, { error: string }>>(
       (await qaEmit(alice, 'qa:participant:submit', {
         pin,
@@ -2995,7 +3057,7 @@ async function assertQaDisplayPresentMode() {
       'create private display label',
     ).label;
 
-    const displaySawQ1 = qaWaitForState(display, (s) => s.questionCount === 1);
+    const displaySawQ1 = qaWaitForQuestions(display, (d) => d.questionCount === 1);
     const q1 = qaOk<Exclude<QaActionAck, { error: string }>>(
       (await qaEmit(alice, 'qa:participant:submit', {
         pin,
@@ -3005,7 +3067,7 @@ async function assertQaDisplayPresentMode() {
     );
     await displaySawQ1;
     await sleep(1100);
-    const displaySawQ2 = qaWaitForState(display, (s) => s.questionCount === 2);
+    const displaySawQ2 = qaWaitForQuestions(display, (d) => d.questionCount === 2);
     const q2 = qaOk<Exclude<QaActionAck, { error: string }>>(
       (await qaEmit(bob, 'qa:participant:submit', {
         pin,

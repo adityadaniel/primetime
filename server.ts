@@ -67,6 +67,8 @@ import {
   setSubmissionsOpen as qaSetSubmissionsOpen,
   setVotingOpen as qaSetVotingOpen,
   submitQuestion as qaSubmitQuestion,
+  toHostQuestion as qaToHostQuestion,
+  toPublicQuestion as qaToPublicQuestion,
   unassignLabel as qaUnassignLabel,
   withdrawQuestion as qaWithdrawQuestion,
 } from './lib/qa';
@@ -94,6 +96,7 @@ import type {
   AnswerIndex,
   QADisplaySettings,
   QADisplaySortMode,
+  QAHostQuestionsDelta,
   QAHostState,
   QAPersonalState,
   QAPublicLabel,
@@ -101,6 +104,7 @@ import type {
   QAPublicState,
   QAQuestionScore,
   QAQuestionStatus,
+  QAQuestionsDelta,
   QASessionStatus,
   QAVoteType,
   Quiz,
@@ -357,6 +361,19 @@ void app.prepare().then(() => {
   const qaPendingScoreFlushes = new Map<string, NodeJS.Timeout>();
   const qaDirtyScores = new Map<string, Set<string>>();
 
+  // Submit-burst fanout guard: at 120 participants, unmoderated submissions
+  // each triggered a full qa:state broadcast (~14,520 deliveries). Instead,
+  // new question ids coalesce into one compact `qa:questions` delta per tick.
+  // A full qa:state supersedes any pending delta (cleared in qaEmitPublicState).
+  const qaPendingPublicQuestionFlushes = new Map<string, NodeJS.Timeout>();
+  const qaDirtyPublicQuestions = new Map<string, Set<string>>();
+
+  // Host-targeted submit coalescing: IN_REVIEW (moderation on) and LIVE new
+  // questions both need to appear on the host board promptly. One coalesced
+  // `qa:host:questions` delta per tick replaces per-submit qaEmitHostState.
+  const qaPendingHostQuestionFlushes = new Map<string, NodeJS.Timeout>();
+  const qaDirtyHostQuestions = new Map<string, Set<string>>();
+
   function isValidStatus(v: unknown): v is WordCloudStateStatus {
     return v === 'LOBBY' || v === 'LIVE' || v === 'PAUSED' || v === 'ENDED';
   }
@@ -419,14 +436,20 @@ void app.prepare().then(() => {
   // participants, so personal/private payloads must never go through here —
   // they are targeted at a single participant socket instead.
   function qaEmitPublicState(state: QAState) {
-    // A full snapshot carries the latest scores, so it supersedes (and
-    // cancels) any pending coalesced score delta for this room.
-    const pending = qaPendingScoreFlushes.get(state.pin);
-    if (pending) {
-      clearTimeout(pending);
+    // A full snapshot carries the latest scores and questions, so it
+    // supersedes (and cancels) any pending coalesced deltas for this room.
+    const scorePending = qaPendingScoreFlushes.get(state.pin);
+    if (scorePending) {
+      clearTimeout(scorePending);
       qaPendingScoreFlushes.delete(state.pin);
     }
     qaDirtyScores.delete(state.pin);
+    const questionPending = qaPendingPublicQuestionFlushes.get(state.pin);
+    if (questionPending) {
+      clearTimeout(questionPending);
+      qaPendingPublicQuestionFlushes.delete(state.pin);
+    }
+    qaDirtyPublicQuestions.delete(state.pin);
     io.to(`qa:${state.pin}`).emit('qa:state', qaPublicState(state));
     // Anything that changes the public board also changes the host board.
     qaEmitHostState(state);
@@ -434,8 +457,15 @@ void app.prepare().then(() => {
 
   // Host control projection (MID-337): includes IN_REVIEW questions and
   // counts by state, so it is targeted at the host socket and never the
-  // mixed qa:${pin} room.
+  // mixed qa:${pin} room. A full host snapshot supersedes any pending
+  // coalesced host question delta.
   function qaEmitHostState(state: QAState) {
+    const hostQuestionPending = qaPendingHostQuestionFlushes.get(state.pin);
+    if (hostQuestionPending) {
+      clearTimeout(hostQuestionPending);
+      qaPendingHostQuestionFlushes.delete(state.pin);
+    }
+    qaDirtyHostQuestions.delete(state.pin);
     if (!state.hostSocketId) return;
     io.to(state.hostSocketId).emit('qa:host:state', qaHostState(state));
   }
@@ -530,6 +560,84 @@ void app.prepare().then(() => {
       qaFlushScores(pin);
     }, BROADCAST_COALESCE_MS);
     qaPendingScoreFlushes.set(pin, t);
+  }
+
+  // Flush coalesced new-question deltas to the public qa:${pin} room.
+  // Only LIVE questions appear — any that moved away from LIVE since the
+  // submit landed (e.g. immediately moderated) are silently dropped.
+  function qaFlushPublicQuestions(pin: string) {
+    const dirty = qaDirtyPublicQuestions.get(pin);
+    qaDirtyPublicQuestions.delete(pin);
+    const state = qaStates.get(pin);
+    if (!state || !dirty || dirty.size === 0) return;
+    const questions = [];
+    for (const questionId of dirty) {
+      const q = state.questions.get(questionId);
+      if (!q || q.status !== 'LIVE') continue;
+      questions.push(qaToPublicQuestion(state, q));
+    }
+    if (questions.length === 0) return;
+    const questionCount = [...state.questions.values()].filter((q) => q.status === 'LIVE').length;
+    const delta: QAQuestionsDelta = { pin, questions, questionCount };
+    io.to(`qa:${pin}`).emit('qa:questions', delta);
+    recordBroadcast('other', io.sockets.adapter.rooms.get(`qa:${pin}`)?.size ?? 0, 0);
+  }
+
+  function qaSchedulePublicQuestionBroadcast(pin: string, questionId: string) {
+    let dirty = qaDirtyPublicQuestions.get(pin);
+    if (!dirty) {
+      dirty = new Set();
+      qaDirtyPublicQuestions.set(pin, dirty);
+    }
+    dirty.add(questionId);
+    if (qaPendingPublicQuestionFlushes.has(pin)) return;
+    const t = setTimeout(() => {
+      qaPendingPublicQuestionFlushes.delete(pin);
+      qaFlushPublicQuestions(pin);
+    }, BROADCAST_COALESCE_MS);
+    qaPendingPublicQuestionFlushes.set(pin, t);
+  }
+
+  // Flush coalesced new-question deltas to the host socket only.
+  // Includes any non-WITHDRAWN question (LIVE or IN_REVIEW) so the host
+  // board updates immediately. Never emitted to the public qa:${pin} room.
+  function qaFlushHostQuestions(pin: string) {
+    const dirty = qaDirtyHostQuestions.get(pin);
+    qaDirtyHostQuestions.delete(pin);
+    const state = qaStates.get(pin);
+    if (!state || !dirty || dirty.size === 0 || !state.hostSocketId) return;
+    const questions = [];
+    for (const questionId of dirty) {
+      const q = state.questions.get(questionId);
+      if (!q || q.status === 'WITHDRAWN') continue;
+      questions.push(qaToHostQuestion(state, q));
+    }
+    if (questions.length === 0) return;
+    const counts = { live: 0, inReview: 0, answered: 0, archived: 0, dismissed: 0 };
+    for (const q of state.questions.values()) {
+      if (q.status === 'LIVE') counts.live += 1;
+      else if (q.status === 'IN_REVIEW') counts.inReview += 1;
+      else if (q.status === 'ANSWERED') counts.answered += 1;
+      else if (q.status === 'ARCHIVED') counts.archived += 1;
+      else if (q.status === 'DISMISSED') counts.dismissed += 1;
+    }
+    const delta: QAHostQuestionsDelta = { pin, questions, counts };
+    io.to(state.hostSocketId).emit('qa:host:questions', delta);
+  }
+
+  function qaScheduleHostQuestionBroadcast(pin: string, questionId: string) {
+    let dirty = qaDirtyHostQuestions.get(pin);
+    if (!dirty) {
+      dirty = new Set();
+      qaDirtyHostQuestions.set(pin, dirty);
+    }
+    dirty.add(questionId);
+    if (qaPendingHostQuestionFlushes.has(pin)) return;
+    const t = setTimeout(() => {
+      qaPendingHostQuestionFlushes.delete(pin);
+      qaFlushHostQuestions(pin);
+    }, BROADCAST_COALESCE_MS);
+    qaPendingHostQuestionFlushes.set(pin, t);
   }
 
   // F2: a socket is authorized as host iff (a) it owns the host slot for this
@@ -1371,6 +1479,13 @@ void app.prepare().then(() => {
       }
       qaLastSubmitAt.set(participantId, now);
       const question = result.question;
+      // Remove the unpersisted temp-id entry BEFORE the DB await so that any
+      // concurrent snapshot (join, display/host attach, full-state request)
+      // during the await never sees an unpersisted question. Without this,
+      // the temp-id reaches the client; the later delta arrives under the DB
+      // id and the client ends up with both rows — a stale duplicate that
+      // never resolves (regression guard: fanout-submit-race).
+      state.questions.delete(question.id);
       try {
         const row = await qaRepoAddQuestion({
           sessionId: state.sessionId,
@@ -1381,15 +1496,13 @@ void app.prepare().then(() => {
           status: question.status === 'IN_REVIEW' ? 'IN_REVIEW' : 'LIVE',
           labelIds: [...question.labelIds],
         });
-        // Re-key the in-memory entry to the DB id so ownership, votes, and
-        // personal projections line up across restarts (lib/qa-hydrate.ts
-        // keys everything by DB ids).
-        state.questions.delete(question.id);
+        // Re-key to the DB id so ownership, votes, and personal projections
+        // line up across restarts (lib/qa-hydrate.ts keys by DB ids).
         question.id = row.id;
         state.questions.set(row.id, question);
       } catch (err) {
         console.error('[qa-repo] addQuestion', err);
-        state.questions.delete(question.id);
+        // Temp-id was already removed above; no cleanup needed.
         cb({ error: 'persistence_failed' });
         return;
       }
@@ -1399,11 +1512,18 @@ void app.prepare().then(() => {
         return;
       }
       cb({ questionId: question.id, status: question.status, personal });
-      // Moderated submissions are IN_REVIEW: nothing public changed, so the
-      // room gets no broadcast and the question stays invisible to displays.
-      // The host board still updates — targeted at the host socket only.
-      if (question.status === 'LIVE') qaEmitPublicState(state);
-      else qaEmitHostState(state);
+      // Use coalesced deltas instead of a full state broadcast to avoid
+      // O(N²) deliveries at 120+ participants. LIVE questions go to the
+      // public room via qa:questions; IN_REVIEW questions stay invisible
+      // to participants/displays and only update the host board via
+      // qa:host:questions. Both paths coalesce into one emit per 250ms tick.
+      if (question.status === 'LIVE') {
+        qaSchedulePublicQuestionBroadcast(state.pin, question.id);
+        qaScheduleHostQuestionBroadcast(state.pin, question.id);
+      } else {
+        // IN_REVIEW: moderated — host board only, nothing public changes.
+        qaScheduleHostQuestionBroadcast(state.pin, question.id);
+      }
     });
 
     socket.on('qa:participant:withdraw', async (payload: unknown, ack: unknown) => {

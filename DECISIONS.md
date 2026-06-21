@@ -10,6 +10,48 @@ and add a new entry below.
 
 ---
 
+## 2026-06-21 · Q&A submission fanout: coalesced `qa:questions` delta (MID-345)
+
+**Status:** Accepted
+
+**Context:** At 120 participants, each unmoderated LIVE question submit called
+`qaEmitPublicState()`, which broadcast the full `qa:state` to every socket in
+the `qa:${pin}` room. With 120 submitters and 121 total sockets the burst
+produced ~14,520 `qa:state` deliveries, and submit p95 latency was measured at
+~557–677ms — consistent with the event-loop queuing the O(N²) serialize
+workload per submit. Votes were already healthy via the `qa:scores` coalescing
+introduced in MID-336.
+
+**Decision:** Mirror the vote-coalescing pattern for submissions. The
+`qa:participant:submit` handler no longer calls `qaEmitPublicState` per submit.
+Instead, the new question id is added to a per-pin dirty set; one
+`BROADCAST_COALESCE_MS` (250ms) tick later, `qaFlushPublicQuestions` serializes
+all dirty question ids to a compact `QAQuestionsDelta` (`qa:questions` event)
+and emits it to the public `qa:${pin}` room in a single broadcast. Clients
+upsert by id and update `questionCount` locally; the render path already
+sorts client-side so no sort order is assumed. A full `qa:state` (reconnect,
+join, structural change, highlight) supersedes and cancels any pending
+question delta for that room.
+
+A parallel `QAHostQuestionsDelta` (`qa:host:questions` event) is emitted to
+`state.hostSocketId` only, covering both LIVE (unmoderated) and IN_REVIEW
+(moderated) new questions along with fresh counts. The host control page
+upserts the same way. IN_REVIEW questions are never included in the public
+`qa:questions` delta — privacy invariant preserved.
+
+The submitter still gets a targeted ack in the callback (questionId, status,
+personal) immediately after persistence succeeds, unaffected by the coalescing.
+Existing `qa:scores` vote coalescing is unchanged. `scripts/qa-stress.ts` now
+counts `qa:state`, `qa:questions`, and `qa:scores` deliveries and fails if
+the submit burst regresses to per-submit full-state fanout.
+
+**Implication:** At 120 participants, expected submit-phase `qa:state`
+deliveries drop from ~14,520 to 0. `qa:questions` delivers once per coalesce
+tick per participant — ~120 total. Any future feature that wants per-submit
+realtime updates must use the delta path, not `qaEmitPublicState`.
+
+---
+
 ## 2026-06-19 · WonderWall author label: store the embedded post's author name (host-only)
 
 **Status:** Accepted — narrows (does not reverse) the WonderWall v1 entry below.

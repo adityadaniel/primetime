@@ -303,3 +303,29 @@ export interface QAPersonalState {
   /** questionId -> this participant's current vote. */
   votes: Record<string, QAVoteType>;
 }
+
+/**
+ * Compact new-question delta flushed once per BROADCAST_COALESCE_MS tick.
+ * Contains only LIVE questions and is broadcast to the public qa:${pin} room.
+ * Never contains IN_REVIEW or host-only data.
+ */
+export interface QAQuestionsDelta {
+  pin: string;
+  /** Newly added LIVE questions in this tick. */
+  questions: QAPublicQuestion[];
+  /** Current total count of LIVE questions (for client header/count display). */
+  questionCount: number;
+}
+
+/**
+ * Host-targeted new-question delta flushed once per BROADCAST_COALESCE_MS tick.
+ * Sent to state.hostSocketId only — never to the mixed qa:${pin} room.
+ * May include IN_REVIEW questions when moderation is enabled.
+ */
+export interface QAHostQuestionsDelta {
+  pin: string;
+  /** Newly added questions (LIVE or IN_REVIEW) in this tick. */
+  questions: QAHostQuestion[];
+  /** Updated question counts by status for the host header. */
+  counts: QAHostCounts;
+}
