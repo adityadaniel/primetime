@@ -70,7 +70,7 @@ export default function WonderWallDisplayClient({
   const joinLabel = joinHost ? `${joinHost}/join` : '/join';
 
   return (
-    <main className="ink-bg relative min-h-[100dvh] flex flex-col grain pb-12">
+    <main className="ink-bg relative min-h-[100dvh] flex flex-col pb-12">
       <header className="shrink-0 px-8 pt-5 flex items-center justify-between">
         <Chyron label="LIVE FEED · WONDERWALL · LINKEDIN" number="WW" dark />
         <div className="flex items-center gap-7">
