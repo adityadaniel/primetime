@@ -27,6 +27,7 @@ import { QA_HOST_REPLY_CHAR_LIMIT, QA_LABEL_NAME_LIMIT, validateLabelName } from
 import { useSocket } from '@/lib/socket';
 import type {
   QADisplaySettings,
+  QAHostCounts,
   QAHostQuestion,
   QAHostState,
   QAPublicLabel,
@@ -282,11 +283,29 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
         };
       });
     };
+    // Coalesced new-question deltas: upsert by id and update counts.
+    // The board re-sorts client-side so order in state doesn't matter.
+    const onHostQuestions = (delta: {
+      pin: string;
+      questions: QAHostQuestion[];
+      counts: QAHostCounts;
+    }) => {
+      if (delta.pin !== pin) return;
+      setHost((prev) => {
+        if (!prev) return prev;
+        const byId = new Map(prev.questions.map((q) => [q.id, q]));
+        for (const q of delta.questions) {
+          byId.set(q.id, q);
+        }
+        return { ...prev, questions: [...byId.values()], counts: delta.counts };
+      });
+    };
     const onConnect = () => attach();
     const onDisconnect = () => setAttached(false);
 
     socket.on('qa:host:state', onHostState);
     socket.on('qa:scores', onScores);
+    socket.on('qa:host:questions', onHostQuestions);
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     if (socket.connected) attach();
@@ -295,6 +314,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
       disposed = true;
       socket.off('qa:host:state', onHostState);
       socket.off('qa:scores', onScores);
+      socket.off('qa:host:questions', onHostQuestions);
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
     };

@@ -744,6 +744,53 @@ function toPublicReply(reply: QAReplyEntry): QAPublicReply {
   };
 }
 
+/**
+ * Serialize a single question entry to the public/participant-safe shape.
+ * Filters labelIds to participant-selectable labels only, matching publicState's
+ * privacy rules. Used by the coalesced qa:questions delta so server.ts can
+ * emit a single-question delta without recomputing a full public snapshot.
+ */
+export function toPublicQuestion(state: QAState, q: QAQuestionEntry): QAPublicQuestion {
+  const publicLabelIds = new Set(
+    [...state.labels.entries()]
+      .filter(([, label]) => label.participantSelectable)
+      .map(([id]) => id),
+  );
+  return {
+    id: q.id,
+    text: q.text,
+    isAnonymous: q.isAnonymous,
+    authorDisplayName: q.isAnonymous ? null : q.authorDisplayName,
+    ...questionVoteCounts(q),
+    labelIds: [...q.labelIds].filter((labelId) => publicLabelIds.has(labelId)),
+    replyCount: q.replies.length,
+    replies: q.replies.map(toPublicReply),
+    highlighted: state.highlightedQuestionId === q.id,
+    submittedAt: q.submittedAt,
+  };
+}
+
+/**
+ * Serialize a single question entry to the host-safe shape (includes status).
+ * Does NOT filter labels — the host board sees all label assignments.
+ * Used by the coalesced qa:host:questions delta.
+ */
+export function toHostQuestion(state: QAState, q: QAQuestionEntry): QAHostQuestion {
+  return {
+    id: q.id,
+    text: q.text,
+    isAnonymous: q.isAnonymous,
+    authorDisplayName: q.isAnonymous ? null : q.authorDisplayName,
+    status: q.status,
+    ...questionVoteCounts(q),
+    labelIds: [...q.labelIds],
+    replyCount: q.replies.length,
+    replies: q.replies.map(toPublicReply),
+    highlighted: state.highlightedQuestionId === q.id,
+    submittedAt: q.submittedAt,
+  };
+}
+
 // Display/participant-safe projection. Only LIVE questions are included, so
 // in-review and dismissed questions — and any private replies attached to
 // them — never reach displays or other participants.

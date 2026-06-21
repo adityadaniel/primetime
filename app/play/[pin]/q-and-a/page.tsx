@@ -297,6 +297,23 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
         };
       });
     };
+    // Coalesced new-question deltas: upsert by id and update questionCount.
+    // The render path sorts client-side so order in state doesn't matter.
+    const onQuestions = (delta: {
+      pin: string;
+      questions: PublicQuestion[];
+      questionCount: number;
+    }) => {
+      if (delta.pin !== pin) return;
+      setPub((prev) => {
+        if (!prev) return prev;
+        const byId = new Map(prev.questions.map((q) => [q.id, q]));
+        for (const q of delta.questions) {
+          byId.set(q.id, q);
+        }
+        return { ...prev, questions: [...byId.values()], questionCount: delta.questionCount };
+      });
+    };
     // Targeted personal push (MID-338): host moderation (approve/dismiss/
     // restore) refreshes this participant's own-questions panel without a
     // round-trip. Only ever emitted at this socket — never the room.
@@ -306,12 +323,14 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
     const onConnect = () => join();
     socket.on('qa:state', onState);
     socket.on('qa:scores', onScores);
+    socket.on('qa:questions', onQuestions);
     socket.on('qa:personal', onPersonal);
     socket.on('connect', onConnect);
     if (socket.connected) join();
     return () => {
       socket.off('qa:state', onState);
       socket.off('qa:scores', onScores);
+      socket.off('qa:questions', onQuestions);
       socket.off('qa:personal', onPersonal);
       socket.off('connect', onConnect);
     };

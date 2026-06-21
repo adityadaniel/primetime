@@ -84,12 +84,30 @@ export default function QAndADisplay({ params }: { params: Promise<{ pin: string
       });
     };
 
+    // Coalesced new-question deltas: upsert by id and update questionCount.
+    const onQuestions = (delta: {
+      pin: string;
+      questions: QAPublicQuestion[];
+      questionCount: number;
+    }) => {
+      if (delta.pin !== pin) return;
+      setState((prev) => {
+        if (!prev) return prev;
+        const byId = new Map(prev.questions.map((q) => [q.id, q]));
+        for (const q of delta.questions) {
+          byId.set(q.id, q);
+        }
+        return { ...prev, questions: [...byId.values()], questionCount: delta.questionCount };
+      });
+    };
+
     const onSettings = (next: QADisplaySettings) => {
       setSettings({ ...DEFAULT_DISPLAY_SETTINGS, ...next });
     };
 
     socket.on('qa:state', applyState);
     socket.on('qa:scores', onScores);
+    socket.on('qa:questions', onQuestions);
     socket.on('qa:display:settings', onSettings);
     socket.on('connect', attach);
     if (socket.connected) attach();
@@ -98,6 +116,7 @@ export default function QAndADisplay({ params }: { params: Promise<{ pin: string
       disposed = true;
       socket.off('qa:state', applyState);
       socket.off('qa:scores', onScores);
+      socket.off('qa:questions', onQuestions);
       socket.off('qa:display:settings', onSettings);
       socket.off('connect', attach);
     };

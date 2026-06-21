@@ -29,6 +29,8 @@ import {
   setSubmissionsOpen,
   setVotingOpen,
   submitQuestion,
+  toHostQuestion,
+  toPublicQuestion,
   unassignLabel,
   withdrawQuestion,
 } from './qa';
@@ -1671,5 +1673,151 @@ describe('addParticipantReply', () => {
     });
     expect(reply.ok).toBe(true);
     expect(publicState(state).questions[0].replies.map((x) => x.text)).toEqual(['instant thread']);
+  });
+});
+
+describe('toPublicQuestion', () => {
+  it('serializes a LIVE question with public-safe fields only', () => {
+    const state = makeState();
+    const pid = join(state, 'Alice');
+    const qid = submitLive(state, pid, 'What time is it?');
+    const q = state.questions.get(qid);
+    if (!q) throw new Error('question not found');
+    const pub = toPublicQuestion(state, q);
+    expect(pub.id).toBe(qid);
+    expect(pub.text).toBe('What time is it?');
+    expect(pub.isAnonymous).toBe(true); // ANONYMOUS_BY_DEFAULT
+    expect(pub.authorDisplayName).toBeNull();
+    expect(pub.score).toBe(0);
+    expect(pub.upvotes).toBe(0);
+    expect(pub.downvotes).toBe(0);
+    expect(pub.labelIds).toEqual([]);
+    expect(pub.replyCount).toBe(0);
+    expect(pub.replies).toEqual([]);
+    expect(pub.highlighted).toBe(false);
+    expect(typeof pub.submittedAt).toBe('number');
+    // Must not include status or participantId
+    expect('status' in pub).toBe(false);
+    expect('participantId' in pub).toBe(false);
+  });
+
+  it('exposes author name for non-anonymous questions', () => {
+    const state = makeState({ privacyMode: 'NAMED_BY_DEFAULT' });
+    const pid = join(state, 'Bob');
+    const r = submitQuestion(state, { participantId: pid, text: 'Named q?', isAnonymous: false });
+    if (!r.ok) throw new Error('submit failed');
+    const pub = toPublicQuestion(state, r.question);
+    expect(pub.isAnonymous).toBe(false);
+    expect(pub.authorDisplayName).toBe('Bob');
+  });
+
+  it('filters labelIds to only participant-selectable labels', () => {
+    const state = makeState();
+    const hostLabelResult = createLabel(state, { name: 'Host Only', participantSelectable: false });
+    const pubLabelResult = createLabel(state, {
+      name: 'Public Tag',
+      participantSelectable: true,
+    });
+    if (!hostLabelResult.ok || !pubLabelResult.ok) throw new Error('label creation failed');
+    const pid = join(state);
+    const r = submitQuestion(state, {
+      participantId: pid,
+      text: 'Tagged?',
+      labelIds: [pubLabelResult.labelId],
+    });
+    if (!r.ok) throw new Error('submit failed');
+    // Manually add host-only label to question (as if host assigned it)
+    r.question.labelIds.add(hostLabelResult.labelId);
+    const pub = toPublicQuestion(state, r.question);
+    expect(pub.labelIds).toContain(pubLabelResult.labelId);
+    expect(pub.labelIds).not.toContain(hostLabelResult.labelId);
+  });
+
+  it('reflects highlighted state', () => {
+    const state = makeState();
+    const pid = join(state);
+    const qid = submitLive(state, pid);
+    const q = state.questions.get(qid);
+    if (!q) throw new Error('question not found');
+    highlightQuestion(state, { questionId: qid });
+    const pub = toPublicQuestion(state, q);
+    expect(pub.highlighted).toBe(true);
+  });
+
+  it('matches the projection from publicState for the same question', () => {
+    const state = makeState({ privacyMode: 'NAMED_BY_DEFAULT' });
+    const pid = join(state, 'Carol');
+    const qid = submitLive(state, pid, 'Hello?');
+    const q = state.questions.get(qid);
+    if (!q) throw new Error('question not found');
+    const pub = toPublicQuestion(state, q);
+    const fromFullState = publicState(state).questions.find((x) => x.id === qid);
+    expect(pub).toEqual(fromFullState);
+  });
+});
+
+describe('toHostQuestion', () => {
+  it('serializes a LIVE question with status included', () => {
+    const state = makeState();
+    const pid = join(state);
+    const qid = submitLive(state, pid, 'Live question');
+    const q = state.questions.get(qid);
+    if (!q) throw new Error('question not found');
+    const host = toHostQuestion(state, q);
+    expect(host.id).toBe(qid);
+    expect(host.status).toBe('LIVE');
+    expect('participantId' in host).toBe(false);
+  });
+
+  it('serializes an IN_REVIEW question with status', () => {
+    const state = makeState({ moderationEnabled: true });
+    const pid = join(state);
+    const r = submitQuestion(state, { participantId: pid, text: 'Pending??' });
+    if (!r.ok) throw new Error('submit failed');
+    const host = toHostQuestion(state, r.question);
+    expect(host.status).toBe('IN_REVIEW');
+    expect(host.text).toBe('Pending??');
+  });
+
+  it('includes all label ids (not filtered to public-only)', () => {
+    const state = makeState();
+    const hostLabelResult = createLabel(state, {
+      name: 'Internal',
+      participantSelectable: false,
+    });
+    const pubLabelResult = createLabel(state, { name: 'Public', participantSelectable: true });
+    if (!hostLabelResult.ok || !pubLabelResult.ok) throw new Error('label creation failed');
+    const pid = join(state);
+    const r = submitQuestion(state, {
+      participantId: pid,
+      text: 'Labeled?',
+      labelIds: [pubLabelResult.labelId],
+    });
+    if (!r.ok) throw new Error('submit failed');
+    r.question.labelIds.add(hostLabelResult.labelId);
+    const host = toHostQuestion(state, r.question);
+    expect(host.labelIds).toContain(pubLabelResult.labelId);
+    expect(host.labelIds).toContain(hostLabelResult.labelId);
+  });
+
+  it('keeps author name anonymous even in host projection', () => {
+    const state = makeState({ privacyMode: 'ALWAYS_ANONYMOUS' });
+    const pid = join(state, 'Dave');
+    const qid = submitLive(state, pid, 'Anon?');
+    const q = state.questions.get(qid);
+    if (!q) throw new Error('question not found');
+    const host = toHostQuestion(state, q);
+    expect(host.isAnonymous).toBe(true);
+    expect(host.authorDisplayName).toBeNull();
+  });
+
+  it('matches the projection from hostState for the same question', () => {
+    const state = makeState({ moderationEnabled: true, privacyMode: 'NAMED_BY_DEFAULT' });
+    const pid = join(state, 'Eve');
+    const r = submitQuestion(state, { participantId: pid, text: 'Hosted?' });
+    if (!r.ok) throw new Error('submit failed');
+    const host = toHostQuestion(state, r.question);
+    const fromFullState = hostState(state).questions.find((x) => x.id === r.question.id);
+    expect(host).toEqual(fromFullState);
   });
 });
