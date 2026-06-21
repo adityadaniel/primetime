@@ -50,6 +50,7 @@ import {
   reviewPost,
   submitPost,
   WONDERWALL_INSTRUCTIONS_MAX,
+  WONDERWALL_POST_LIMIT,
   WonderWallNotFoundError,
   WonderWallOwnershipError,
   WonderWallReorderError,
@@ -312,7 +313,7 @@ describe('submitPost', () => {
 
   it('throws submissions_closed when the post cap is reached', async () => {
     sessionFindUnique.mockResolvedValueOnce({ id: 'ww_1', status: 'LIVE' });
-    postCount.mockResolvedValueOnce(100);
+    postCount.mockResolvedValueOnce(WONDERWALL_POST_LIMIT);
     await expect(
       submitPost({ pin: '123456', url: 'https://www.linkedin.com/feed/update/urn:li:activity:1/' }),
     ).rejects.toMatchObject({ reason: 'submissions_closed' });

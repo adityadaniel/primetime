@@ -27,7 +27,7 @@ import {
 } from './wonderwall-limits';
 
 export { WONDERWALL_DESCRIPTION_MAX, WONDERWALL_INSTRUCTIONS_MAX, WONDERWALL_TITLE_MAX };
-export const WONDERWALL_POST_LIMIT = 100;
+export const WONDERWALL_POST_LIMIT = 200;
 
 // Public display/player DTO. Intentionally excludes every review-only field
 // (submitterName/Key, rejectionReason, failureReason, review timestamps): the

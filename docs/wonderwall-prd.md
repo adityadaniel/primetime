@@ -141,7 +141,7 @@ Measurement is **fail-soft**: if LinkedIn serves the logged-out sign-in/language
 
 It does **not** store LinkedIn post body, profile data, reactions, comments, or images. The height fields are layout measurements (pixels), not content. The one content field is `authorName` — the embedded post's author **display name only** (≤120 chars), captured during height measurement and used **host-only** on the control surface to differentiate one submitter's multiple posts. It is null until measured (and on login-gated failures), and is deliberately excluded from the public projector DTO, the participant `my-posts` payload, and the CSV export (DECISIONS.md 2026-06-19 "WonderWall author label").
 
-Input limits (`lib/wonderwall-limits.ts`): title ≤ 100, description ≤ 200, instructions ≤ 240. Per-wall submission cap: `WONDERWALL_POST_LIMIT = 100` in `lib/wonderwall-repo.ts`.
+Input limits (`lib/wonderwall-limits.ts`): title ≤ 100, description ≤ 200, instructions ≤ 240. Per-wall submission cap: `WONDERWALL_POST_LIMIT = 200` in `lib/wonderwall-repo.ts`.
 
 ---
 
