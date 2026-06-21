@@ -11,6 +11,7 @@ const postUpdate = vi.fn();
 const postUpdateMany = vi.fn();
 const postAggregate = vi.fn();
 const postCount = vi.fn();
+const postGroupBy = vi.fn();
 
 vi.mock('./db', () => {
   const prisma: Record<string, unknown> = {
@@ -28,6 +29,7 @@ vi.mock('./db', () => {
       updateMany: (args: unknown) => postUpdateMany(args),
       aggregate: (args: unknown) => postAggregate(args),
       count: (args: unknown) => postCount(args),
+      groupBy: (args: unknown) => postGroupBy(args),
     },
   };
   // Interactive-transaction mock: run the callback against the same mocked
@@ -43,6 +45,7 @@ import {
   getPostsForSubmitter,
   getPublicStateByPin,
   listPostsForExport,
+  listSessionSummariesForUser,
   reorderApprovedPosts,
   reviewPost,
   submitPost,
@@ -68,6 +71,8 @@ beforeEach(() => {
   postFindFirst.mockResolvedValue(null);
   postCount.mockResolvedValue(0);
   postUpdateMany.mockResolvedValue({ count: 0 });
+  postGroupBy.mockReset();
+  postGroupBy.mockResolvedValue([]);
   // Default: update echoes back the data it was given merged with the id.
   postUpdate.mockImplementation((args: { where: { id: string }; data: Record<string, unknown> }) =>
     Promise.resolve({ id: args.where.id, ...args.data }),
@@ -612,5 +617,60 @@ describe('reorderApprovedPosts', () => {
       reorderApprovedPosts({ sessionId: 'ww_1', orderedPostIds: ['p_1', 'p_missing'] }),
     ).rejects.toThrow('belong to the session');
     expect(postUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('listSessionSummariesForUser', () => {
+  it('returns host rooms with on-air + submission counts as a serializable summary', async () => {
+    sessionFindMany.mockResolvedValueOnce([
+      {
+        id: 'ww_1',
+        pin: '111111',
+        title: 'Workshop A',
+        status: 'DRAFT',
+        createdAt: new Date('2026-06-20T10:00:00.000Z'),
+        updatedAt: new Date('2026-06-21T08:30:00.000Z'),
+        _count: { posts: 3 }, // filtered to canDisplay=true (on air)
+      },
+    ]);
+    postGroupBy.mockResolvedValueOnce([{ sessionId: 'ww_1', _count: { _all: 12 } }]);
+
+    const out = await listSessionSummariesForUser('u_1');
+
+    expect(out).toEqual([
+      {
+        id: 'ww_1',
+        pin: '111111',
+        title: 'Workshop A',
+        status: 'DRAFT',
+        approvedCount: 3,
+        submissionCount: 12,
+        createdAt: '2026-06-20T10:00:00.000Z',
+        updatedAt: '2026-06-21T08:30:00.000Z',
+      },
+    ]);
+    const arg = sessionFindMany.mock.calls[0][0];
+    expect(arg.where).toEqual({ hostUserId: 'u_1' });
+    expect(arg.orderBy).toEqual({ createdAt: 'desc' });
+    // The on-air count is a canDisplay-filtered relation count.
+    expect(arg.select._count.select.posts.where).toEqual({ canDisplay: true });
+  });
+
+  it('defaults submissionCount to 0 for a room with no posts', async () => {
+    sessionFindMany.mockResolvedValueOnce([
+      {
+        id: 'ww_2',
+        pin: '222222',
+        title: 'Empty room',
+        status: 'DRAFT',
+        createdAt: new Date('2026-06-20T10:00:00.000Z'),
+        updatedAt: new Date('2026-06-20T10:00:00.000Z'),
+        _count: { posts: 0 },
+      },
+    ]);
+    postGroupBy.mockResolvedValueOnce([]);
+    const out = await listSessionSummariesForUser('u_1');
+    expect(out[0].submissionCount).toBe(0);
+    expect(out[0].approvedCount).toBe(0);
   });
 });

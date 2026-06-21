@@ -614,3 +614,55 @@ export async function listSessionsForUser(
     skip: offset,
   });
 }
+
+// Serializable summary for the host's room history on /host. Mirrors the Saved
+// Quizzes pattern (lib/repos/quiz.ts listQuizzes): a projection with post counts.
+// submissionCount = all posts; approvedCount = displayable (on-air) posts.
+export type WonderWallSessionSummary = {
+  id: string;
+  pin: string;
+  title: string;
+  status: WonderWallStatus;
+  submissionCount: number;
+  approvedCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function listSessionSummariesForUser(
+  userId: string,
+): Promise<WonderWallSessionSummary[]> {
+  const rows = await prisma.wonderWallSession.findMany({
+    where: { hostUserId: userId },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+    select: {
+      id: true,
+      pin: true,
+      title: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+      _count: { select: { posts: { where: { canDisplay: true } } } },
+      // A second filtered count isn't expressible in one _count block, so total
+      // submissions comes from a grouped count below.
+    },
+  });
+  // Total post counts per session (one query) keyed by sessionId.
+  const totals = await prisma.wonderWallPost.groupBy({
+    by: ['sessionId'],
+    where: { session: { hostUserId: userId } },
+    _count: { _all: true },
+  });
+  const totalById = new Map(totals.map((t) => [t.sessionId, t._count._all]));
+  return rows.map((row) => ({
+    id: row.id,
+    pin: row.pin,
+    title: row.title,
+    status: row.status,
+    submissionCount: totalById.get(row.id) ?? 0,
+    approvedCount: row._count.posts,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }));
+}

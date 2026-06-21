@@ -4,12 +4,21 @@ import Link from 'next/link';
 import { useState } from 'react';
 import AccountMenu from '@/components/AccountMenu';
 import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
+import { publicUrl } from '@/lib/public-origin';
 import type { QuizSummary } from '@/lib/types';
+import type { WonderWallSessionSummary } from '@/lib/wonderwall-repo';
 
-export default function HostMenuClient({ initialQuizzes }: { initialQuizzes: QuizSummary[] }) {
+export default function HostMenuClient({
+  initialQuizzes,
+  initialRooms,
+}: {
+  initialQuizzes: QuizSummary[];
+  initialRooms: WonderWallSessionSummary[];
+}) {
   const [quizzes, setQuizzes] = useState<QuizSummary[]>(initialQuizzes);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletingQuizId, setDeletingQuizId] = useState<string | null>(null);
+  const [copiedPin, setCopiedPin] = useState<string | null>(null);
 
   return (
     <main className="relative min-h-screen pb-24">
@@ -162,6 +171,104 @@ export default function HostMenuClient({ initialQuizzes }: { initialQuizzes: Qui
         <div className="flex items-end justify-between gap-4 mb-3">
           <div>
             <p className="chyron mb-2" style={{ color: 'var(--vermilion)' }}>
+              WONDERWALL ROOMS · REUSABLE
+            </p>
+            <h2
+              className="font-editorial leading-none"
+              style={{ fontSize: 'clamp(30px, 4vw, 52px)' }}
+            >
+              Reopen a room, reshare its link.
+            </h2>
+          </div>
+          <Link
+            href="/host/wonderwall/new"
+            className="hidden sm:inline-flex ink-border ticker text-[11px] tracking-widest px-4 py-3"
+            style={{ background: 'var(--ink)', color: 'var(--bone)' }}
+          >
+            + NEW ROOM
+          </Link>
+        </div>
+
+        <div className="ink-border" style={{ background: 'var(--bone)' }}>
+          <div
+            className="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_110px_140px_150px_300px] gap-3 px-4 py-2 border-b-2 ticker text-[10px] tracking-widest opacity-70"
+            style={{ borderColor: 'var(--ink)' }}
+          >
+            <span>ROOM</span>
+            <span className="hidden md:block">PIN</span>
+            <span className="hidden md:block">ON AIR / SUB</span>
+            <span className="hidden md:block">UPDATED</span>
+            <span>ACTIONS</span>
+          </div>
+
+          {initialRooms.length === 0 && (
+            <div className="p-5">
+              <p className="font-editorial italic text-lg">No WonderWall rooms yet</p>
+              <p className="ticker text-[11px] tracking-widest opacity-70 mt-2">
+                RUN A WONDERWALL ABOVE — IT APPEARS HERE, AND ITS LINK STAYS LIVE FOR LATER
+                MEETINGS.
+              </p>
+            </div>
+          )}
+
+          {initialRooms.map((room) => (
+            <div
+              key={room.id}
+              className="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_110px_140px_150px_300px] gap-3 px-4 py-3 border-b-2 last:border-b-0 items-center"
+              style={{ borderColor: 'var(--ink)' }}
+            >
+              <div className="min-w-0">
+                <p className="font-editorial text-xl leading-tight truncate">{room.title}</p>
+                <p className="md:hidden ticker text-[10px] tracking-widest opacity-70 mt-1">
+                  PIN {room.pin} · {room.approvedCount}/{room.submissionCount} ON AIR ·{' '}
+                  {formatUpdated(room.updatedAt)}
+                </p>
+              </div>
+              <span className="hidden md:block display-num text-lg tabular-nums">{room.pin}</span>
+              <span className="hidden md:block ticker text-[12px] tracking-widest opacity-70">
+                {String(room.approvedCount).padStart(2, '0')} /{' '}
+                {String(room.submissionCount).padStart(2, '0')}
+              </span>
+              <span className="hidden md:block ticker text-[12px] tracking-widest opacity-70">
+                {formatUpdated(room.updatedAt)}
+              </span>
+              <div className="flex items-center justify-end gap-2">
+                <Link
+                  href={`/host/wonderwall/${room.pin}/control`}
+                  className="ink-border ticker text-[11px] tracking-widest px-3 py-2"
+                  style={{ background: 'var(--ink)', color: 'var(--bone)' }}
+                >
+                  CONTROL
+                </Link>
+                <Link
+                  href={`/host/wonderwall/${room.pin}/display`}
+                  className="ink-border ticker text-[11px] tracking-widest px-3 py-2"
+                  style={{ background: 'var(--bone)', color: 'var(--ink)' }}
+                >
+                  DISPLAY
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => copyJoinLink(room.pin)}
+                  className="ticker text-[11px] tracking-widest px-3 py-2"
+                  style={{
+                    background: 'transparent',
+                    border: '2px solid var(--vermilion)',
+                    color: 'var(--vermilion)',
+                  }}
+                >
+                  {copiedPin === room.pin ? 'COPIED' : 'COPY LINK'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="px-8 pt-10 max-w-[1400px] mx-auto">
+        <div className="flex items-end justify-between gap-4 mb-3">
+          <div>
+            <p className="chyron mb-2" style={{ color: 'var(--vermilion)' }}>
               SAVED QUIZZES · CUE SHEETS
             </p>
             <h2
@@ -272,6 +379,21 @@ export default function HostMenuClient({ initialQuizzes }: { initialQuizzes: Qui
       setDeleteError(err instanceof Error ? err.message : 'Could not delete quiz');
     } finally {
       setDeletingQuizId(null);
+    }
+  }
+
+  // Copy the room's persistent join link (the PIN never changes), so the host can
+  // reshare the same URL for the next meeting. Uses publicUrl() so it prefers the
+  // configured live/tunnel origin (NEXT_PUBLIC_SITE_URL) when set.
+  async function copyJoinLink(pin: string) {
+    const origin = typeof window === 'undefined' ? null : window.location.origin;
+    const url = publicUrl(`/join?pin=${pin}`, origin);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedPin(pin);
+      window.setTimeout(() => setCopiedPin((current) => (current === pin ? null : current)), 1500);
+    } catch {
+      // Clipboard can be blocked (permissions/insecure context); fail silently.
     }
   }
 }
