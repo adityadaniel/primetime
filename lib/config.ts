@@ -39,6 +39,11 @@ export interface AppConfig {
   uploadProvider: UploadProvider;
   /** BILLING_ENABLED — `false` by default (OSS ships with no billing). */
   billingEnabled: boolean;
+  /** WONDERWALL_ANALYSIS_ENABLED — `false` by default. When true, WonderWall
+   * fetches submitted LinkedIn post content via Apify for host-only word-cloud
+   * insights (requires APIFY_TOKEN). OFF for OSS/self-host; opt-in only, and the
+   * operator accepts the LinkedIn-ToS risk. See DECISIONS.md 2026-06-21. */
+  wonderwallAnalysisEnabled: boolean;
   /** Max players per game. Code-level constant in lib/constants.ts. */
   playerCap: number;
   /** UPLOAD_MAX_BYTES — max upload file size in bytes. Default 5 MB. */
@@ -117,6 +122,14 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const uploadProvider = enumOr('UPLOAD_PROVIDER', env.UPLOAD_PROVIDER, UPLOAD_PROVIDERS, 'local');
   const billingEnabled = parseBool(env.BILLING_ENABLED, false);
 
+  // WonderWall content analysis (Apify scraping) is OFF by default. When an
+  // operator opts in, APIFY_TOKEN is required so a misconfigured deploy fails
+  // loudly rather than silently never fetching.
+  const wonderwallAnalysisEnabled = parseBool(env.WONDERWALL_ANALYSIS_ENABLED, false);
+  if (wonderwallAnalysisEnabled) {
+    requireVars('WONDERWALL_ANALYSIS_ENABLED=true', env, ['APIFY_TOKEN']);
+  }
+
   const playerCap = PLAYER_CAP;
 
   // Upload settings
@@ -173,6 +186,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     emailProvider,
     uploadProvider,
     billingEnabled,
+    wonderwallAnalysisEnabled,
     playerCap,
     uploadMaxBytes,
     uploadDir,

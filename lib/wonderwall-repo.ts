@@ -17,6 +17,7 @@ import {
   type WonderWallSession,
   type WonderWallStatus,
 } from '@prisma/client';
+import { config } from './config';
 import { prisma } from './db';
 import { resolveDisplayHeight } from './wonderwall-height';
 import { parseLinkedInPostUrl, type WonderWallParseResult } from './wonderwall-input';
@@ -210,6 +211,77 @@ export async function getHostStateByPin(args: {
     updatedAt: session.updatedAt,
     endedAt: session.endedAt,
     posts: session.posts,
+  };
+}
+
+// Host-only room insights source (DECISIONS.md 2026-06-21 "WonderWall content
+// analysis (Apify)"). Returns the on-air posts with their scraped content text
+// (host-only) plus fetch-status counts, so the insights page can build a word
+// cloud. Ownership-guarded like getHostStateByPin. `text` is OK-content only and
+// must never be handed to a public/participant surface.
+export type WonderWallInsightsPost = {
+  id: string;
+  urn: string;
+  originalUrl: string;
+  authorName: string | null;
+  contentStatus: string | null;
+  text: string | null;
+};
+
+export type WonderWallInsightsData = {
+  pin: string;
+  title: string;
+  analysisEnabled: boolean;
+  posts: WonderWallInsightsPost[];
+  counts: { approved: number; ok: number; pending: number; failed: number };
+};
+
+export async function getRoomContentForInsights(args: {
+  pin: string;
+  hostUserId: string;
+}): Promise<WonderWallInsightsData | null> {
+  const session = await prisma.wonderWallSession.findUnique({
+    where: { pin: args.pin },
+    select: {
+      pin: true,
+      title: true,
+      hostUserId: true,
+      posts: {
+        where: { status: 'APPROVED', canDisplay: true },
+        orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+        select: {
+          id: true,
+          urn: true,
+          originalUrl: true,
+          authorName: true,
+          content: { select: { status: true, text: true } },
+        },
+      },
+    },
+  });
+  if (!session) return null;
+  if (session.hostUserId !== args.hostUserId) throw new WonderWallOwnershipError(args.pin);
+
+  const posts: WonderWallInsightsPost[] = session.posts.map((post) => ({
+    id: post.id,
+    urn: post.urn,
+    originalUrl: post.originalUrl,
+    authorName: post.authorName,
+    contentStatus: post.content?.status ?? null,
+    text: post.content?.status === 'OK' ? (post.content.text ?? null) : null,
+  }));
+
+  return {
+    pin: session.pin,
+    title: session.title,
+    analysisEnabled: config.wonderwallAnalysisEnabled,
+    posts,
+    counts: {
+      approved: posts.length,
+      ok: posts.filter((p) => p.contentStatus === 'OK').length,
+      pending: posts.filter((p) => p.contentStatus === 'PENDING').length,
+      failed: posts.filter((p) => p.contentStatus === 'FAILED').length,
+    },
   };
 }
 

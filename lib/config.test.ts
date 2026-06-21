@@ -18,6 +18,7 @@ describe('loadConfig — OSS defaults', () => {
     expect(c.oauthEnabled).toBe(false);
     expect(c.appleEnabled).toBe(false);
     expect(c.emailEnabled).toBe(false);
+    expect(c.wonderwallAnalysisEnabled).toBe(false);
   });
 
   it('treats empty-string values as unset and falls back to defaults', () => {
@@ -32,6 +33,21 @@ describe('loadConfig — OSS defaults', () => {
     expect(c.uploadProvider).toBe('local');
     expect(c.billingEnabled).toBe(false);
     expect(c.playerCap).toBe(PLAYER_CAP);
+  });
+});
+
+describe('loadConfig — WonderWall content analysis flag', () => {
+  it('is off by default and requires no token', () => {
+    expect(loadConfig({}).wonderwallAnalysisEnabled).toBe(false);
+  });
+
+  it('enables when WONDERWALL_ANALYSIS_ENABLED=true and APIFY_TOKEN is set', () => {
+    const c = loadConfig({ WONDERWALL_ANALYSIS_ENABLED: 'true', APIFY_TOKEN: 'apify_api_x' });
+    expect(c.wonderwallAnalysisEnabled).toBe(true);
+  });
+
+  it('fails fast when enabled without APIFY_TOKEN', () => {
+    expect(() => loadConfig({ WONDERWALL_ANALYSIS_ENABLED: 'true' })).toThrow(ConfigError);
   });
 });
 

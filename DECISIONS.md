@@ -10,6 +10,46 @@ and add a new entry below.
 
 ---
 
+## 2026-06-21 · WonderWall content analysis (Apify), flag-gated — narrows the no-scraping boundary
+
+**Status:** Accepted — **supersedes**, for the opt-in path only, the "no scraping /
+no LinkedIn API / store no post content" stance in the three earlier WonderWall
+entries (2026-06-19 v1, dynamic-height, author-label) and PRD §1.3/§6/§11. Those
+remain the **default**; this entry adds a documented, off-by-default exception.
+
+**Context:** The host wants to analyze the LinkedIn posts submitted to a room —
+starting with a word cloud of the post text. The official embed exposes no text to
+the parent, and WonderWall deliberately stored no content. To get post text we now
+fetch it from a third-party scraper (Apify actor `harvestapi~linkedin-profile-posts`)
+on host approval, store it, and render a host-only word cloud. This is exactly the
+content scraping/storage the prior entries prohibited and which they said required a
+new entry first — this is that entry. **It carries LinkedIn-ToS/legal exposure**
+(scraping + storing other users' post content); the operator who enables it accepts
+that risk.
+
+**Decision:** Permit fetching and storing submitted-post content **only when the
+operator opts in** via `WONDERWALL_ANALYSIS_ENABLED=true` (+ their own `APIFY_TOKEN`).
+Hard constraints:
+- **Off by default.** OSS/self-host and SaaS default to NO scraping, NO content
+  stored — the v1 boundary is unchanged for everyone who doesn't opt in.
+- **Host-only.** Stored content (`WonderWallPostContent`, 1:1, cascade-delete) and the
+  insights surface (`/host/wonderwall/[pin]/insights`) are host/owner-gated and **never**
+  exposed on the public projector, the participant `my-posts` payload, or the CSV export.
+- **Approval-scoped.** Content is fetched only for posts the host approves/displays
+  (mirrors measure-on-approval), in the background, fail-soft.
+- **Isolated + purgeable.** Content lives in its own table so it can be dropped
+  independently; deleting a post cascades its content.
+- **v1 = word cloud only.** No sentiment yet.
+
+**Consequences:** When the flag is off, nothing changes — no Apify calls, no content
+storage (verify in tests). When on, the operator owns the ToS/privacy/retention
+risk; the embed and projector behavior are untouched. Any future expansion (sentiment,
+exposing content publicly, fetching on submission instead of approval, or storing more
+than post text + author + engagement) must open a new entry. POC reference:
+`/Users/adityadaniel/Developer/linkedin-apify-test/linkedin_posts_fetch.py`.
+
+---
+
 ## 2026-06-21 · Q&A submission fanout: coalesced `qa:questions` delta (MID-345)
 
 **Status:** Accepted
