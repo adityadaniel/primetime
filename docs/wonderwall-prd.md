@@ -1,6 +1,8 @@
 # WonderWall — LinkedIn iframe PRD
 
-Version: 1.1 · Status: Implemented · Last Updated: June 2026 · Owner: Aditya Daniel
+Version: 1.2 · Status: Implemented · Last Updated: June 2026 · Owner: Aditya Daniel
+
+> v1.2 adds **opt-in content analysis** (OFF by default): when `WONDERWALL_ANALYSIS_ENABLED=true`, approved posts' LinkedIn content is fetched via Apify and stored for a **host-only** word-cloud insights view (`/host/wonderwall/[pin]/insights`). This narrows the "no scraping / no content" boundary for opt-in deployments only — see DECISIONS.md 2026-06-21 "WonderWall content analysis (Apify)". The default (flag off) behavior is unchanged.
 
 > v1.1 adds dynamic-height masonry: cards render at a per-post measured height instead of one fixed height. See §5 "Dynamic card height", §6 data model, §11 compliance, and the DECISIONS.md 2026-06-19 "WonderWall dynamic-height" entry.
 
@@ -22,7 +24,7 @@ Let a host open a PIN-backed wall, let participants submit public LinkedIn post 
 
 ### 1.3 Non-goals (v1)
 
-- No scraping LinkedIn pages or logged-in/headless automation — **except** a narrowly-scoped headless render of the official public embed used solely to measure a card's layout height (an integer), no login and no content stored (see §5 "Dynamic card height" and DECISIONS.md 2026-06-19).
+- No scraping LinkedIn pages or logged-in/headless automation — **except** (a) a narrowly-scoped headless render of the official public embed used solely to measure a card's layout height (an integer), no login and no content stored (see §5 "Dynamic card height" and DECISIONS.md 2026-06-19); and (b) **opt-in only**, when `WONDERWALL_ANALYSIS_ENABLED=true`, fetching approved posts' content via Apify for host-only insights (default OFF; see §12 and DECISIONS.md 2026-06-21).
 - No LinkedIn API integration.
 - No screenshot generation or screenshot fallback when an embed fails.
 - No storing LinkedIn post content (body, profile data, reactions, comments, images) — **except** the embedded post's author **display name**, stored host-only to differentiate submissions on the control surface (see §6 and DECISIONS.md 2026-06-19 "WonderWall author label"). Never shown on public/projector/participant surfaces.
@@ -210,7 +212,31 @@ v1 ships a light polling refresh, not a Socket.IO state machine. The display cli
 1. Only public LinkedIn post URLs supplied by participants/host.
 2. Rendered via LinkedIn-hosted iframe embeds.
 3. No scraping, no logged-in automation, no LinkedIn API, no screenshot fallback. The one carve-out (DECISIONS.md 2026-06-19): a headless render of the **official public embed** purely to measure card height — no login, no bot-detection evasion, only `/embed/feed/update/` URLs, and only a height integer is stored (never content).
-4. Store only URL/URN/embed/review metadata, layout-height integers, and the embedded post's author **display name** (host-only, for control-surface differentiation) — never other post content (body, profile data, reactions, comments, images), and never the author name on a public/participant surface.
+4. Store only URL/URN/embed/review metadata, layout-height integers, and the embedded post's author **display name** (host-only, for control-surface differentiation) — never other post content (body, profile data, reactions, comments, images), and never the author name on a public/participant surface. **Exception (opt-in, default OFF):** when `WONDERWALL_ANALYSIS_ENABLED=true`, approved posts' content (text + author + engagement counts) is fetched via Apify and stored in `WonderWallPostContent` for a host-only word-cloud insights view; never exposed on public/participant surfaces or the CSV export. See §12 and DECISIONS.md 2026-06-21.
 5. Always keep a path back to LinkedIn ("OPEN ON LINKEDIN" per approved card). A blank/failed cross-origin iframe is not auto-detected; the manual link is the graceful path.
 
-See `DECISIONS.md` (2026-06-19 "WonderWall v1" iframe entry, "WonderWall dynamic-height" entry, and "WonderWall author label" entry) for the durable record.
+See `DECISIONS.md` (2026-06-19 "WonderWall v1" iframe entry, "WonderWall dynamic-height" entry, "WonderWall author label" entry, and 2026-06-21 "WonderWall content analysis (Apify)") for the durable record.
+
+---
+
+## 12. Content analysis (opt-in, default OFF)
+
+A deployment may opt in to **room insights** — a host-only word cloud built from the
+LinkedIn content of approved posts. This **reverses the default no-scraping/no-content
+stance** and is therefore gated and documented (DECISIONS.md 2026-06-21).
+
+- **Flag:** `WONDERWALL_ANALYSIS_ENABLED=true` (default `false`) + the operator's own
+  `APIFY_TOKEN`. With the flag off, nothing changes — no Apify calls, no content stored.
+- **Fetch:** on host **approval/restore**, a background worker (`lib/wonderwall-content.ts`,
+  mirroring the height-measurement worker) calls the Apify actor
+  `harvestapi~linkedin-profile-posts` (`lib/wonderwall-apify.ts`) and stores normalized
+  fields (text, author, engagement counts) in a 1:1 `WonderWallPostContent` row with a
+  `PENDING → OK/FAILED` status. Fail-soft; login-gated/unavailable posts end `FAILED`.
+- **Insights surface:** `/host/wonderwall/[pin]/insights` (host-only, ownership-guarded).
+  Post text is tokenized + stopword-filtered server-side (`lib/wonderwall-insights.ts`)
+  and rendered with the Word Cloud activity's pure `layoutWords()` engine. The raw text
+  never crosses to the client; counts/word-frequencies do.
+- **Boundaries:** stored content and the insights view are **host-only** — never on the
+  public projector, the participant `my-posts` payload, or the CSV export. Content is
+  isolated in its own table (cascade-deletes with the post) so it can be purged. v1 is
+  **word cloud only** (no sentiment). The operator accepts the LinkedIn-ToS/legal risk.

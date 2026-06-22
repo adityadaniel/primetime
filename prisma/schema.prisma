@@ -477,10 +477,39 @@ model WonderWallPost {
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
+  // Opt-in content analysis (DECISIONS.md 2026-06-21 "WonderWall content
+  // analysis (Apify)"). 1:1 scraped content, only populated when
+  // WONDERWALL_ANALYSIS_ENABLED=true. Isolated in its own table so it can be
+  // purged independently and never leaks onto public surfaces.
+  content WonderWallPostContent?
+
   // Intentionally not unique in v1. A rejected/failed URL may be resubmitted
   // later with a cleaner link; the control surface can group duplicates
   // visually instead.
   @@index([sessionId, position])
   @@index([sessionId, status])
   @@index([sessionId, canDisplay, position])
+}
+
+// Scraped LinkedIn post content for WonderWall room insights. FLAG-GATED and
+// host-only (DECISIONS.md 2026-06-21). Reverses the v1 "store no post content"
+// boundary, opt-in via WONDERWALL_ANALYSIS_ENABLED. Cascades on post delete so
+// content is purged with its post; never exposed on public/participant surfaces.
+model WonderWallPostContent {
+  id            String         @id @default(cuid())
+  postId        String         @unique
+  post          WonderWallPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  // Fetch lifecycle: 'PENDING' | 'OK' | 'FAILED'.
+  status        String         @db.VarChar(16)
+  text          String?        @db.Text
+  authorName    String?        @db.VarChar(160)
+  authorHeadline String?       @db.VarChar(240)
+  numLikes      Int?
+  numComments   Int?
+  numShares     Int?
+  postedAt      DateTime?
+  fetchedAt     DateTime?
+  failureReason String?        @db.VarChar(240)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }

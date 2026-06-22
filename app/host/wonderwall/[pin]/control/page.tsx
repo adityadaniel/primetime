@@ -12,6 +12,7 @@ import { notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import AccountMenu from '@/components/AccountMenu';
 import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
+import { config } from '@/lib/config';
 import { publicUrl } from '@/lib/public-origin';
 import { resolveDisplayHeight } from '@/lib/wonderwall-height';
 import { getHostStateByPin, WonderWallOwnershipError } from '@/lib/wonderwall-repo';
@@ -120,6 +121,18 @@ export default async function WonderWallControlPage({
           >
             EXPORT SUBMISSIONS CSV ↓
           </a>
+          {/* Host-only room insights (word cloud from scraped post content).
+              Only shown when the opt-in content-analysis feature is enabled
+              (DECISIONS.md 2026-06-21). */}
+          {config.wonderwallAnalysisEnabled && (
+            <a
+              href={`/host/wonderwall/${state.pin}/insights`}
+              className="ink-border stamp px-5 py-3 ticker tracking-widest text-[12px] text-center"
+              style={{ background: 'var(--bone)', color: 'var(--ink)' }}
+            >
+              ROOM INSIGHTS ◆
+            </a>
+          )}
         </div>
 
         <WonderWallControlClient pin={state.pin} initialPosts={posts} />

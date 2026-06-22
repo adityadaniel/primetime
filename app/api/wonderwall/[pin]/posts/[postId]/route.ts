@@ -10,6 +10,8 @@
 import type { WonderWallPost } from '@prisma/client';
 import { type NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { config } from '@/lib/config';
+import { fetchPostContentInBackground } from '@/lib/wonderwall-content';
 import { resolveDisplayHeight } from '@/lib/wonderwall-height';
 import {
   measurePostHeightInBackground,
@@ -159,6 +161,12 @@ export async function PATCH(
     // returns now and the next control/display poll surfaces the stored height.
     if ((action === 'approve' || action === 'restore') && post.measureStatus !== 'OK') {
       measurePostHeightInBackground(post.id);
+    }
+    // Opt-in content analysis (DECISIONS.md 2026-06-21): on approval, fetch the
+    // post's LinkedIn content via Apify in the background for host-only insights.
+    // Flag-gated and OFF by default; the Apify client also no-ops without a token.
+    if ((action === 'approve' || action === 'restore') && config.wonderwallAnalysisEnabled) {
+      fetchPostContentInBackground(post.id);
     }
     return NextResponse.json({ post: serializeHostPost(post) });
   } catch (err) {
