@@ -143,6 +143,7 @@ describe('POST /api/q-and-a', () => {
       downvotesEnabled: false,
       questionCharLimit: 500,
       hostUserId: 'host-1',
+      status: 'CLOSED',
       labels: [],
     });
   });
@@ -165,8 +166,23 @@ describe('POST /api/q-and-a', () => {
       downvotesEnabled: false,
       questionCharLimit: 280,
       hostUserId: 'host-1',
+      status: 'CLOSED',
       labels: [],
     });
+  });
+
+  it('starts CLOSED by default (prepare-ahead) and OPEN when openImmediately=true', async () => {
+    authMock.mockResolvedValue(hostSession);
+    allocatePinMock.mockResolvedValue('777888');
+    createSessionMock.mockResolvedValue({ id: 'qas_x', pin: '777888' });
+
+    await POST(postReq({ title: 'Town hall' }));
+    expect(createSessionMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: 'CLOSED' }),
+    );
+
+    await POST(postReq({ title: 'Spontaneous', openImmediately: true }));
+    expect(createSessionMock).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'OPEN' }));
   });
 
   it('passes trimmed labels with per-label participant visibility (MID-340)', async () => {
