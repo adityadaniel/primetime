@@ -35,6 +35,9 @@ export default function QAndANew() {
   const [moderationEnabled, setModerationEnabled] = useState(false);
   const [participantRepliesEnabled, setParticipantRepliesEnabled] = useState(false);
   const [downvotesEnabled, setDownvotesEnabled] = useState(false);
+  // Default OFF: rooms are created CLOSED so a host can prepare ahead of time and
+  // open questions from the control room when the event starts.
+  const [openImmediately, setOpenImmediately] = useState(false);
   const [questionCharLimit, setQuestionCharLimit] = useState<(typeof CHAR_LIMITS)[number]>(280);
   // Optional session-scoped labels (MID-340) with a per-label toggle deciding
   // whether participants may pick it at submission.
@@ -97,6 +100,7 @@ export default function QAndANew() {
           downvotesEnabled,
           questionCharLimit,
           labels,
+          openImmediately,
         }),
       });
       if (!res.ok) {
@@ -242,6 +246,19 @@ export default function QAndANew() {
               offText="OFF · UPVOTES ONLY"
               hint={
                 downvotesEnabled ? 'Score = upvotes minus downvotes.' : 'Ranking by upvotes alone.'
+              }
+            />
+
+            <ToggleControl
+              label="QUESTIONS"
+              on={openImmediately}
+              onToggle={() => setOpenImmediately((v) => !v)}
+              onText="OPEN ON CREATE"
+              offText="CLOSED · PREPARE AHEAD"
+              hint={
+                openImmediately
+                  ? 'Questions open the moment the room is created.'
+                  : 'Room starts closed — open questions from the control room when your event starts.'
               }
             />
           </div>

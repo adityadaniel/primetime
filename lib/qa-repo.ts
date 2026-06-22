@@ -72,6 +72,10 @@ export async function createSession(args: {
   downvotesEnabled?: boolean;
   questionCharLimit?: number;
   hostUserId: string | null;
+  // Initial status. Defaults to OPEN for back-compat; the create route passes
+  // CLOSED for "prepare ahead" rooms so questions don't trickle in before the
+  // event (the host opens submissions from the control room when ready).
+  status?: QASessionStatus;
   // Session-scoped labels defined at creation (MID-340). Nested create keeps
   // the session and its labels atomic — no session row without its labels.
   labels?: { name: string; participantSelectable?: boolean }[];
@@ -110,6 +114,7 @@ export async function createSession(args: {
       downvotesEnabled: args.downvotesEnabled ?? false,
       questionCharLimit,
       hostUserId: args.hostUserId,
+      ...(args.status ? { status: args.status } : {}),
       ...(labels.length > 0 ? { labels: { create: labels } } : {}),
     },
   });
@@ -550,4 +555,43 @@ export async function listSessionsForUser(
     take: limit,
     skip: offset,
   });
+}
+
+// Serializable summary for the host's Q&A room history on /host. Mirrors
+// lib/wonderwall-repo.ts listSessionSummariesForUser: a projection with a
+// question count so a host can find and reopen a prepared room.
+export type QASessionSummary = {
+  id: string;
+  pin: string;
+  title: string;
+  status: QASessionStatus;
+  questionCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function listSessionSummariesForUser(userId: string): Promise<QASessionSummary[]> {
+  const rows = await prisma.qASession.findMany({
+    where: { hostUserId: userId },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+    select: {
+      id: true,
+      pin: true,
+      title: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+      _count: { select: { questions: true } },
+    },
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    pin: row.pin,
+    title: row.title,
+    status: row.status,
+    questionCount: row._count.questions,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }));
 }

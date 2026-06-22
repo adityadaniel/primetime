@@ -5,15 +5,18 @@ import { useState } from 'react';
 import AccountMenu from '@/components/AccountMenu';
 import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { publicUrl } from '@/lib/public-origin';
+import type { QASessionSummary } from '@/lib/qa-repo';
 import type { QuizSummary } from '@/lib/types';
 import type { WonderWallSessionSummary } from '@/lib/wonderwall-repo';
 
 export default function HostMenuClient({
   initialQuizzes,
   initialRooms,
+  initialQaRooms,
 }: {
   initialQuizzes: QuizSummary[];
   initialRooms: WonderWallSessionSummary[];
+  initialQaRooms: QASessionSummary[];
 }) {
   const [quizzes, setQuizzes] = useState<QuizSummary[]>(initialQuizzes);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -242,6 +245,106 @@ export default function HostMenuClient({
                 </Link>
                 <Link
                   href={`/host/wonderwall/${room.pin}/display`}
+                  className="ink-border ticker text-[11px] tracking-widest px-3 py-2"
+                  style={{ background: 'var(--bone)', color: 'var(--ink)' }}
+                >
+                  DISPLAY
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => copyJoinLink(room.pin)}
+                  className="ticker text-[11px] tracking-widest px-3 py-2"
+                  style={{
+                    background: 'transparent',
+                    border: '2px solid var(--vermilion)',
+                    color: 'var(--vermilion)',
+                  }}
+                >
+                  {copiedPin === room.pin ? 'COPIED' : 'COPY LINK'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="px-8 pt-10 max-w-[1400px] mx-auto">
+        <div className="flex items-end justify-between gap-4 mb-3">
+          <div>
+            <p className="chyron mb-2" style={{ color: 'var(--vermilion)' }}>
+              Q&amp;A ROOMS · REUSABLE
+            </p>
+            <h2
+              className="font-editorial leading-none"
+              style={{ fontSize: 'clamp(30px, 4vw, 52px)' }}
+            >
+              Prepare ahead, reopen on the day.
+            </h2>
+          </div>
+          <Link
+            href="/host/q-and-a/new"
+            className="hidden sm:inline-flex ink-border ticker text-[11px] tracking-widest px-4 py-3"
+            style={{ background: 'var(--ink)', color: 'var(--bone)' }}
+          >
+            + NEW ROOM
+          </Link>
+        </div>
+
+        <div className="ink-border" style={{ background: 'var(--bone)' }}>
+          <div
+            className="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_110px_120px_120px_150px_300px] gap-3 px-4 py-2 border-b-2 ticker text-[10px] tracking-widest opacity-70"
+            style={{ borderColor: 'var(--ink)' }}
+          >
+            <span>ROOM</span>
+            <span className="hidden md:block">PIN</span>
+            <span className="hidden md:block">STATUS</span>
+            <span className="hidden md:block">QUESTIONS</span>
+            <span className="hidden md:block">UPDATED</span>
+            <span>ACTIONS</span>
+          </div>
+
+          {initialQaRooms.length === 0 && (
+            <div className="p-5">
+              <p className="font-editorial italic text-lg">No Q&amp;A rooms yet</p>
+              <p className="ticker text-[11px] tracking-widest opacity-70 mt-2">
+                CREATE A Q&amp;A ABOVE — IT APPEARS HERE, READY TO REOPEN WHEN YOUR EVENT STARTS.
+              </p>
+            </div>
+          )}
+
+          {initialQaRooms.map((room) => (
+            <div
+              key={room.id}
+              className="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_110px_120px_120px_150px_300px] gap-3 px-4 py-3 border-b-2 last:border-b-0 items-center"
+              style={{ borderColor: 'var(--ink)' }}
+            >
+              <div className="min-w-0">
+                <p className="font-editorial text-xl leading-tight truncate">{room.title}</p>
+                <p className="md:hidden ticker text-[10px] tracking-widest opacity-70 mt-1">
+                  PIN {room.pin} · {room.status} · {room.questionCount} Q ·{' '}
+                  {formatUpdated(room.updatedAt)}
+                </p>
+              </div>
+              <span className="hidden md:block display-num text-lg tabular-nums">{room.pin}</span>
+              <span className="hidden md:block ticker text-[11px] tracking-widest opacity-70">
+                {room.status}
+              </span>
+              <span className="hidden md:block ticker text-[12px] tracking-widest opacity-70">
+                {String(room.questionCount).padStart(2, '0')}
+              </span>
+              <span className="hidden md:block ticker text-[12px] tracking-widest opacity-70">
+                {formatUpdated(room.updatedAt)}
+              </span>
+              <div className="flex items-center justify-end gap-2">
+                <Link
+                  href={`/host/q-and-a/${room.pin}/control`}
+                  className="ink-border ticker text-[11px] tracking-widest px-3 py-2"
+                  style={{ background: 'var(--ink)', color: 'var(--bone)' }}
+                >
+                  CONTROL
+                </Link>
+                <Link
+                  href={`/host/q-and-a/${room.pin}/display`}
                   className="ink-border ticker text-[11px] tracking-widest px-3 py-2"
                   style={{ background: 'var(--bone)', color: 'var(--ink)' }}
                 >

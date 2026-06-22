@@ -77,6 +77,7 @@ import {
   deleteLabel,
   editQuestionText,
   listLabels,
+  listSessionSummariesForUser,
   listSessionsForUser,
   loadSessionForHydration,
   logModerationEvent,
@@ -138,6 +139,18 @@ describe('createSession', () => {
         hostUserId: 'u_1',
       },
     });
+  });
+
+  it('passes an explicit status through (prepare-ahead CLOSED)', async () => {
+    sessionCreate.mockResolvedValueOnce({ id: 'qa_1', pin: '123456' });
+    await createSession({ pin: '123456', title: 'Town hall', status: 'CLOSED', hostUserId: 'u_1' });
+    expect(sessionCreate.mock.calls[0][0].data.status).toBe('CLOSED');
+  });
+
+  it('omits status when not provided (defaults to OPEN in the DB)', async () => {
+    sessionCreate.mockResolvedValueOnce({ id: 'qa_1', pin: '123456' });
+    await createSession({ pin: '123456', title: 'Town hall', hostUserId: 'u_1' });
+    expect(sessionCreate.mock.calls[0][0].data).not.toHaveProperty('status');
   });
 
   it('stores null description when omitted or blank', async () => {
@@ -934,5 +947,39 @@ describe('listSessionsForUser', () => {
       take: 5,
       skip: 10,
     });
+  });
+});
+
+describe('listSessionSummariesForUser', () => {
+  it('returns host rooms with a question count as a serializable summary', async () => {
+    sessionFindMany.mockResolvedValueOnce([
+      {
+        id: 'qa_1',
+        pin: '111111',
+        title: 'Townhall',
+        status: 'CLOSED',
+        createdAt: new Date('2026-06-21T10:00:00.000Z'),
+        updatedAt: new Date('2026-06-22T08:30:00.000Z'),
+        _count: { questions: 7 },
+      },
+    ]);
+
+    const out = await listSessionSummariesForUser('u_1');
+
+    expect(out).toEqual([
+      {
+        id: 'qa_1',
+        pin: '111111',
+        title: 'Townhall',
+        status: 'CLOSED',
+        questionCount: 7,
+        createdAt: '2026-06-21T10:00:00.000Z',
+        updatedAt: '2026-06-22T08:30:00.000Z',
+      },
+    ]);
+    const arg = sessionFindMany.mock.calls[0][0];
+    expect(arg.where).toEqual({ hostUserId: 'u_1' });
+    expect(arg.orderBy).toEqual({ createdAt: 'desc' });
+    expect(arg.select._count.select.questions).toBe(true);
   });
 });

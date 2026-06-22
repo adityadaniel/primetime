@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
     downvotesEnabled,
     questionCharLimit,
     labels,
+    openImmediately,
   } = body as {
     title?: unknown;
     description?: unknown;
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
     downvotesEnabled?: unknown;
     questionCharLimit?: unknown;
     labels?: unknown;
+    openImmediately?: unknown;
   };
 
   if (typeof title !== 'string') {
@@ -158,6 +160,10 @@ export async function POST(req: NextRequest) {
       downvotesEnabled: downvotesEnabled ?? false,
       questionCharLimit: charLimit,
       hostUserId: userId,
+      // "Prepare ahead" default: rooms start CLOSED so questions don't trickle
+      // in before the event. Host opens submissions from the control room when
+      // ready. Pass openImmediately:true to start OPEN (spontaneous Q&A).
+      status: openImmediately === true ? 'OPEN' : 'CLOSED',
       labels: sessionLabels,
     });
     return NextResponse.json({ pin: created.pin, sessionId: created.id });
