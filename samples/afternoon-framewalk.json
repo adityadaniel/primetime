@@ -1,0 +1,88 @@
+{
+  "$schema": "https://theprimetime.id/quiz-v1.json",
+  "version": 1,
+  "title": "Afternoon Framewalk",
+  "exportedAt": "2026-07-01T00:00:00.000Z",
+  "questions": [
+    {
+      "type": "multiple",
+      "text": "Which of the following frameworks utilize AI?",
+      "options": ["ActivityKit", "Group Activities", "AVFoundation", "Foundation Models"],
+      "correct": 3,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Apple framework that integrates app actions with Siri for voice commands and system interactions.",
+      "options": ["SiriKat", "SxrxKxt", "SiriKit", "SiriKut"],
+      "correct": 2,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "MusicKit supports both Apple Music and YouTube Music.",
+      "options": ["True", "False"],
+      "correct": 1,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Which of the following is NOT Apple framework?",
+      "options": ["Core Motion", "Core Memory", "Core Bluetooth", "Core Haptics"],
+      "correct": 1,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Which of the following is NOT measured or calculated by Core Motion?",
+      "options": ["Magnetometer", "Gyroscope", "Barometer", "Pedometer"],
+      "correct": 2,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Which framework that expose app actions to Siri, Shortcuts, and Controls.",
+      "options": ["App Clips", "App Intent", "WidgetKit", "SwiftData"],
+      "correct": 1,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Apple framework that creates and updates Live Activities on the Lock Screen and Dynamic Island.",
+      "options": ["IctivitiKit", "4ct1v1tyK1t", "ActivityKit", "XctxvxtxKxt"],
+      "correct": 2,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "PencilKit can be used to build drawing and sketching features in an app.",
+      "options": ["True", "False"],
+      "correct": 0,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "ARKit is only available on visionOS.",
+      "options": ["True", "False"],
+      "correct": 1,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Who is the creator of Hacking with Swift website?",
+      "options": ["Paul Walker", "Paul McCartney", "Paul Hubson", "Paul Hudson"],
+      "correct": 3,
+      "timeLimit": 10,
+      "doublePoints": false
+    }
+  ]
+}
