@@ -284,7 +284,16 @@ export function QuestionDisplay({ state }: { state: PublicGameState }) {
           return (
             <div
               key={i}
-              className="relative ink-border overflow-hidden"
+              // In the question phase the tiles are decorative channel markers, so
+              // cap their height (rather than letting the square aspect ratio eat the
+              // column width) — this guarantees the question stem keeps readable
+              // vertical room and never gets clipped on tight displays. The cap is
+              // tighter below `lg`, where the grid wraps to two rows of tiles.
+              className={`relative ink-border overflow-hidden ${
+                isReveal
+                  ? ''
+                  : 'h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center'
+              }`}
               style={{
                 background: isCorrect ? 'var(--ivy)' : ch.color,
                 opacity: isWrong ? 0.35 : 1,
@@ -384,16 +393,15 @@ export function PodiumDisplay({ state }: { state: PublicGameState }) {
               <div className="font-editorial italic opacity-50 mb-3">—</div>
             )}
             <div
-              className="w-full ink-border grid place-items-center"
+              className="w-full ink-border"
               style={{ background: colors[i], height: heights[i] }}
+            />
+            <span
+              className="display-num mt-3"
+              style={{ fontSize: 'clamp(56px, 9vw, 140px)', color: 'var(--ink)', lineHeight: 1 }}
             >
-              <span
-                className="display-num"
-                style={{ fontSize: 'clamp(80px, 14vw, 220px)', color: 'var(--ink)' }}
-              >
-                {ranks[i]}
-              </span>
-            </div>
+              {ranks[i]}
+            </span>
           </div>
         ))}
       </div>

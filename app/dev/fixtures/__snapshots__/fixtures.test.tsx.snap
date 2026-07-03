@@ -23490,16 +23490,15 @@ exports[`fixture × surface snapshots > display · leaderboard-1 1`] = `
               —
             </div>
             <div
-              class="w-full ink-border grid place-items-center"
+              class="w-full ink-border"
               style="background: var(--ash); height: 40%;"
+            />
+            <span
+              class="display-num mt-3"
+              style="color: var(--ink); line-height: 1;"
             >
-              <span
-                class="display-num"
-                style="color: var(--ink);"
-              >
-                2
-              </span>
-            </div>
+              2
+            </span>
           </div>
           <div
             class="flex flex-col items-center justify-end h-full"
@@ -23515,16 +23514,15 @@ exports[`fixture × surface snapshots > display · leaderboard-1 1`] = `
               800
             </div>
             <div
-              class="w-full ink-border grid place-items-center"
+              class="w-full ink-border"
               style="background: var(--marigold); height: 65%;"
+            />
+            <span
+              class="display-num mt-3"
+              style="color: var(--ink); line-height: 1;"
             >
-              <span
-                class="display-num"
-                style="color: var(--ink);"
-              >
-                1
-              </span>
-            </div>
+              1
+            </span>
           </div>
           <div
             class="flex flex-col items-center justify-end h-full"
@@ -23535,16 +23533,15 @@ exports[`fixture × surface snapshots > display · leaderboard-1 1`] = `
               —
             </div>
             <div
-              class="w-full ink-border grid place-items-center"
+              class="w-full ink-border"
               style="background: var(--vermilion); height: 30%;"
+            />
+            <span
+              class="display-num mt-3"
+              style="color: var(--ink); line-height: 1;"
             >
-              <span
-                class="display-num"
-                style="color: var(--ink);"
-              >
-                3
-              </span>
-            </div>
+              3
+            </span>
           </div>
         </div>
       </div>
@@ -23641,16 +23638,15 @@ exports[`fixture × surface snapshots > display · leaderboard-3-close 1`] = `
               1,440
             </div>
             <div
-              class="w-full ink-border grid place-items-center"
+              class="w-full ink-border"
               style="background: var(--ash); height: 40%;"
+            />
+            <span
+              class="display-num mt-3"
+              style="color: var(--ink); line-height: 1;"
             >
-              <span
-                class="display-num"
-                style="color: var(--ink);"
-              >
-                2
-              </span>
-            </div>
+              2
+            </span>
           </div>
           <div
             class="flex flex-col items-center justify-end h-full"
@@ -23666,16 +23662,15 @@ exports[`fixture × surface snapshots > display · leaderboard-3-close 1`] = `
               1,450
             </div>
             <div
-              class="w-full ink-border grid place-items-center"
+              class="w-full ink-border"
               style="background: var(--marigold); height: 65%;"
+            />
+            <span
+              class="display-num mt-3"
+              style="color: var(--ink); line-height: 1;"
             >
-              <span
-                class="display-num"
-                style="color: var(--ink);"
-              >
-                1
-              </span>
-            </div>
+              1
+            </span>
           </div>
           <div
             class="flex flex-col items-center justify-end h-full"
@@ -23691,16 +23686,15 @@ exports[`fixture × surface snapshots > display · leaderboard-3-close 1`] = `
               1,420
             </div>
             <div
-              class="w-full ink-border grid place-items-center"
+              class="w-full ink-border"
               style="background: var(--vermilion); height: 30%;"
+            />
+            <span
+              class="display-num mt-3"
+              style="color: var(--ink); line-height: 1;"
             >
-              <span
-                class="display-num"
-                style="color: var(--ink);"
-              >
-                3
-              </span>
-            </div>
+              3
+            </span>
           </div>
         </div>
       </div>
@@ -23797,16 +23791,15 @@ exports[`fixture × surface snapshots > display · leaderboard-10 1`] = `
               900
             </div>
             <div
-              class="w-full ink-border grid place-items-center"
+              class="w-full ink-border"
               style="background: var(--ash); height: 40%;"
+            />
+            <span
+              class="display-num mt-3"
+              style="color: var(--ink); line-height: 1;"
             >
-              <span
-                class="display-num"
-                style="color: var(--ink);"
-              >
-                2
-              </span>
-            </div>
+              2
+            </span>
           </div>
           <div
             class="flex flex-col items-center justify-end h-full"
@@ -23822,16 +23815,15 @@ exports[`fixture × surface snapshots > display · leaderboard-10 1`] = `
               950
             </div>
             <div
-              class="w-full ink-border grid place-items-center"
+              class="w-full ink-border"
               style="background: var(--marigold); height: 65%;"
+            />
+            <span
+              class="display-num mt-3"
+              style="color: var(--ink); line-height: 1;"
             >
-              <span
-                class="display-num"
-                style="color: var(--ink);"
-              >
-                1
-              </span>
-            </div>
+              1
+            </span>
           </div>
           <div
             class="flex flex-col items-center justify-end h-full"
@@ -23847,16 +23839,15 @@ exports[`fixture × surface snapshots > display · leaderboard-10 1`] = `
               850
             </div>
             <div
-              class="w-full ink-border grid place-items-center"
+              class="w-full ink-border"
               style="background: var(--vermilion); height: 30%;"
+            />
+            <span
+              class="display-num mt-3"
+              style="color: var(--ink); line-height: 1;"
             >
-              <span
-                class="display-num"
-                style="color: var(--ink);"
-              >
-                3
-              </span>
-            </div>
+              3
+            </span>
           </div>
         </div>
       </div>
@@ -23953,16 +23944,15 @@ exports[`fixture × surface snapshots > display · leaderboard-tie 1`] = `
               1,500
             </div>
             <div
-              class="w-full ink-border grid place-items-center"
+              class="w-full ink-border"
               style="background: var(--ash); height: 40%;"
+            />
+            <span
+              class="display-num mt-3"
+              style="color: var(--ink); line-height: 1;"
             >
-              <span
-                class="display-num"
-                style="color: var(--ink);"
-              >
-                2
-              </span>
-            </div>
+              2
+            </span>
           </div>
           <div
             class="flex flex-col items-center justify-end h-full"
@@ -23978,16 +23968,15 @@ exports[`fixture × surface snapshots > display · leaderboard-tie 1`] = `
               1,500
             </div>
             <div
-              class="w-full ink-border grid place-items-center"
+              class="w-full ink-border"
               style="background: var(--marigold); height: 65%;"
+            />
+            <span
+              class="display-num mt-3"
+              style="color: var(--ink); line-height: 1;"
             >
-              <span
-                class="display-num"
-                style="color: var(--ink);"
-              >
-                1
-              </span>
-            </div>
+              1
+            </span>
           </div>
           <div
             class="flex flex-col items-center justify-end h-full"
@@ -24003,16 +23992,15 @@ exports[`fixture × surface snapshots > display · leaderboard-tie 1`] = `
               1,200
             </div>
             <div
-              class="w-full ink-border grid place-items-center"
+              class="w-full ink-border"
               style="background: var(--vermilion); height: 30%;"
+            />
+            <span
+              class="display-num mt-3"
+              style="color: var(--ink); line-height: 1;"
             >
-              <span
-                class="display-num"
-                style="color: var(--ink);"
-              >
-                3
-              </span>
-            </div>
+              3
+            </span>
           </div>
         </div>
       </div>
@@ -27920,7 +27908,7 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
           style="grid-auto-rows: 1fr;"
         >
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 1;"
           >
             <div
@@ -27993,7 +27981,7 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
@@ -28047,7 +28035,7 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--marigold); opacity: 0.35;"
           >
             <div
@@ -28102,7 +28090,7 @@ exports[`fixture × surface snapshots > display · paused-over-reveal 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 0.35;"
           >
             <div
@@ -28267,7 +28255,7 @@ exports[`fixture × surface snapshots > display · question-double-points 1`] = 
           class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
         >
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--vermilion); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -28297,7 +28285,7 @@ exports[`fixture × surface snapshots > display · question-double-points 1`] = 
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--cobalt); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -28327,7 +28315,7 @@ exports[`fixture × surface snapshots > display · question-double-points 1`] = 
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--marigold); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -28358,7 +28346,7 @@ exports[`fixture × surface snapshots > display · question-double-points 1`] = 
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -28556,7 +28544,7 @@ exports[`fixture × surface snapshots > display · question-image 1`] = `
           class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
         >
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--vermilion); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -28586,7 +28574,7 @@ exports[`fixture × surface snapshots > display · question-image 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--cobalt); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -28616,7 +28604,7 @@ exports[`fixture × surface snapshots > display · question-image 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--marigold); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -28647,7 +28635,7 @@ exports[`fixture × surface snapshots > display · question-image 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -28788,7 +28776,7 @@ exports[`fixture × surface snapshots > display · question-long-options 1`] = `
           class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
         >
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--vermilion); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -28818,7 +28806,7 @@ exports[`fixture × surface snapshots > display · question-long-options 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--cobalt); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -28848,7 +28836,7 @@ exports[`fixture × surface snapshots > display · question-long-options 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--marigold); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -28879,7 +28867,7 @@ exports[`fixture × surface snapshots > display · question-long-options 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -29020,7 +29008,7 @@ exports[`fixture × surface snapshots > display · question-long-stem 1`] = `
           class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
         >
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--vermilion); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -29050,7 +29038,7 @@ exports[`fixture × surface snapshots > display · question-long-stem 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--cobalt); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -29080,7 +29068,7 @@ exports[`fixture × surface snapshots > display · question-long-stem 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--marigold); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -29111,7 +29099,7 @@ exports[`fixture × surface snapshots > display · question-long-stem 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -29293,7 +29281,7 @@ exports[`fixture × surface snapshots > display · question-short 1`] = `
           class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
         >
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--vermilion); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -29323,7 +29311,7 @@ exports[`fixture × surface snapshots > display · question-short 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--cobalt); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -29353,7 +29341,7 @@ exports[`fixture × surface snapshots > display · question-short 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--marigold); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -29384,7 +29372,7 @@ exports[`fixture × surface snapshots > display · question-short 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--ivy); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -29525,7 +29513,7 @@ exports[`fixture × surface snapshots > display · question-truefalse 1`] = `
           class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2 shrink-0"
         >
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--vermilion); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -29555,7 +29543,7 @@ exports[`fixture × surface snapshots > display · question-truefalse 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden h-[min(24vh,280px)] lg:h-[min(32vh,340px)] w-auto justify-self-center"
             style="background: var(--cobalt); opacity: 1; aspect-ratio: 1.05 / 1;"
           >
             <div
@@ -29724,7 +29712,7 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
           style="grid-auto-rows: 1fr;"
         >
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 1;"
           >
             <div
@@ -29797,7 +29785,7 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
@@ -29851,7 +29839,7 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--marigold); opacity: 0.35;"
           >
             <div
@@ -29906,7 +29894,7 @@ exports[`fixture × surface snapshots > display · reveal-all-wrong 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 0.35;"
           >
             <div
@@ -30101,7 +30089,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
           style="grid-auto-rows: 1fr;"
         >
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 1;"
           >
             <div
@@ -30174,7 +30162,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
@@ -30228,7 +30216,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--marigold); opacity: 0.35;"
           >
             <div
@@ -30283,7 +30271,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-0 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 0.35;"
           >
             <div
@@ -30478,7 +30466,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
           style="grid-auto-rows: 1fr;"
         >
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--vermilion); opacity: 0.35;"
           >
             <div
@@ -30532,7 +30520,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 1;"
           >
             <div
@@ -30605,7 +30593,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--marigold); opacity: 0.35;"
           >
             <div
@@ -30660,7 +30648,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-1 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 0.35;"
           >
             <div
@@ -30856,7 +30844,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
           style="grid-auto-rows: 1fr;"
         >
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--vermilion); opacity: 0.35;"
           >
             <div
@@ -30910,7 +30898,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
@@ -30964,7 +30952,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 1;"
           >
             <div
@@ -31038,7 +31026,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-2 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 0.35;"
           >
             <div
@@ -31235,7 +31223,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
           style="grid-auto-rows: 1fr;"
         >
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--vermilion); opacity: 0.35;"
           >
             <div
@@ -31289,7 +31277,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
@@ -31343,7 +31331,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--marigold); opacity: 0.35;"
           >
             <div
@@ -31398,7 +31386,7 @@ exports[`fixture × surface snapshots > display · reveal-correct-3 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 1;"
           >
             <div
@@ -31612,7 +31600,7 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
           style="grid-auto-rows: 1fr;"
         >
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 1;"
           >
             <div
@@ -31685,7 +31673,7 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
@@ -31739,7 +31727,7 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--marigold); opacity: 0.35;"
           >
             <div
@@ -31794,7 +31782,7 @@ exports[`fixture × surface snapshots > display · reveal-even 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 0.35;"
           >
             <div
@@ -31989,7 +31977,7 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
           style="grid-auto-rows: 1fr;"
         >
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--vermilion); opacity: 0.35;"
           >
             <div
@@ -32043,7 +32031,7 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 1;"
           >
             <div
@@ -32116,7 +32104,7 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--marigold); opacity: 0.35;"
           >
             <div
@@ -32171,7 +32159,7 @@ exports[`fixture × surface snapshots > display · reveal-long-answer 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 0.35;"
           >
             <div
@@ -32366,7 +32354,7 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
           style="grid-auto-rows: 1fr;"
         >
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 1;"
           >
             <div
@@ -32439,7 +32427,7 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
@@ -32493,7 +32481,7 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--marigold); opacity: 0.35;"
           >
             <div
@@ -32548,7 +32536,7 @@ exports[`fixture × surface snapshots > display · reveal-skew 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 0.35;"
           >
             <div
@@ -32743,7 +32731,7 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
           style="grid-auto-rows: 1fr;"
         >
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 1;"
           >
             <div
@@ -32816,7 +32804,7 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--cobalt); opacity: 0.35;"
           >
             <div
@@ -32870,7 +32858,7 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--marigold); opacity: 0.35;"
           >
             <div
@@ -32925,7 +32913,7 @@ exports[`fixture × surface snapshots > display · reveal-zero 1`] = `
             </div>
           </div>
           <div
-            class="relative ink-border overflow-hidden"
+            class="relative ink-border overflow-hidden "
             style="background: var(--ivy); opacity: 0.35;"
           >
             <div
