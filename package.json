@@ -7,6 +7,7 @@
     "qa": "next dev --port 4322",
     "build": "prisma generate && next build",
     "start": "NODE_ENV=production tsx server.ts",
+    "serve": "trap 'kill 0' EXIT; npm run start & cloudflared tunnel run primetime-live & wait",
     "setup": "bash scripts/setup.sh",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

@@ -1,0 +1,88 @@
+{
+  "$schema": "https://theprimetime.id/quiz-v1.json",
+  "version": 1,
+  "title": "Morning Framewalk",
+  "exportedAt": "2026-07-01T00:00:00.000Z",
+  "questions": [
+    {
+      "type": "multiple",
+      "text": "Which of the following frameworks does NOT utilize AI?",
+      "options": ["Foundation Models", "AVFoundation", "SiriKit", "Natural Language"],
+      "correct": 1,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Apple framework that integrates calling experiences into the system.",
+      "options": ["CallKet", "CapCut", "CallKut", "CallKit"],
+      "correct": 3,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "EventKit can create, edit, and delete alarms in Clock app.",
+      "options": ["True", "False"],
+      "correct": 1,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Which of the following is an Apple framework?",
+      "options": ["SpidolKit", "PenKit", "PencilKit", "StabiloKit"],
+      "correct": 2,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Which of the following is NOT provided by WeatherKit?",
+      "options": ["Moon phase", "Magnetometer", "Precipitation", "Sun event"],
+      "correct": 1,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Which framework that provide lightweight app experiences without requiring full app installation?",
+      "options": ["App Clips", "App Intent", "WidgetKit", "SwiftData"],
+      "correct": 0,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Apple framework that accesses, manages, and edits photos and videos in the user's library.",
+      "options": ["Ph0t0K1t", "FotoKit", "PhotoKit", "FitiKit"],
+      "correct": 2,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "PencilKit lets users draw with Apple Pencil or their finger.",
+      "options": ["True", "False"],
+      "correct": 0,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "RealityKit is used only for 2D games.",
+      "options": ["True", "False"],
+      "correct": 1,
+      "timeLimit": 10,
+      "doublePoints": false
+    },
+    {
+      "type": "multiple",
+      "text": "Who is the creator of Hacking with Swift website?",
+      "options": ["Paul Walker", "Paul McCartney", "Paul Hubson", "Paul Hudson"],
+      "correct": 3,
+      "timeLimit": 10,
+      "doublePoints": false
+    }
+  ]
+}
