@@ -30,23 +30,11 @@ Postgres via Prisma. Hosts sign in; players join anonymously by PIN.
 
 ### Quiz
 
-| On-air display | Host control | Player |
-|---|---|---|
-| ![Quiz on-air display — question with four shape-coded answers](docs/images/quiz-display.png) | ![Quiz host control console — timer, players, answer distribution](docs/images/quiz-control.png) | ![Quiz player view on a phone](docs/images/quiz-player.png) |
-
-### Word Cloud, Q&A & WonderWall
-
-| Word Cloud | Q&A present mode | WonderWall |
-|---|---|---|
-| ![Live word cloud projection](docs/images/wordcloud-display.png) | ![Q&A display with highlighted question](docs/images/q-and-a-display.png) | ![WonderWall waterfall of approved LinkedIn embeds](docs/images/wonderwall-display.png) |
-
-### Host dashboard & lobby
-
-| Host dashboard | Join lobby |
-|---|---|
-| ![Host dashboard — saved quizzes and recent rooms](docs/images/host-dashboard.png) | ![Lobby with PIN and join QR code](docs/images/lobby-join.png) |
-
----
+![](docs/images/5af70681-1d38-4ddf-a46f-36bfd2276b1f.JPG)
+![](docs/images/05105dfe-fcec-43ab-9510-6bcc61a800a8.JPG)
+![](docs/images/f509f8ff-6148-4793-8828-a186f9566213.JPG)
+![](docs/images/a3b1faf1-5c07-462c-97e4-58aabc2e3417.JPG)
+![](docs/images/IMG_5780.jpeg)
 
 ## Quickstart (local)
 
