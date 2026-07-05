@@ -1,25 +1,36 @@
 [![PR](https://github.com/adityadaniel/primetime/actions/workflows/pr.yml/badge.svg)](https://github.com/adityadaniel/primetime/actions/workflows/pr.yml)
 [![Main](https://github.com/adityadaniel/primetime/actions/workflows/main.yml/badge.svg)](https://github.com/adityadaniel/primetime/actions/workflows/main.yml)
 
-# PRIMETIME — Live quiz game (open-source)
+# PRIMETIME — Live in-room engagement platform (open-source)
 
-> **OSS build uses sane defaults — no SaaS keys required.** Clone, install, and run with zero configuration beyond a database URL. See [Quickstart (local)](#quickstart-local) and [Environment reference](#environment-reference) below.
+> **OSS build uses sane defaults — no SaaS keys required.** Clone, install, and run with only a database URL and an auth secret. See [Quickstart (local)](#quickstart-local) and [Environment reference](#environment-reference).
 
-A real-time quiz game with a vintage broadcast-graphics aesthetic. Built end-to-end as the **M1 — Core Loop** and **M2 — Resilience & Scale** milestones described in `PRD.md` and `CLAUDE.md`.
+A real-time engagement platform with a vintage broadcast-graphics aesthetic,
+built for running live activities in a room (workshops, classes, watch parties).
+It hosts four activity types on one shared PIN / host / player / projection model:
 
-> See **`DESIGN.md`** for the visual identity, palette, type stack, and motion principles.
->
-> M3 issues tracked in <https://linear.app/midnight-labs/project/kahoot-clone-broadcast-4a50abefef00>.
+- **Quiz** — Kahoot-style multiple-choice / true-false with a server-authoritative timer and scoring.
+- **Word Cloud** — audience submits words to a live projected cloud.
+- **Q&A** — Slido-style crowd questions with voting, moderation, highlight/present mode, labels, and replies.
+- **WonderWall** — a moderated wall of official LinkedIn post embeds.
+
+State is server-authoritative (Next.js + Socket.IO on one port) and persisted to
+Postgres via Prisma. Hosts sign in; players join anonymously by PIN.
+
+> **Source of truth for contributors:** read `AGENTS.md` first, then `PRD.md`
+> (product/routes), `DESIGN.md` (visual identity), and `DECISIONS.md` (durable
+> decisions). Per-activity specs live in `docs/wordcloud-prd.md`,
+> `docs/q-and-a-prd.md`, and `docs/wonderwall-prd.md`.
 
 ---
 
 ## Quickstart (local)
 
-**No SaaS accounts needed.** The defaults are password auth, no email, local uploads, and no billing.
+**No SaaS accounts needed.** Defaults are password auth, no email, local uploads, no billing.
 
 ### 1. Prerequisites
 
-- Node.js 24+
+- Node.js 22+ (CI and the reference deploy run Node 24)
 - Postgres 16 (Docker, Postgres.app, or Homebrew — see [Database setup](#database-setup))
 
 ### 2. Clone and install
@@ -67,169 +78,193 @@ npm run db:migrate
 npm run dev
 ```
 
-Single command boots Next.js + the WebSocket server on the **same port**: <http://localhost:4321>.
+A single command boots Next.js + the WebSocket server on the **same port**:
+<http://localhost:4321>.
 
 > Port 3000 is intentionally avoided. To override: `PORT=4000 npm run dev`
 
 ### 7. Play
 
-1. Open <http://localhost:4321> → click **Host**
-2. Build a quiz → click **GO LIVE** → note the 6-digit PIN
-3. Open <http://localhost:4321/join> → enter PIN + nickname
+1. Open <http://localhost:4321> → **Sign up** (first account) → **Host**.
+2. Create a quiz (or a Word Cloud / Q&A / WonderWall room) → **GO LIVE** → note the 6-digit PIN.
+3. Open <http://localhost:4321/join> → enter the PIN + a nickname.
 4. Play!
 
 ---
 
-## Quickstart (Docker — self-host)
+## Deployment / self-host
 
-For production self-hosting, run the app + database in Docker:
+There is **no prebuilt Docker image** — `docker compose` here runs **Postgres
+only**; the app runs directly with Node. Two supported ways to expose it:
+
+### Production start
 
 ```bash
-# Build the app image
-docker build -t primetime .
-
-# Run with docker-compose (app + Postgres)
-docker compose up -d
+npm run build          # prisma generate + next build
+npm run start          # NODE_ENV=production, Next + Socket.IO on :4321
 ```
 
-The app is available at `http://localhost:4321`. Expose via [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) or your reverse proxy of choice.
+### Public / live via Cloudflare Tunnel
+
+```bash
+npm run serve          # runs `npm run start` + `cloudflared tunnel run primetime-live` together
+```
+
+`npm run serve` starts the production server and the named Cloudflare Tunnel in
+one process (Ctrl-C tears down both). Configure the public origin first:
+
+```
+NEXT_PUBLIC_SITE_URL=https://live.theprimetime.id
+```
+
+Full walkthroughs (local-IP mode for a room, and Cloudflare Tunnel for a public
+domain, including one-time `cloudflared` provisioning) are in
+[`DEPLOYMENT.md`](DEPLOYMENT.md). For a guided first-time academy setup, run
+`bash scripts/setup.sh` — see [Self-hosting for other academies](#self-hosting-for-other-academies).
+
+> **Tunnel/live-origin note:** when hosting locally but projecting through a
+> public tunnel, host auth cookies stay on `localhost` while public
+> projection/display routes stay public-by-PIN. Read
+> [`docs/live-origin-auth.md`](docs/live-origin-auth.md) before changing QR /
+> projection URL generation or Auth.js middleware.
 
 ---
 
 ## Environment reference
 
-All flags default to the OSS path. **Unset = OSS default.** You only need to set these when you want SaaS behavior.
+All flags default to the OSS path. **Unset = OSS default.** Set these only for SaaS/tunnel behavior.
 
-| Env var | Values | Default | Owning ticket | Notes |
-|---|---|---|---|---|
-| `AUTH_MODE` | `password` · `password+oauth` | `password` | MID-213 | `password` = local email/password only. `password+oauth` enables Apple (gated by `ENABLE_APPLE_SIGNIN`). |
-| `EMAIL_PROVIDER` | `none` · `token-print` · `smtp` · `resend` | `none` | MID-215 | `token-print` logs reset URLs to server console (dev). `smtp` requires `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`. `resend` requires `RESEND_API_KEY`. |
-| `UPLOAD_PROVIDER` | `local` · `s3` · `uploadthing` | `local` | MID-217 | `local` = on-disk at `public/uploads/`. `s3` (incl. R2/MinIO) requires `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`. `uploadthing` requires `UPLOADTHING_TOKEN`. |
-| `BILLING_ENABLED` | `true` · `false` | `false` | MID-214 | OSS ships with no billing/upgrade flow. |
-| `UPLOAD_MAX_BYTES` | bytes (integer) | `5242880` (5 MB) | MID-217 | Max file upload size in bytes. |
-| `UPLOAD_DIR` | absolute path | `<cwd>/public/uploads` | MID-217 | Upload directory on disk. |
-| `AUTH_SECRET` | any non-empty string | — | MID-213 | **Required.** JWT session secret. Generate: `openssl rand -hex 32`. |
-| `DATABASE_URL` | postgres connection URI | — | — | **Required.** |
-| `ENABLE_APPLE_SIGNIN` | `true` · `false` | `false` | MID-213 | Only effective when `AUTH_MODE=password+oauth`. Requires `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`. |
-| `NEXTAUTH_URL` | URL | `http://localhost:4321` | MID-213 | Your app's public URL. |
-| `NEXT_PUBLIC_SITE_URL` | URL | — | — | Public origin used by client-side QR, projection, and share links. Set to `https://live.theprimetime.id` for Cloudflare Tunnel live mode. |
+| Env var | Values | Default | Notes |
+|---|---|---|---|
+| `DATABASE_URL` | postgres connection URI | — | **Required.** |
+| `AUTH_SECRET` | any non-empty string | — | **Required.** JWT session secret. Generate: `openssl rand -hex 32`. |
+| `NEXTAUTH_URL` | URL | `http://localhost:4321` | Your app's URL (server-side). |
+| `NEXT_PUBLIC_SITE_URL` | URL | — | Public origin for client-side QR, projection, and share links. Set to your tunnel origin (e.g. `https://live.theprimetime.id`) for live mode. |
+| `PORT` | integer | `4321` | Port for the combined Next + Socket.IO server. |
+| `AUTH_MODE` | `password` · `password+oauth` | `password` | `password` = local email/password only. `password+oauth` enables Apple (gated by `ENABLE_APPLE_SIGNIN`). |
+| `ENABLE_APPLE_SIGNIN` | `true` · `false` | `false` | Only effective with `AUTH_MODE=password+oauth`. Requires `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`. |
+| `EMAIL_PROVIDER` | `none` · `token-print` · `smtp` · `resend` | `none` | `token-print` logs reset URLs to the server console (dev). `smtp` needs `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASSWORD`. `resend` needs `RESEND_API_KEY`. |
+| `UPLOAD_PROVIDER` | `local` · `s3` · `uploadthing` | `local` | `local` = on-disk at `public/uploads/`. `s3` (incl. R2/MinIO) needs `S3_BUCKET`/`S3_REGION`/`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`. `uploadthing` needs `UPLOADTHING_TOKEN`. |
+| `UPLOAD_MAX_BYTES` | bytes (integer) | `5242880` (5 MB) | Max upload size. |
+| `UPLOAD_DIR` | absolute path | `<cwd>/public/uploads` | Upload directory on disk. |
+| `ENABLE_SESSION_PERSISTENCE` | `true` · `false` | `true` | When on, quiz games persist to Postgres (players, answers, results, history). Set `false` to run purely in-memory. |
+| `BILLING_ENABLED` | `true` · `false` | `false` | OSS ships with no billing/upgrade flow. |
+| `WONDERWALL_ANALYSIS_ENABLED` | `true` · `false` | `false` | **Opt-in only.** When on, fetches + stores approved LinkedIn post text (via Apify) for a host-only word-cloud insights view. Requires `APIFY_TOKEN`. Carries LinkedIn-ToS/privacy risk the operator accepts — see `DECISIONS.md` (2026-06-21). |
+| `APIFY_TOKEN` | token | — | Required only when `WONDERWALL_ANALYSIS_ENABLED=true`. |
 
-> **Self-hosting OSS?** Only `DATABASE_URL` and `AUTH_SECRET` are required. Leave everything else at defaults — password auth, no email, local uploads, no billing. Max players per game is a code-level constant in `lib/constants.ts`.
->
-> **Tunnel/live-origin note:** when hosting locally but projecting through a public tunnel, host auth cookies stay on `localhost`; public projection/display routes must stay public-by-PIN. See [`docs/live-origin-auth.md`](docs/live-origin-auth.md) before changing QR/projection URL generation or Auth.js middleware.
+> **Self-hosting OSS?** Only `DATABASE_URL` and `AUTH_SECRET` are required. Leave
+> everything else at defaults — password auth, no email, local uploads, no
+> billing, no scraping. Max players per game is a code-level constant in
+> `lib/constants.ts` (`PLAYER_CAP`).
 
----
-
-## Auth modes
-
-| Mode | What it does | Config |
-|---|---|---|
-| **Password-only** (default) | Email/password signup and login. No third-party OAuth. | `AUTH_MODE=password` |
-| **Password + OAuth** | Password auth plus third-party providers (Apple). | `AUTH_MODE=password+oauth` + `ENABLE_APPLE_SIGNIN=true` + Apple credential vars |
-
-See [MID-213](https://linear.app/midnight-labs/issue/MID-213) for implementation details.
-
----
-
-## Email modes
-
-| Mode | What it does | Config |
-|---|---|---|
-| **None** (default) | No email. Forgot-password link is hidden. | `EMAIL_PROVIDER=none` |
-| **Token print** | Logs reset URL to server console instead of sending. Dev-only — shows a warning in production. | `EMAIL_PROVIDER=token-print` |
-| **SMTP** | Sends real emails via an SMTP server (e.g. Mailpit, SES, Postmark). | `EMAIL_PROVIDER=smtp` + `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` |
-| **Resend** | Sends via the Resend API. | `EMAIL_PROVIDER=resend` + `RESEND_API_KEY` |
-
-See [MID-215](https://linear.app/midnight-labs/issue/MID-215) for implementation details.
-
----
-
-## Upload modes
-
-| Mode | What it does | Config |
-|---|---|---|
-| **Local** (default) | Writes files to `public/uploads/` on disk. Served by Next.js static file serving. | `UPLOAD_PROVIDER=local` |
-| **S3-compatible** | Uploads to any S3-compatible bucket (AWS S3, Cloudflare R2, MinIO, etc.). | `UPLOAD_PROVIDER=s3` + S3 credential vars |
-| **UploadThing** | Uploads via the UploadThing SaaS. | `UPLOAD_PROVIDER=uploadthing` + `UPLOADTHING_TOKEN` |
-
-See [MID-217](https://linear.app/midnight-labs/issue/MID-217) for implementation details.
-
----
-
-## Live demo flow
-
-Open three browser windows on the same machine (or use Chrome profiles):
-
-1. **Host / Builder** — <http://localhost:4321/host> · build a quiz, click **GO LIVE**.
-   - This auto-opens the projection display in a new tab and routes you to the control panel.
-2. **Projection display** (auto-opened) — <http://localhost:4321/host/[PIN]/display> · drag this to a second monitor or fullscreen it on the projector.
-3. **Players** — <http://localhost:4321/join> · enter the 6-digit PIN + a nickname. Repeat in another window for a second player.
-
-In the **control panel** (`/host/[PIN]/control`) the host clicks the right-rail button to advance:
-`ROLL TAPE → LOCK ANSWERS → SHOW LEADERBOARD → NEXT QUESTION → … → FADE OUT`
-
-The timer auto-locks when it hits zero, and locks early once every connected player has answered.
+`.env.example` also documents optional beta-gating flags (`REQUIRE_INVITE_CODE`,
+`BETA_INVITE_CODES`) and `NEXT_PUBLIC_DEMO_PIN`.
 
 ---
 
 ## Surfaces
 
+Every activity reuses the same **PIN → host → player → display** model. Host
+surfaces require a signed-in host; display and play surfaces are public-by-PIN.
+
 | Route | Who | Purpose |
 |------|-----|---------|
-| `/` | Anyone | Studio master · landing |
-| `/host` | Host | Quiz builder (anonymous, in-memory) |
+| `/` | Anyone | Landing / studio master |
+| `/signup`, `/signin`, `/reset` | Anyone | Host auth (password; Apple optional) |
+| `/host` | Host | Dashboard — saved quizzes, recent rooms, Q&A room history |
+| `/pricing`, `/privacy`, `/terms` | Anyone | Informational pages |
+| **Quiz** | | |
+| `/host/quiz/new` | Host | Quiz builder (multiple-choice / true-false, per-question image, timer, double points) |
 | `/host/[pin]/control` | Host | Director's console — PIN, players, timer, distribution, advance controls |
-| `/host/[pin]/display` | Audience | On-air feed (fullscreen on projector) — PIN, question, shapes-only, podium |
-| `/join` | Player | PIN + nickname |
-| `/play/[pin]` | Player | Lobby → answer → reveal → final |
-| `/host/wonderwall/new` | Host | Create a WonderWall (LinkedIn iframe wall) |
-| `/host/wonderwall/[pin]/control` | Host | Review queue — approve/reject/hide/restore/reorder, export submissions CSV |
-| `/host/wonderwall/[pin]/display` | Audience | Public waterfall of approved LinkedIn iframe posts |
+| `/host/[pin]/display` | Audience | On-air feed (projector) — PIN, question, shapes-only, podium |
+| `/join` → `/play/[pin]` | Player | PIN + nickname → lobby → answer → reveal → final |
+| **Word Cloud** | | |
+| `/host/wordcloud/new`, `/host/wordcloud/[pin]/control`, `/host/wordcloud/[pin]/display` | Host / Audience | Create, moderate, project a live word cloud |
+| `/play/[pin]/wordcloud` | Player | Submit words |
+| **Q&A** | | |
+| `/host/q-and-a/new`, `/host/q-and-a/[pin]/control`, `/host/q-and-a/[pin]/display` | Host / Audience | Create, moderate/highlight, present-mode projection |
+| `/play/[pin]/q-and-a` | Player | Submit / upvote questions |
+| **WonderWall** | | |
+| `/host/wonderwall/new`, `/host/wonderwall/[pin]/control`, `/host/wonderwall/[pin]/display` | Host / Audience | Create, review queue, public waterfall of approved LinkedIn embeds |
+| `/host/wonderwall/[pin]/insights` | Host | Word-cloud insights over approved posts (only when analysis is enabled) |
 | `/play/[pin]/wonderwall` | Participant | Paste public LinkedIn post URLs, see review feedback |
 
-> Word Cloud, Q&A, and WonderWall reuse the same PIN/host/player/display model. See `docs/wordcloud-prd.md`, `docs/q-and-a-prd.md`, and `docs/wonderwall-prd.md`.
+**Exports:** `GET /host/[pin]/results.csv` (quiz results, once `final`),
+`GET /host/wordcloud/[pin]/answers.csv`, `GET /host/q-and-a/[pin]/questions.csv`,
+`GET /api/wonderwall/[pin]/export` (host-only), and quiz definition
+import/export via `POST /api/quiz/import` and `GET /api/quiz/[id]/export` (the
+`quiz-v1` JSON format, see `samples/`).
 
 ---
 
-## What's done (M1 + M2)
+## What's shipped
 
-- Next.js 15 App Router + TypeScript + Tailwind, single `npm run dev`
-- Custom Node server in `server.ts` colocates Next + Socket.IO on one port
-- Anonymous quiz builder (multiple choice + true/false, 10/20/30/60/90/120 s, double points)
-- 6-digit PIN game session, in-memory state in `lib/game.ts`
-- Server-authoritative scoring: `1000 × (½ + ½ × t_left/t_limit) × {1|2}`
-- Lobby → question → reveal → leaderboard → final state machine
-- Real-time WS: host, display, and player views all kept in sync
-- Auto-lock at timer expiry **or** when all connected players have answered
-- Live answer distribution + correct-answer reveal
-- Top-3 podium between questions, full leaderboard at the end
-- Player feedback: locked-in confirmation, correct/incorrect, points awarded, current rank
-- Distinct **PRIMETIME** visual identity executed across all five surfaces
-- **Player reconnect grace window** — disconnected players have 30 s to rejoin and reclaim their score, nickname, and socket binding
-- **Host disconnect grace pause** — game pauses for 60 s on host drop; resumes seamlessly if the host returns, otherwise ends with `host-left`
-- **Player cap enforcement** — a single code-level cap (`PLAYER_CAP` in `lib/constants.ts`). The host lobby shows current/max; a join past the cap is rejected with the `full` code and the player sees a "room is full" message. No tiers, no upgrade prompts.
-- **CSV export of session results** — `GET /host/[pin]/results.csv` once the game is in `final`; includes rank, nickname, score, correct count, total questions, average response time
-- **Light profanity filter** for nicknames — rejects with `nickname-rejected` code so the join page can show a friendly retry
-- Smoke test extended to cover reconnect, host pause, cap enforcement, CSV export, and profanity rejection: `npm run smoke`
-- Word Cloud activity (alternative to quiz): host posts a prompt, players submit words, real-time projection cloud with CSV export
-- **Q&A live activity** (Slido-style): host creates a session, participants submit/vote on questions, host moderates/highlights/answers, public display/present mode with board + fullscreen highlight, labels, replies, session controls (close/reopen/end), and CSV export of all questions with votes/labels/replies
-- **WonderWall activity** (moderated LinkedIn iframe wall): participants paste public LinkedIn post URLs by PIN, the host reviews each submission (approve/reject with feedback/hide/restore/reorder), and the public display projects **only** approved posts (`status=APPROVED` + `canDisplay=true`) as a waterfall of official LinkedIn iframe embeds. Host-only CSV export of all submissions across statuses with formula-injection-safe escaping. No scraping, no LinkedIn API, no screenshots, and no post-content storage — only URL/URN/embed/review metadata. See `docs/wonderwall-prd.md`.
-- **OSS configuration surface** — password auth, email, uploads, and billing are configurable via env vars; the player cap is a code-level constant. Defaults require zero SaaS accounts.
-- **Local file upload** — `POST /api/upload` for on-disk file uploads (quiz covers, etc.) with size and MIME validation
-- **Password reset** — optional SMTP or token-print reset flow for OSS self-hosters
+**Platform**
+
+- Next.js 15 App Router + React 19 + TypeScript + Tailwind; single `npm run dev`.
+- Custom Node server (`server.ts`) colocates Next + Socket.IO on one port.
+- **Postgres + Prisma persistence** — users, quizzes, game sessions, players,
+  answers, and per-activity state all persisted (gated by
+  `ENABLE_SESSION_PERSISTENCE`, on by default).
+- **Auth.js v5** — email/password host accounts with password reset; optional
+  Apple OAuth (`AUTH_MODE=password+oauth`). Socket.IO connections authenticate
+  off the Auth.js session cookie; players stay anonymous.
+- **OSS ⇄ SaaS config surface** — auth, email, uploads, billing, and WonderWall
+  analysis are env-configurable; defaults need zero SaaS accounts.
+- Distinct **PRIMETIME** broadcast identity across every surface; answer options
+  are distinguishable by **shape**, not color alone.
+- **Broadcast sound effects** — generated SFX for cues/reveals (`lib/sfx.ts`,
+  `npm run sounds:generate`).
+
+**Quiz**
+
+- Quiz builder: multiple-choice + true/false, timers (10/20/30/60/90/120 s),
+  double points, and an **optional per-question image** (local upload, wired
+  into the builder).
+- **Saved quiz library** per host, plus **JSON import/export** (`quiz-v1`).
+- 6-digit PIN sessions; server-authoritative scoring
+  `1000 × (½ + ½ × t_left/t_limit) × {1|2}`.
+- Lobby → question → reveal → leaderboard → final state machine, kept in sync
+  across host, display, and player over WebSocket.
+- Auto-lock at timer expiry **or** when all connected players have answered;
+  live answer distribution + correct-answer reveal; top-3 podium; final leaderboard.
+- **Player reconnect grace** (30 s to reclaim score/nickname/socket) and
+  **host-disconnect grace pause** (60 s; resumes if the host returns, else ends
+  `host-left`).
+- **Player cap** enforcement (`PLAYER_CAP` code constant); over-cap joins get a
+  `full` rejection.
+- Light **profanity filter** on nicknames; **results CSV** export.
+
+**Word Cloud** — host posts a prompt, players submit words, real-time projected
+cloud, answers CSV export.
+
+**Q&A** (Slido-style) — participants submit and upvote questions; host moderates,
+highlights, replies, and applies labels; public display + fullscreen present
+mode; session controls (close/reopen/end); coalesced delta fan-out for scale
+(see `docs/q-and-a-prd.md`); questions CSV export.
+
+**WonderWall** (moderated LinkedIn wall) — participants paste public LinkedIn
+post URLs by PIN; the host reviews each (approve/reject-with-feedback/hide/
+restore/reorder); the public display projects **only** approved posts
+(`status=APPROVED` + `canDisplay=true`) as official LinkedIn iframe embeds.
+Host-only CSV export with formula-injection-safe escaping. By default **no
+scraping, no LinkedIn API, no post-content storage** — only URL/URN/embed/review
+metadata. An **opt-in** analysis path (`WONDERWALL_ANALYSIS_ENABLED`) fetches +
+stores approved-post text for a host-only word-cloud insights view; off for
+OSS/self-host. See `docs/wonderwall-prd.md` and `DECISIONS.md`.
 
 ---
 
-## What's stubbed / deferred (M3)
+## Deferred / not built
 
-- **Postgres + Prisma persistence** — quizzes and session history still live in process memory
-- **Auth.js v5 + Google OAuth** — anonymous host only
-- **Quiz library** — no saved quizzes per host yet
-- **Stripe billing + Pro tier upgrade** — tier flag exists in `createGame`, billing flow does not
-- **Session history & analytics** — results vanish at process exit
-- **Redis pub/sub for multi-node** — single-node only; would need the Socket.IO Redis adapter to scale horizontally
-- **Image uploads in questions** — text-only questions for now (upload endpoint exists but isn't wired into the question builder yet)
-- **Browser tested:** Chrome on macOS. Should work in modern Safari/Firefox but not exhaustively verified.
+- **Billing + Pro tier upgrade** — a `tier` flag exists on sessions and a
+  `/pricing` page is informational, but there is no payment flow
+  (`BILLING_ENABLED=false`). Free-tier caps and the Pro watermark gate are
+  stubbed (`MID-75`).
+- **Redis pub/sub for multi-node** — single-node only; horizontal scaling would
+  need the Socket.IO Redis adapter and a shared store for rate limiting.
+- **Browser coverage** — developed/tested primarily on Chrome (macOS). Modern
+  Safari/Firefox should work but aren't exhaustively verified.
 
 ---
 
@@ -237,37 +272,38 @@ The timer auto-locks when it hits zero, and locks early once every connected pla
 
 ```
 app/
-  page.tsx                       landing
-  host/page.tsx                  builder
-  host/[pin]/control/page.tsx    director's console
-  host/[pin]/display/page.tsx    on-air feed
-  join/page.tsx                  player entry
-  play/[pin]/page.tsx            player live view
-  api/upload/route.ts            local file upload endpoint
+  page.tsx                         landing
+  signup|signin|reset/             host auth pages
+  host/page.tsx                    host dashboard (quizzes, rooms, Q&A history)
+  host/quiz/new/page.tsx           quiz builder
+  host/[pin]/control|display       quiz director console / on-air feed
+  host/wordcloud/**                word-cloud host + projection
+  host/q-and-a/**                  Q&A host control + display/present
+  host/wonderwall/**               WonderWall review queue + display + insights
+  join/page.tsx                    player entry
+  play/[pin]/(page|wordcloud|q-and-a|wonderwall)   player views per activity
+  api/                             quiz CRUD + import/export, upload, auth,
+                                   wordcloud/q-and-a/wonderwall endpoints, health
 components/
-  Broadcast.tsx                  chyron, frame counter, on-air, smpte bars, clock
-  Countdown.tsx                  ring countdown
-  Shape.tsx                      4 answer shapes (triangle / diamond / circle / square)
+  Broadcast.tsx, Countdown.tsx, Shape.tsx          broadcast UI primitives
 lib/
-  config.ts                      OSS ⇄ SaaS config surface (env flags)
-  constants.ts                   code-level product constants
-  game.ts                        in-memory game state + scoring
-  socket.ts                      browser socket singleton hook
-  types.ts                       shared types
-  upload.ts                      local file upload module
-  mailer.ts                      email transport (SMTP / token-print)
-  reset.ts                       password reset email wrapper
-server.ts                        Next.js + Socket.IO on one port
-scripts/
-  smoke.ts                       Socket.IO realtime smoke test
-  e2e-db-reset.ts                create + migrate the primetime_e2e database
-tests/e2e/
-  auth.spec.ts                   signup / signin / reset / first-run / duplicate
-  quiz-lifecycle.spec.ts         quiz CRUD, socket game, upload, word-cloud CSV
-  helpers/                       db reset/seed, auth flows, socket client
-  e2e-env.ts                     shared E2E env (DB URL derivation, server env)
-playwright.config.ts             E2E runner config (boots the server)
-DESIGN.md                        visual identity rationale
+  config.ts, constants.ts          OSS⇄SaaS config surface + code constants
+  game.ts                          quiz in-memory game state + scoring
+  qa.ts, qa-repo.ts, qa-hydrate.ts Q&A state machine, persistence, hydration
+  wordcloud*.ts                    word-cloud state / layout / repo / hydration
+  wonderwall-repo.ts, wonderwall-apify.ts   WonderWall persistence + opt-in analysis
+  session-repo.ts                  quiz session persistence (gated)
+  repos/                           Prisma-backed repositories (quiz, etc.)
+  sfx.ts, use-sfx.ts               broadcast sound effects
+  socket.ts, use-socket-*.ts       browser socket singleton + hooks
+  upload.ts, mailer.ts, reset.ts   uploads, email transport, password reset
+  public-origin.ts, types.ts       public URL helper, shared types
+  dev-fixtures/                    fixture catalog for visual QA + snapshots
+auth.ts, auth.config.ts            Auth.js (server-only / edge-safe split)
+server.ts                          Next.js + Socket.IO on one port
+prisma/                            schema, migrations, seed
+scripts/                           setup.sh, smoke.ts, qa-stress.ts, generate-sounds.ts, e2e-db-reset.ts
+tests/e2e/                         Playwright suites (auth, quiz, q-and-a, wonderwall)
 ```
 
 ---
@@ -275,117 +311,129 @@ DESIGN.md                        visual identity rationale
 ## Scripts
 
 ```bash
-npm run dev      # start everything on http://localhost:4321
-npm run qa       # vanilla Next dev on :4322 for /dev/fixtures (no socket, no DB)
-npm run build    # next build
-npm run start    # production-ish start (still tsx-driven)
-npm run smoke    # end-to-end ws smoke test (server must be running)
-npm test         # vitest (lib/* unit tests + fixture × surface snapshots)
-npm run test:e2e # Playwright browser E2E (auth + quiz lifecycle); boots its own server
-npm run test:e2e:ui   # same, in Playwright's interactive UI
-npm run db:up    # start Postgres via Docker Compose
-npm run db:down  # stop Postgres
-npm run db:reset # nuke and rebuild DB
-npm run db:migrate  # apply Prisma migrations
-npm run db:e2e:reset # create + migrate the dedicated primetime_e2e database
-npm run db:studio   # browse data at localhost:5555
+# Run
+npm run dev            # Next + Socket.IO on http://localhost:4321
+npm run qa             # vanilla Next dev on :4322 for /dev/fixtures (no socket, no DB)
+npm run build          # prisma generate + next build
+npm run start          # production start (NODE_ENV=production, tsx-driven)
+npm run serve          # start + Cloudflare Tunnel (primetime-live) together
+npm run setup          # guided first-time academy setup (scripts/setup.sh)
+
+# Quality
+npm run lint           # biome check .
+npm run lint:fix       # biome check --write .
+npm run format         # biome format --write .
+npm test               # vitest run (lib unit tests + fixture × surface snapshots)
+npm run test:watch     # vitest watch mode
+npm run test:coverage  # vitest with V8 coverage
+npm run smoke          # Socket.IO realtime smoke (server must be running)
+npm run qa:stress      # Q&A 120-participant stress harness
+npm run test:e2e       # Playwright browser E2E (boots its own server)
+npm run test:e2e:ui    # Playwright interactive UI
+
+# Assets
+npm run sounds:generate  # (re)generate broadcast SFX
+
+# Database
+npm run db:up          # start Postgres via Docker Compose
+npm run db:down        # stop Postgres
+npm run db:reset       # nuke + rebuild + migrate
+npm run db:migrate     # apply Prisma migrations
+npm run db:logs        # tail Postgres logs
+npm run db:psql        # psql shell into the dev DB
+npm run db:studio      # Prisma Studio at localhost:5555
+npm run db:e2e:reset   # create + migrate the dedicated primetime_e2e database
 ```
 
 ---
 
 ## Testing
 
-Three layers, each with a distinct job:
+Layers, each with a distinct job:
 
 | Layer | Command | Covers |
 | --- | --- | --- |
-| Unit | `npm test` / `npm run test:coverage` | `lib/*` logic, scoring, config parsing, fixture × surface snapshots |
-| Smoke | `npm run smoke` | Socket.IO realtime: full game loop, reconnect/pause, cap, CSV, profanity, word cloud (server must already be running) |
-| E2E | `npm run test:e2e` | Browser-level auth (signup → signin → reset) + quiz/game/upload lifecycle via Playwright |
+| Unit | `npm test` / `npm run test:coverage` | `lib/*` logic (scoring, config, Q&A/word-cloud/wonderwall repos + state) and fixture × surface snapshots |
+| Smoke | `npm run smoke` | Socket.IO realtime: full game loop, reconnect/pause, cap, CSV, profanity, word cloud (server must be running) |
+| Stress | `npm run qa:stress` | Q&A submission fan-out at ~120 participants |
+| E2E | `npm run test:e2e` | Browser-level auth + quiz + Q&A + WonderWall lifecycles via Playwright |
+
+> Coverage is configured in `vitest.config.ts`. Note it currently measures a
+> subset of `lib/` — treat the reported percentage as scoped, not whole-repo.
 
 ### End-to-end (Playwright)
 
-The E2E suite (`tests/e2e/`) drives a real Chromium browser through the OSS
-auth flows and the authenticated quiz lifecycle. It is self-contained — you
-only need Postgres running:
+The E2E suite (`tests/e2e/`) drives a real Chromium browser through the OSS auth
+flows and the authenticated activity lifecycles. It is self-contained — you only
+need Postgres running:
 
 ```bash
 npm run db:up        # Postgres (if not already up)
-npm run test:e2e     # installs nothing; boots the app itself
+npm run test:e2e     # boots the app itself
 ```
 
-What it does for you:
+What it does:
 
-- **Dedicated database.** Tests run against `primetime_e2e` (derived from your
-  `DATABASE_URL`, same Postgres server), created + migrated by
-  `npm run db:e2e:reset`. Your dev DB is never touched. Tables are truncated
-  between tests, so order never matters.
+- **Dedicated database.** Runs against `primetime_e2e` (derived from your
+  `DATABASE_URL`, same server), created + migrated by `npm run db:e2e:reset`.
+  Your dev DB is never touched; tables truncate between tests, so order never
+  matters.
 - **Boots the server.** Playwright's `webServer` runs `db:e2e:reset` then
-  `npm run dev`, pinning a known OSS profile via env (`EMAIL_PROVIDER=token-print`,
-  `UPLOAD_PROVIDER=local`, code-level player cap, session persistence on). Locally it
-  reuses an already-running server on `:4321`; in CI it always boots a fresh one.
-- **No SaaS, no real email.** Password-reset links are captured from the
-  `devUrl` the reset endpoint returns in non-production mode — no SMTP, no log
-  scraping.
+  `npm run dev`, pinning an OSS profile via env (`EMAIL_PROVIDER=token-print`,
+  `UPLOAD_PROVIDER=local`, session persistence on). Locally it reuses a running
+  `:4321`; in CI it boots fresh.
+- **No SaaS, no real email.** Reset links are captured from the `devUrl` the
+  reset endpoint returns in non-production mode.
 
-First run only, install the browser:
+First run only, install the browser: `npx playwright install chromium`.
 
-```bash
-npx playwright install chromium
-```
+Suites:
 
-Coverage:
-
-- `tests/e2e/auth.spec.ts` — signup, sign out + sign back in, forgot/reset
-  (UI + dev-token capture), first-run admin banner, duplicate signup rejected
+- `tests/e2e/auth.spec.ts` — signup, sign out + back in, forgot/reset (UI +
+  dev-token capture), first-run admin banner, duplicate-signup rejection.
 - `tests/e2e/quiz-lifecycle.spec.ts` — create quiz + see it in the library, run
   a full game over Socket.IO and assert a finished `GameSession` row, player-cap
-  rejection, local image upload, word-cloud CSV export
+  rejection, local image upload, word-cloud CSV export.
+- `tests/e2e/qa-lifecycle.spec.ts` — Q&A submit / vote / moderate / display flow.
+- `tests/e2e/wonderwall-lifecycle.spec.ts` — submission → review → approved
+  projection and CSV export.
 
-The HTML report lands in `playwright-report/` (open with
-`npx playwright show-report`).
+The HTML report lands in `playwright-report/` (`npx playwright show-report`).
 
 ---
 
 ## Dev fixtures
 
-For visual QA without standing up a real game, every presentational surface
-(`display`, `control`, `player`) accepts plain `PublicGameState` props and is
-catalogued under `lib/dev-fixtures/`.
+For visual QA without a live game, every presentational surface (`display`,
+`control`, `player`) accepts plain props and is catalogued under
+`lib/dev-fixtures/`.
 
 ```bash
 npm run qa
 # open http://localhost:4322/dev/fixtures
 ```
 
-The browser has a sidebar of edge-case scenarios (lobby cap, long stems,
-truncating answers, ties, host-left endings, paused-over-reveal, etc.) and a
-`Display | Control | Player` segmented control to switch surfaces. Selection
-is persisted in the URL (`?id=…&surface=…`) so refresh stays put.
+A sidebar lists edge-case scenarios (lobby cap, long stems, truncating answers,
+ties, host-left endings, paused-over-reveal, etc.) with a `Display | Control |
+Player` segmented control; selection persists in the URL (`?id=…&surface=…`).
 
 ### Bare mode (recommended for visual QA)
 
-Append `&bare=1` to any fixtures URL to hide the sidebar, tab bar, notes
-ribbon, and wrapping card. The surface renders edge-to-edge at full viewport
-so what you see matches the real `/host/[pin]/display`,
-`/host/[pin]/control`, and `/play/[pin]` routes — no harness distortion.
+Append `&bare=1` to any fixtures URL to hide the sidebar, tab bar, notes ribbon,
+and wrapping card so the surface renders edge-to-edge at full viewport — matching
+the real `/host/[pin]/display`, `/host/[pin]/control`, and `/play/[pin]` routes
+with no harness distortion.
 
 ```
 http://localhost:4322/dev/fixtures?id=question-long-stem&surface=display&bare=1
 ```
 
-This is the mode QA agents should use when checking layout, font clamps,
-or anything `vw`-based — the regular harness wraps the surface in chrome
-that eats viewport height and skews `clamp()` math.
-
-A small `← exit bare` pill in the bottom-right returns you to the regular
-harness with the same fixture and surface preselected.
-
-The route returns `notFound()` in production, so it ships only in dev builds.
-
-The same fixture catalog drives Vitest snapshot tests
-(`app/dev/fixtures/fixtures.test.tsx`) — run `npm test` and any unintended
-visual change shows up as a snapshot diff.
+Use bare mode when checking layout, font clamps, or anything `vw`-based; the
+regular harness wraps the surface in chrome that skews `clamp()` math. A
+`← exit bare` pill returns you to the full harness with the same fixture
+preselected. The route returns `notFound()` in production. The same catalog
+drives Vitest snapshot tests (`app/dev/fixtures/fixtures.test.tsx`) — run
+`npm test` and any unintended visual change surfaces as a snapshot diff.
 
 ---
 
@@ -399,12 +447,13 @@ Local Postgres 16 required.
 npm run db:up
 ```
 
-Uses the same image, credentials, and database name as CI. See `docker-compose.yml`.
+Uses the same image, credentials, and database name as CI. See
+`docker-compose.yml` (Postgres only — the app is not containerized).
 
 ### Postgres.app (one-click on macOS)
 
 1. Download from <https://postgresapp.com> (already installed if `/Applications/Postgres.app` exists).
-2. Open the app, click "Initialize" on first run.
+2. Open it, click "Initialize" on first run.
 3. Add to your shell: `export PATH="/Applications/Postgres.app/Contents/Versions/latest/bin:$PATH"`
 4. Create role + dev database: `createuser primetime && createdb -O primetime primetime_dev`
 
@@ -418,43 +467,52 @@ createuser primetime && createdb -O primetime primetime_dev
 
 ### After install
 
-Set `DATABASE_URL` in `.env` (copy from `.env.example`), then:
+Set `DATABASE_URL` in `.env`, then:
 
 ```bash
 npm run db:migrate    # creates schema + applies migrations
-npm run db:reset      # nuke and rebuild (no seed yet)
+npm run db:reset      # nuke and rebuild
 npm run db:studio     # browse data at localhost:5555
 ```
 
 ---
 
-## Self-hosting (for other academies)
+## Self-hosting for other academies
 
-This is the internal tool we use to run live in-room workshop activities at our academy. It's not a SaaS and there's no hosted version — but the install path is open, and the repo is set up so any other academy can clone it, point it at their own domain, and run their own instance.
+This is the internal tool we use to run live in-room activities at our academy.
+It's not a SaaS and there's no hosted version — but the install path is open, and
+the repo is set up so any academy can clone it, point it at their own domain, and
+run their own instance.
 
 ### What you need
 
-- A machine (Mac mini, MacBook, or Linux server) with Node.js 24+
+- A machine (Mac mini, MacBook, or Linux server) with Node.js 22+
 - A domain you control, with DNS managed by Cloudflare (free tier is fine)
 - About 30 minutes for first-time setup
 
 ### Steps
 
 1. Clone the repo on your server.
-2. Run `bash scripts/setup.sh`. The script installs prerequisites, sets up the database, walks you through provisioning a Cloudflare Tunnel for your domain, and optionally seeds a sample quiz.
-3. Start the app: `npm run dev` (or `npm run start` for production).
-4. In a separate terminal, start the tunnel: `cloudflared tunnel run <your-tunnel-name>`.
-5. Workshops happen at `https://live.<your-domain>` — players scan a QR code on the host's screen to join.
+2. Run `bash scripts/setup.sh`. It installs prerequisites, sets up the database,
+   walks you through provisioning a Cloudflare Tunnel for your domain, and
+   optionally seeds a sample quiz.
+3. Start the app: `npm run start` (or `npm run dev` for development).
+4. In a separate terminal, start the tunnel:
+   `cloudflared tunnel run <your-tunnel-name>` — or run both together with
+   `npm run serve`.
+5. Workshops happen at `https://live.<your-domain>` — players scan a QR code on
+   the host's screen to join.
 
 ### Customize
 
-This fork is branded **PRIMETIME**. You'll want to swap that out for your own academy's identity. The things to change:
+This build is branded **PRIMETIME**. To rebrand for your academy:
 
-- **Wordmark, colors, design tokens** — `app/globals.css`. Pick your own name, palette, and type stack.
+- **Wordmark, colors, design tokens** — `app/globals.css`.
 - **Page metadata** — `app/layout.tsx` (title, description, OG tags).
 - **Sample quiz content** — `prisma/seed.ts`.
 
-Everything else (game logic, scoring, real-time wiring, host/display/player surfaces) is generic and shouldn't need touching.
+Everything else (game logic, scoring, real-time wiring, host/display/player
+surfaces) is generic and shouldn't need touching.
 
 ---
 
