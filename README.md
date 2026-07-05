@@ -24,6 +24,30 @@ Postgres via Prisma. Hosts sign in; players join anonymously by PIN.
 
 ---
 
+## App in action
+
+<!-- Drop screenshots into docs/images/ using these filenames — see docs/images/README.md. -->
+
+### Quiz
+
+| On-air display | Host control | Player |
+|---|---|---|
+| ![Quiz on-air display — question with four shape-coded answers](docs/images/quiz-display.png) | ![Quiz host control console — timer, players, answer distribution](docs/images/quiz-control.png) | ![Quiz player view on a phone](docs/images/quiz-player.png) |
+
+### Word Cloud, Q&A & WonderWall
+
+| Word Cloud | Q&A present mode | WonderWall |
+|---|---|---|
+| ![Live word cloud projection](docs/images/wordcloud-display.png) | ![Q&A display with highlighted question](docs/images/q-and-a-display.png) | ![WonderWall waterfall of approved LinkedIn embeds](docs/images/wonderwall-display.png) |
+
+### Host dashboard & lobby
+
+| Host dashboard | Join lobby |
+|---|---|
+| ![Host dashboard — saved quizzes and recent rooms](docs/images/host-dashboard.png) | ![Lobby with PIN and join QR code](docs/images/lobby-join.png) |
+
+---
+
 ## Quickstart (local)
 
 **No SaaS accounts needed.** Defaults are password auth, no email, local uploads, no billing.
