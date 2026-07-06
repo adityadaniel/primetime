@@ -12,12 +12,20 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['lib/game.ts'],
+      include: [
+        'lib/game.ts',
+        // Core session libraries measured explicitly so coverage gaps stay visible.
+        'lib/qa.ts',
+        'lib/qa-repo.ts',
+        'lib/wonderwall-repo.ts',
+      ],
+      // Baseline captured 2026-07-06 when qa/repo libs were added to coverage.
+      // Ratchet these upward as tests are added; do not lower them.
       thresholds: {
-        statements: 80,
-        branches: 80,
-        functions: 80,
-        lines: 80,
+        statements: 93,
+        branches: 88,
+        functions: 91,
+        lines: 94,
       },
     },
     projects: [
