@@ -56,6 +56,9 @@ export interface GameSession {
   endedReason?: 'host-left';
   createdAt: number;
   sessionDbId: string | null;
+  /** True once the create-session DB write has rejected or returned no row; distinguishes a
+   *  failed write from one that simply has not resolved yet. */
+  sessionDbFailed: boolean;
   finalized?: boolean;
 }
 
@@ -108,13 +111,25 @@ export function createGame(
     answers: new Map(),
     createdAt: Date.now(),
     sessionDbId: null,
+    sessionDbFailed: false,
   };
   games.set(pin, session);
   createSessionRecord({ pin, hostUserId, quizSnapshot: quiz })
     .then((row) => {
-      if (row) session.sessionDbId = row.id;
+      if (row) {
+        session.sessionDbId = row.id;
+        return;
+      }
+      session.sessionDbFailed = true;
+      console.error('[session-repo] create returned no row', { pin });
     })
-    .catch((err) => console.error('[session-repo]', err));
+    .catch((err) => {
+      session.sessionDbFailed = true;
+      console.error('[session-repo] create failed — game history will not persist', {
+        pin,
+        err,
+      });
+    });
   return session;
 }
 

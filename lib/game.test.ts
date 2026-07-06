@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./session-repo', () => ({
-  createSessionRecord: vi.fn(async () => null),
+  createSessionRecord: vi.fn(() => new Promise<{ id: string } | null>(() => undefined)),
   recordPlayerJoin: vi.fn(async () => undefined),
   recordAnswer: vi.fn(async () => undefined),
   finalizeSession: vi.fn(async () => undefined),
@@ -1167,6 +1167,7 @@ describe('session persistence hooks', () => {
     });
     await flushMicrotasks();
     expect(game.sessionDbId).toBe('sess-1');
+    expect(game.sessionDbFailed).toBe(false);
   });
 
   it('createGame defaults hostUserId to null when not supplied', () => {
@@ -1183,19 +1184,37 @@ describe('session persistence hooks', () => {
     );
   });
 
-  it('createGame does not crash if createSessionRecord rejects; logs the error', async () => {
-    mockedRepo.createSessionRecord.mockRejectedValueOnce(new Error('db down'));
+  it('createGame returns a playable lobby synchronously while the DB write is pending', () => {
+    mockedRepo.createSessionRecord.mockReturnValueOnce(new Promise(() => null));
+
+    const game = createGame(makeQuiz());
+
+    expect(game.pin).toMatch(/^\d{6}$/);
+    expect(game.phase).toBe('lobby');
+    expect(game.sessionDbId).toBeNull();
+    expect(game.sessionDbFailed).toBe(false);
+  });
+
+  it('createGame marks the session when createSessionRecord rejects and logs a distinct persistence warning', async () => {
+    const err = new Error('db down');
+    mockedRepo.createSessionRecord.mockRejectedValueOnce(err);
     const game = createGame(makeQuiz());
     await flushMicrotasks();
     expect(game.sessionDbId).toBeNull();
-    expect(errSpy).toHaveBeenCalledWith('[session-repo]', expect.any(Error));
+    expect(game.sessionDbFailed).toBe(true);
+    expect(errSpy).toHaveBeenCalledWith(
+      '[session-repo] create failed — game history will not persist',
+      expect.objectContaining({ pin: game.pin, err }),
+    );
   });
 
-  it('createGame leaves sessionDbId null when persistence is disabled (returns null row)', async () => {
+  it('createGame marks the session when createSessionRecord returns no row', async () => {
     mockedRepo.createSessionRecord.mockResolvedValueOnce(null);
     const game = createGame(makeQuiz());
     await flushMicrotasks();
     expect(game.sessionDbId).toBeNull();
+    expect(game.sessionDbFailed).toBe(true);
+    expect(errSpy).toHaveBeenCalledWith('[session-repo] create returned no row', { pin: game.pin });
   });
 
   it('joinPlayer calls recordPlayerJoin with sessionId, in-game id, and nickname', async () => {
