@@ -97,6 +97,15 @@ export async function uploadLocal(
     return { ok: false, error: validationError };
   }
 
+  // Constrain subdir to a single safe path segment. Without this, a value like
+  // "../../x" escapes uploadDir via path.join normalization (path traversal).
+  if (subdir !== undefined) {
+    const SAFE_SUBDIR = /^[A-Za-z0-9._-]+$/;
+    if (subdir === '.' || subdir === '..' || !SAFE_SUBDIR.test(subdir)) {
+      return { ok: false, error: 'invalid_subdir' };
+    }
+  }
+
   const filename = safeFilename(file.type);
   const targetDir = subdir ? join(uploadDir, subdir) : uploadDir;
   const filePath = join(targetDir, filename);
