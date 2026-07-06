@@ -43,6 +43,8 @@ npm run build
 
 Use `npm run smoke` when touching Socket.IO/gameplay flows. Use `npm run test:e2e` when touching auth, signup/signin, saved quizzes, or browser lifecycle flows. For UI-visible work, use `npm run qa` or Playwright/Chrome DevTools to inspect the actual rendered pages.
 
+Husky installs a pre-commit hook via `npm install`; it runs `npm run lint` and `npx tsc --noEmit`. Use `git commit --no-verify` only for emergency skips.
+
 ## Architecture map
 
 - App Router pages live under `app/`.
