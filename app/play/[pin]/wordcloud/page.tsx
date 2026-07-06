@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Chyron, Clock, FrameCounter, SmpteBars } from '@/components/Broadcast';
 import { useSocket } from '@/lib/socket';
+import { useSocketListener } from '@/lib/use-socket-listener';
 import { validateWordInput, WORDCLOUD_INPUT_MAX } from '@/lib/wordcloud-input';
 
 type CloudStatus = 'LOBBY' | 'LIVE' | 'PAUSED' | 'ENDED';
@@ -103,75 +104,69 @@ export default function WordCloudPlayerPage({ params }: { params: Promise<{ pin:
     return () => window.clearInterval(t);
   }, [cooldownUntil]);
 
-  useEffect(() => {
+  const onState = (s: {
+    pin: string;
+    prompt: string;
+    wordsPerPlayer: number;
+    status: CloudStatus;
+  }) => {
+    if (s.pin !== pin) return;
+    setPrompt(s.prompt);
+    setWordsPerPlayer(s.wordsPerPlayer);
+    setStatus(s.status);
+  };
+  const onStatusChanged = (s: { status: CloudStatus }) => setStatus(s.status);
+  const onMine = (e: { submissions: Submission[] }) => setMySubmissions(e.submissions);
+  const onRejected = (e: { reason?: RejectReason }) => {
+    inFlightSubmitRef.current = false;
+    const msg = rejectMessage(e.reason, wordsPerPlayer);
+    showToast(msg);
+  };
+  const onWordRemoved = (e: { normalized: string }) => {
+    setMySubmissions((prev) => prev.filter((s) => s.normalized !== e.normalized));
+  };
+
+  const join = () => {
     if (!socket || !pin || !me) return;
+    socket.emit(
+      'wordcloud:player:join',
+      { pin, nickname: me.nickname, playerId: playerIdRef.current ?? undefined },
+      (res: JoinAck) => {
+        if ('error' in res) {
+          const errMsg =
+            res.error === 'not_found'
+              ? "Activity isn't live anymore."
+              : res.error === 'duplicate_nickname'
+                ? 'That name is taken in this room.'
+                : "Couldn't join, try again.";
+          setEvicted(errMsg);
+          return;
+        }
+        const ok = res as JoinSuccess;
+        playerIdRef.current = ok.playerId;
+        sessionStorage.setItem(`bc:player:${pin}`, ok.playerId);
+        setMe((prev) => (prev ? { ...prev, id: ok.playerId } : prev));
+        setPrompt(ok.prompt);
+        setWordsPerPlayer(ok.wordsPerPlayer);
+        setStatus(ok.status);
+        setMySubmissions(ok.mySubmissions);
+      },
+    );
+  };
 
-    const onState = (s: {
-      pin: string;
-      prompt: string;
-      wordsPerPlayer: number;
-      status: CloudStatus;
-    }) => {
-      if (s.pin !== pin) return;
-      setPrompt(s.prompt);
-      setWordsPerPlayer(s.wordsPerPlayer);
-      setStatus(s.status);
-    };
-    const onStatusChanged = (s: { status: CloudStatus }) => setStatus(s.status);
-    const onMine = (e: { submissions: Submission[] }) => setMySubmissions(e.submissions);
-    const onRejected = (e: { reason?: RejectReason }) => {
-      inFlightSubmitRef.current = false;
-      const msg = rejectMessage(e.reason, wordsPerPlayer);
-      showToast(msg);
-    };
-    const onWordRemoved = (e: { normalized: string }) => {
-      setMySubmissions((prev) => prev.filter((s) => s.normalized !== e.normalized));
-    };
-
-    const join = () => {
-      socket.emit(
-        'wordcloud:player:join',
-        { pin, nickname: me.nickname, playerId: playerIdRef.current ?? undefined },
-        (res: JoinAck) => {
-          if ('error' in res) {
-            const errMsg =
-              res.error === 'not_found'
-                ? "Activity isn't live anymore."
-                : res.error === 'duplicate_nickname'
-                  ? 'That name is taken in this room.'
-                  : "Couldn't join, try again.";
-            setEvicted(errMsg);
-            return;
-          }
-          const ok = res as JoinSuccess;
-          playerIdRef.current = ok.playerId;
-          sessionStorage.setItem(`bc:player:${pin}`, ok.playerId);
-          setMe((prev) => (prev ? { ...prev, id: ok.playerId } : prev));
-          setPrompt(ok.prompt);
-          setWordsPerPlayer(ok.wordsPerPlayer);
-          setStatus(ok.status);
-          setMySubmissions(ok.mySubmissions);
-        },
-      );
-    };
-
-    socket.on('wordcloud:state', onState);
-    socket.on('wordcloud:status:changed', onStatusChanged);
-    socket.on('wordcloud:player:my-submissions', onMine);
-    socket.on('wordcloud:player:rejected', onRejected);
-    socket.on('wordcloud:word:removed', onWordRemoved);
-    socket.on('connect', join);
-    if (socket.connected) join();
-
-    return () => {
-      socket.off('wordcloud:state', onState);
-      socket.off('wordcloud:status:changed', onStatusChanged);
-      socket.off('wordcloud:player:my-submissions', onMine);
-      socket.off('wordcloud:player:rejected', onRejected);
-      socket.off('wordcloud:word:removed', onWordRemoved);
-      socket.off('connect', join);
-    };
-  }, [socket, pin, me, wordsPerPlayer, showToast]);
+  useSocketListener(
+    socket,
+    Boolean(pin && me),
+    {
+      'wordcloud:state': onState,
+      'wordcloud:status:changed': onStatusChanged,
+      'wordcloud:player:my-submissions': onMine,
+      'wordcloud:player:rejected': onRejected,
+      'wordcloud:word:removed': onWordRemoved,
+    },
+    join,
+    [socket, pin, me, wordsPerPlayer, showToast],
+  );
 
   const wordsLeft = Math.max(0, wordsPerPlayer - mySubmissions.length);
   const maxReached = mySubmissions.length >= wordsPerPlayer;
