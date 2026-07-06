@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSocket } from '@/lib/socket';
 import type { AnswerIndex, PublicGameState } from '@/lib/types';
 import { useSfx } from '@/lib/use-sfx';
+import { useSocketListener } from '@/lib/use-socket-listener';
 import { type PersonalLike, PlayerView } from './player-views';
 
 type Personal = PersonalLike;
@@ -160,52 +161,51 @@ export default function QuizClient({ pin }: { pin: string }) {
     if (id && nick) setMe({ id, nickname: nick });
   }, [pin]);
 
-  useEffect(() => {
-    if (!socket || !pin || !me) return;
-    const onState = (s: PublicGameState) => {
-      if (s.pin === pin) setState(s);
-    };
-    const onPersonal = (p: Personal) => setPersonal(p);
-    const onReconnected = (e: { nickname: string }) => {
-      if (e.nickname.toLowerCase() === me.nickname.toLowerCase()) {
-        flashToast(setToast, 'Reconnected — score restored');
-      }
-    };
-    socket.on('state', onState);
-    socket.on('personal', onPersonal);
-    socket.on('event:reconnected', onReconnected);
+  const onState = (s: PublicGameState) => {
+    if (s.pin === pin) setState(s);
+  };
+  const onPersonal = (p: Personal) => setPersonal(p);
+  const onReconnected = (e: { nickname: string }) => {
+    if (me && e.nickname.toLowerCase() === me.nickname.toLowerCase()) {
+      flashToast(setToast, 'Reconnected — score restored');
+    }
+  };
 
-    const rejoin = () => {
-      socket.emit(
-        'player:join',
-        pin,
-        me.nickname,
-        (res: {
-          ok: boolean;
-          error?: string;
-          code?: string;
-          playerId?: string;
-          reconnected?: boolean;
-        }) => {
-          if (!res.ok) {
-            setEvicted(res.error ?? "You're no longer in this game.");
-            return;
-          }
-          if (res.playerId) {
-            sessionStorage.setItem(`bc:player:${pin}`, res.playerId);
-          }
-        },
-      );
-    };
-    if (socket.connected) rejoin();
-    socket.on('connect', rejoin);
-    return () => {
-      socket.off('state', onState);
-      socket.off('personal', onPersonal);
-      socket.off('event:reconnected', onReconnected);
-      socket.off('connect', rejoin);
-    };
-  }, [socket, pin, me]);
+  const rejoin = () => {
+    if (!socket || !pin || !me) return;
+    socket.emit(
+      'player:join',
+      pin,
+      me.nickname,
+      (res: {
+        ok: boolean;
+        error?: string;
+        code?: string;
+        playerId?: string;
+        reconnected?: boolean;
+      }) => {
+        if (!res.ok) {
+          setEvicted(res.error ?? "You're no longer in this game.");
+          return;
+        }
+        if (res.playerId) {
+          sessionStorage.setItem(`bc:player:${pin}`, res.playerId);
+        }
+      },
+    );
+  };
+
+  useSocketListener(
+    socket,
+    Boolean(pin && me),
+    {
+      state: onState,
+      personal: onPersonal,
+      'event:reconnected': onReconnected,
+    },
+    rejoin,
+    [socket, pin, me],
+  );
 
   function submit(i: AnswerIndex) {
     if (!socket || !pin || !state) return;

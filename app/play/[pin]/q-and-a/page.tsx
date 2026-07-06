@@ -24,6 +24,7 @@ import type {
   QAQuestionStatus,
   QAVoteType,
 } from '@/lib/types';
+import { useSocketListener } from '@/lib/use-socket-listener';
 
 type PublicQuestion = {
   id: string;
@@ -268,73 +269,70 @@ export default function QAndAPlayerPage({ params }: { params: Promise<{ pin: str
     [socket, pin],
   );
 
-  useEffect(() => {
-    if (!socket || !pin) return;
-    const onState = (s: PublicSnapshot) => {
-      if (s.pin !== pin) return;
-      setPub(s);
-    };
-    // Coalesced vote deltas: patch the affected questions' counts in place;
-    // the render path re-sorts by popularity, so the order updates live.
-    const onScores = (delta: { pin: string; scores: QAQuestionScore[] }) => {
-      if (delta.pin !== pin) return;
-      setPub((prev) => {
-        if (!prev) return prev;
-        const byId = new Map(delta.scores.map((s) => [s.questionId, s]));
-        return {
-          ...prev,
-          questions: prev.questions.map((q) => {
-            const s = byId.get(q.id);
-            return s
-              ? {
-                  ...q,
-                  score: s.score,
-                  upvotes: s.upvotes,
-                  downvotes: s.downvotes,
-                }
-              : q;
-          }),
-        };
-      });
-    };
-    // Coalesced new-question deltas: upsert by id and update questionCount.
-    // The render path sorts client-side so order in state doesn't matter.
-    const onQuestions = (delta: {
-      pin: string;
-      questions: PublicQuestion[];
-      questionCount: number;
-    }) => {
-      if (delta.pin !== pin) return;
-      setPub((prev) => {
-        if (!prev) return prev;
-        const byId = new Map(prev.questions.map((q) => [q.id, q]));
-        for (const q of delta.questions) {
-          byId.set(q.id, q);
-        }
-        return { ...prev, questions: [...byId.values()], questionCount: delta.questionCount };
-      });
-    };
-    // Targeted personal push (MID-338): host moderation (approve/dismiss/
-    // restore) refreshes this participant's own-questions panel without a
-    // round-trip. Only ever emitted at this socket — never the room.
-    const onPersonal = (p: QAPersonalState) => {
-      if (p.participantId === participantIdRef.current) setPersonal(p);
-    };
-    const onConnect = () => join();
-    socket.on('qa:state', onState);
-    socket.on('qa:scores', onScores);
-    socket.on('qa:questions', onQuestions);
-    socket.on('qa:personal', onPersonal);
-    socket.on('connect', onConnect);
-    if (socket.connected) join();
-    return () => {
-      socket.off('qa:state', onState);
-      socket.off('qa:scores', onScores);
-      socket.off('qa:questions', onQuestions);
-      socket.off('qa:personal', onPersonal);
-      socket.off('connect', onConnect);
-    };
-  }, [socket, pin, join]);
+  const onState = (s: PublicSnapshot) => {
+    if (s.pin !== pin) return;
+    setPub(s);
+  };
+  // Coalesced vote deltas: patch the affected questions' counts in place;
+  // the render path re-sorts by popularity, so the order updates live.
+  const onScores = (delta: { pin: string; scores: QAQuestionScore[] }) => {
+    if (delta.pin !== pin) return;
+    setPub((prev) => {
+      if (!prev) return prev;
+      const byId = new Map(delta.scores.map((s) => [s.questionId, s]));
+      return {
+        ...prev,
+        questions: prev.questions.map((q) => {
+          const s = byId.get(q.id);
+          return s
+            ? {
+                ...q,
+                score: s.score,
+                upvotes: s.upvotes,
+                downvotes: s.downvotes,
+              }
+            : q;
+        }),
+      };
+    });
+  };
+  // Coalesced new-question deltas: upsert by id and update questionCount.
+  // The render path sorts client-side so order in state doesn't matter.
+  const onQuestions = (delta: {
+    pin: string;
+    questions: PublicQuestion[];
+    questionCount: number;
+  }) => {
+    if (delta.pin !== pin) return;
+    setPub((prev) => {
+      if (!prev) return prev;
+      const byId = new Map(prev.questions.map((q) => [q.id, q]));
+      for (const q of delta.questions) {
+        byId.set(q.id, q);
+      }
+      return { ...prev, questions: [...byId.values()], questionCount: delta.questionCount };
+    });
+  };
+  // Targeted personal push (MID-338): host moderation (approve/dismiss/
+  // restore) refreshes this participant's own-questions panel without a
+  // round-trip. Only ever emitted at this socket — never the room.
+  const onPersonal = (p: QAPersonalState) => {
+    if (p.participantId === participantIdRef.current) setPersonal(p);
+  };
+  const onConnect = () => join();
+
+  useSocketListener(
+    socket,
+    Boolean(pin),
+    {
+      'qa:state': onState,
+      'qa:scores': onScores,
+      'qa:questions': onQuestions,
+      'qa:personal': onPersonal,
+    },
+    onConnect,
+    [socket, pin, join],
+  );
 
   const charLimit = pub?.questionCharLimit ?? 280;
   const cooldownRemaining = Math.max(0, cooldownUntil - now);
