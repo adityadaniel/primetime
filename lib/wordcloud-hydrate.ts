@@ -9,6 +9,8 @@ import {
 } from './wordcloud';
 import { getSessionByPin, type WordCloudSessionWithRelations } from './wordcloud-repo';
 
+const inFlightLoads = new Map<string, Promise<WordCloudState | null>>();
+
 // Map a Prisma WordCloudStatus to the smaller in-memory state machine.
 // ARCHIVED collapses to ENDED — the live socket treats both the same way:
 // no transitions allowed, view-only.
@@ -80,9 +82,26 @@ export async function loadOrCreateState(
 ): Promise<WordCloudState | null> {
   const cached = states.get(pin);
   if (cached) return cached;
-  const session = await getSessionByPin(pin);
-  if (!session) return null;
-  const state = hydrateStateFromSession(session);
-  states.set(pin, state);
-  return state;
+
+  // Serialize concurrent first-time loads for the same PIN so competing socket
+  // attaches do not hydrate separate in-memory state objects.
+  const inFlight = inFlightLoads.get(pin);
+  if (inFlight) return inFlight;
+
+  const load = (async () => {
+    const session = await getSessionByPin(pin);
+    if (!session) return null;
+    const raced = states.get(pin);
+    if (raced) return raced;
+    const state = hydrateStateFromSession(session);
+    states.set(pin, state);
+    return state;
+  })();
+
+  inFlightLoads.set(pin, load);
+  try {
+    return await load;
+  } finally {
+    inFlightLoads.delete(pin);
+  }
 }
