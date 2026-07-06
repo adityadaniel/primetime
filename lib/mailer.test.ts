@@ -14,7 +14,11 @@ function restoreEnv() {
 
 describe('buildResetMailer — provider modes', () => {
   beforeEach(() => restoreEnv());
-  afterEach(() => restoreEnv());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    restoreEnv();
+  });
 
   it('returns a function for none provider', () => {
     const mailer = buildResetMailer('none');
@@ -26,22 +30,19 @@ describe('buildResetMailer — provider modes', () => {
     expect(typeof mailer).toBe('function');
   });
 
-  it('returns a function for smtp provider', () => {
-    const mailer = buildResetMailer('smtp');
-    expect(typeof mailer).toBe('function');
-  });
-
-  it('returns a function for an unknown/unsupported provider', () => {
-    // Defensive: the switch is exhaustive for the current union, but the
-    // default branch exists so the function never throws at construction.
-    const mailer = buildResetMailer('resend' as never);
+  it('returns a function for resend provider', () => {
+    const mailer = buildResetMailer('resend');
     expect(typeof mailer).toBe('function');
   });
 });
 
 describe('buildResetMailer — runtime behavior', () => {
   beforeEach(() => restoreEnv());
-  afterEach(() => restoreEnv());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    restoreEnv();
+  });
 
   it('token-print returns devUrl and logs a warning', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -54,7 +55,6 @@ describe('buildResetMailer — runtime behavior', () => {
     }
     expect(warn.mock.calls.length).toBeGreaterThan(0);
     expect(warn.mock.calls.flat().join(' ')).toContain('http://localhost:4321/reset/abc');
-    warn.mockRestore();
   });
 
   it('default/unknown mode logs a dev warning with the reset URL', async () => {
@@ -67,25 +67,63 @@ describe('buildResetMailer — runtime behavior', () => {
       expect(result.devUrl).toBe('http://localhost:4321/reset/xyz');
     }
     expect(warn.mock.calls.length).toBeGreaterThan(0);
-    warn.mockRestore();
   });
 
-  it('smtp without nodemailer installed returns a helpful error', async () => {
-    // Simulate missing nodemailer by forcing the dynamic import path to fail.
-    // Rather than mocking the module (which conflicts with top-level imports),
-    // we directly invoke the transport constructor with an invalid port so
-    // the SMTP codepath exercises a validation failure before touching nodemailer.
-    vi.resetModules();
-    process.env.SMTP_HOST = 'smtp.example.com';
-    process.env.SMTP_PORT = 'not-a-number';
-    process.env.SMTP_USER = 'user';
-    process.env.SMTP_PASSWORD = 'pass';
-    const { buildResetMailer: freshBuild } = await import('./mailer');
-    const mailer = freshBuild('smtp');
-    const result = await mailer({ to: 'dev@example.test', url: 'http://localhost:4321/reset/s' });
+  it('resend posts the password-reset email through the Resend HTTP API', async () => {
+    process.env.RESEND_API_KEY = 're_test_123';
+    process.env.EMAIL_FROM = 'PRIMETIME <reset@example.test>';
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ id: 'email_123' }), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const mailer = buildResetMailer('resend');
+    const result = await mailer({
+      to: 'host@example.test',
+      url: 'http://localhost:4321/reset/token',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.resend.com/emails',
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer re_test_123',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'PRIMETIME <reset@example.test>',
+          to: 'host@example.test',
+          subject: 'Reset your PRIMETIME password',
+          text: 'Open this link to reset your password: http://localhost:4321/reset/token\n\nIf you did not request this, ignore this email.',
+          html: '<p>Open this link to reset your password: <a href="http://localhost:4321/reset/token">http://localhost:4321/reset/token</a></p><p>If you did not request this, ignore this email.</p>',
+        }),
+      }),
+    );
+  });
+
+  it('resend reports a failed HTTP response without exposing the API key', async () => {
+    process.env.RESEND_API_KEY = 're_secret_should_not_leak';
+    process.env.EMAIL_FROM = 'PRIMETIME <reset@example.test>';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () => new Response(JSON.stringify({ message: 'invalid sender' }), { status: 403 }),
+      ),
+    );
+
+    const mailer = buildResetMailer('resend');
+    const result = await mailer({
+      to: 'host@example.test',
+      url: 'http://localhost:4321/reset/token',
+    });
+
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.error).toContain('SMTP_PORT');
+      expect(result.error).toContain('Resend API returned 403');
+      expect(result.error).toContain('invalid sender');
+      expect(result.error).not.toContain('re_secret_should_not_leak');
     }
   });
 });

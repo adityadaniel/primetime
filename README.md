@@ -143,7 +143,7 @@ All flags default to the OSS path. **Unset = OSS default.** Set these only for S
 | `PORT` | integer | `4321` | Port for the combined Next + Socket.IO server. |
 | `AUTH_MODE` | `password` · `password+oauth` | `password` | `password` = local email/password only. `password+oauth` enables Apple (gated by `ENABLE_APPLE_SIGNIN`). |
 | `ENABLE_APPLE_SIGNIN` | `true` · `false` | `false` | Only effective with `AUTH_MODE=password+oauth`. Requires `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`. |
-| `EMAIL_PROVIDER` | `none` · `token-print` · `smtp` · `resend` | `none` | `token-print` logs reset URLs to the server console (dev). `smtp` needs `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASSWORD`. `resend` needs `RESEND_API_KEY`. |
+| `EMAIL_PROVIDER` | `none` · `token-print` · `resend` | `none` | `token-print` logs reset URLs to the server console (dev). `resend` sends real reset emails via the Resend HTTP API and requires `RESEND_API_KEY` plus `EMAIL_FROM`. |
 | `UPLOAD_PROVIDER` | `local` · `s3` · `uploadthing` | `local` | `local` = on-disk at `public/uploads/`. `s3` (incl. R2/MinIO) needs `S3_BUCKET`/`S3_REGION`/`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`. `uploadthing` needs `UPLOADTHING_TOKEN`. |
 | `UPLOAD_MAX_BYTES` | bytes (integer) | `5242880` (5 MB) | Max upload size. |
 | `UPLOAD_DIR` | absolute path | `<cwd>/public/uploads` | Upload directory on disk. |
