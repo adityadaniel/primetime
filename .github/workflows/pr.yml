@@ -47,6 +47,9 @@ jobs:
           cache: 'npm'
       - run: npm ci
 
+      - name: Security audit (runtime, high+)
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Generate Prisma client
         run: npx prisma generate
 

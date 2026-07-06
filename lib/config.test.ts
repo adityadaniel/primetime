@@ -93,35 +93,22 @@ describe('loadConfig — player cap constant', () => {
 });
 
 describe('loadConfig — email provider vars', () => {
-  it('smtp requires host, port, user, and password', () => {
-    expect(() => loadConfig({ EMAIL_PROVIDER: 'smtp' })).toThrow(/EMAIL_PROVIDER=smtp/);
-    expect(() =>
-      loadConfig({
-        EMAIL_PROVIDER: 'smtp',
-        SMTP_HOST: 'smtp.example.com',
-        SMTP_PORT: '587',
-        SMTP_USER: 'user',
-      }),
-    ).toThrow(/SMTP_PASSWORD/);
+  it('rejects smtp because bundled SMTP/nodemailer support was removed', () => {
+    expect(() => loadConfig({ EMAIL_PROVIDER: 'smtp' })).toThrow(/EMAIL_PROVIDER must be one of/);
   });
 
-  it('smtp passes when all vars are present', () => {
-    const c = loadConfig({
-      EMAIL_PROVIDER: 'smtp',
-      SMTP_HOST: 'smtp.example.com',
-      SMTP_PORT: '587',
-      SMTP_USER: 'user',
-      SMTP_PASSWORD: 'secret',
-    });
-    expect(c.emailProvider).toBe('smtp');
-    expect(c.emailEnabled).toBe(true);
-  });
-
-  it('resend requires RESEND_API_KEY', () => {
+  it('resend requires RESEND_API_KEY and EMAIL_FROM', () => {
     expect(() => loadConfig({ EMAIL_PROVIDER: 'resend' })).toThrow(/RESEND_API_KEY/);
-    expect(loadConfig({ EMAIL_PROVIDER: 'resend', RESEND_API_KEY: 're_123' }).emailProvider).toBe(
-      'resend',
+    expect(() => loadConfig({ EMAIL_PROVIDER: 'resend', RESEND_API_KEY: 're_123' })).toThrow(
+      /EMAIL_FROM/,
     );
+    expect(
+      loadConfig({
+        EMAIL_PROVIDER: 'resend',
+        RESEND_API_KEY: 're_123',
+        EMAIL_FROM: 'PRIMETIME <reset@example.test>',
+      }).emailProvider,
+    ).toBe('resend');
   });
 
   it('does not require email vars on the default (none) provider', () => {

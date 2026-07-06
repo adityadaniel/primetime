@@ -5,7 +5,7 @@ import { PLAYER_CAP } from './constants';
 // OSS ⇄ SaaS configuration surface (MID-214 · OSS-CONFIG-01)
 //
 // The same codebase ships two ways:
-//   • OSS self-host — no billing, no Resend/SMTP, no third-party OAuth. Boots
+//   • OSS self-host — no billing, no Resend, no third-party OAuth. Boots
 //     with ZERO extra env vars. This is the default for every flag below.
 //   • SaaS — billing on, a real email provider, OAuth, cloud uploads.
 //
@@ -23,8 +23,8 @@ export type AuthMode = 'password' | 'password+oauth';
 
 /** EMAIL_PROVIDER — `none` (OSS default, reset UI hidden),
  * `token-print` (log reset URL to server logs; warns in production),
- * `smtp`, or `resend`. */
-export type EmailProvider = 'none' | 'token-print' | 'smtp' | 'resend';
+ * or `resend`. */
+export type EmailProvider = 'none' | 'token-print' | 'resend';
 
 /** UPLOAD_PROVIDER — `local` (OSS default, on-disk),
  * `s3` (S3-compatible incl. R2), or `uploadthing`. */
@@ -33,7 +33,7 @@ export type UploadProvider = 'local' | 's3' | 'uploadthing';
 export interface AppConfig {
   /** `password` (default) or `password+oauth`. */
   authMode: AuthMode;
-  /** `none` (default), `smtp`, or `resend`. */
+  /** `none` (default), `token-print`, or `resend`. */
   emailProvider: EmailProvider;
   /** `local` (default), `s3`, or `uploadthing`. */
   uploadProvider: UploadProvider;
@@ -62,7 +62,7 @@ export interface AppConfig {
 }
 
 const AUTH_MODES = ['password', 'password+oauth'] as const;
-const EMAIL_PROVIDERS = ['none', 'token-print', 'smtp', 'resend'] as const;
+const EMAIL_PROVIDERS = ['none', 'token-print', 'resend'] as const;
 const UPLOAD_PROVIDERS = ['local', 's3', 'uploadthing'] as const;
 
 /** Coerce common truthy/falsy spellings; treat unset as the given default. */
@@ -143,15 +143,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const uploadDir = env.UPLOAD_DIR ?? join(process.cwd(), 'public', 'uploads');
 
   // ---- provider-specific var validation (only when explicitly selected) ----
-  if (emailProvider === 'smtp') {
-    requireVars('EMAIL_PROVIDER=smtp', env, [
-      'SMTP_HOST',
-      'SMTP_PORT',
-      'SMTP_USER',
-      'SMTP_PASSWORD',
-    ]);
-  } else if (emailProvider === 'resend') {
-    requireVars('EMAIL_PROVIDER=resend', env, ['RESEND_API_KEY']);
+  if (emailProvider === 'resend') {
+    requireVars('EMAIL_PROVIDER=resend', env, ['RESEND_API_KEY', 'EMAIL_FROM']);
   }
 
   if (uploadProvider === 's3') {
