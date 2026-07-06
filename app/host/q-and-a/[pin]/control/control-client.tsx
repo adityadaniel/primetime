@@ -36,6 +36,7 @@ import type {
   QAQuestionStatus,
   QASessionStatus,
 } from '@/lib/types';
+import { qaErrorMessage } from './qa-error-message';
 
 type AttachAck = { pin: string; sessionId: string; hostState: QAHostState } | { error: string };
 
@@ -78,111 +79,6 @@ const SORT_LABELS: Record<SortMode, string> = {
   recent: 'RECENT',
   oldest: 'OLDEST',
 };
-
-function attachErrorMessage(error: string): string {
-  switch (error) {
-    case 'forbidden':
-      return 'This control room belongs to another host.';
-    case 'not_found':
-      return "That session isn't on the air.";
-    case 'session_mismatch':
-      return 'Session credentials are stale — reopen from the studio.';
-    default:
-      return "Couldn't take the control room — try reloading.";
-  }
-}
-
-function moderationErrorMessage(error: string): string {
-  switch (error) {
-    case 'invalid_transition':
-      return 'That question already moved on.';
-    case 'unknown_question':
-      return "That question isn't in this session.";
-    case 'persistence_failed':
-      return "Couldn't save — try again.";
-    case 'forbidden':
-      return 'This control room belongs to another host.';
-    default:
-      return "Couldn't update the question — try again.";
-  }
-}
-
-function highlightErrorMessage(error: string): string {
-  return error === 'not_live'
-    ? 'Only live questions can go on air.'
-    : moderationErrorMessage(error);
-}
-
-function editErrorMessage(error: string): string {
-  switch (error) {
-    case 'empty_text':
-      return 'A question needs some words.';
-    case 'text_too_long':
-      return 'Too long — trim the copy.';
-    case 'invalid_status':
-      return 'That question already settled.';
-    default:
-      return moderationErrorMessage(error);
-  }
-}
-
-function replyErrorMessage(error: string): string {
-  switch (error) {
-    case 'empty_text':
-      return 'A reply needs some words.';
-    case 'text_too_long':
-      return `Keep replies under ${QA_HOST_REPLY_CHAR_LIMIT} characters.`;
-    case 'invalid_status':
-      return 'That question already settled — restore it to reply.';
-    case 'unknown_reply':
-      return 'That reply is gone — refresh the thread.';
-    case 'not_host_reply':
-      return 'Only your own replies can be rewritten.';
-    case 'session_ended':
-      return 'The session has ended.';
-    default:
-      return moderationErrorMessage(error);
-  }
-}
-
-function labelErrorMessage(error: string): string {
-  switch (error) {
-    case 'empty_label':
-      return 'A label needs a name.';
-    case 'label_too_long':
-      return `Keep labels under ${QA_LABEL_NAME_LIMIT} characters.`;
-    case 'duplicate_label':
-      return 'That label already exists.';
-    case 'unknown_label':
-      return "That label isn't in this session.";
-    case 'session_ended':
-      return 'The session has ended.';
-    default:
-      return moderationErrorMessage(error);
-  }
-}
-
-function controlErrorMessage(error: string): string {
-  switch (error) {
-    case 'invalid_transition':
-      return 'That session move is not allowed.';
-    case 'session_ended':
-      return 'The session has already ended.';
-    default:
-      return moderationErrorMessage(error);
-  }
-}
-
-function displaySettingsErrorMessage(error: string): string {
-  switch (error) {
-    case 'unknown_label':
-      return "That display label isn't in this session.";
-    case 'private_label':
-      return 'Only audience-visible labels can filter the projection.';
-    default:
-      return moderationErrorMessage(error);
-  }
-}
 
 export default function QAndAControlClient({ pin, sessionId }: { pin: string; sessionId: string }) {
   const socket = useSocket();
@@ -408,7 +304,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
     if (!socket) return;
     socket.emit(`qa:host:${action}`, { pin, questionId }, (res: ModerationAck) => {
       if ('error' in res) {
-        showToast(moderationErrorMessage(res.error));
+        showToast(qaErrorMessage('moderation', res.error));
         return;
       }
       const status = 'status' in res ? res.status : undefined;
@@ -441,7 +337,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
     const questionId = q.highlighted ? null : q.id;
     socket.emit('qa:host:highlight', { pin, questionId }, (res: HighlightAck) => {
       if ('error' in res) {
-        showToast(highlightErrorMessage(res.error));
+        showToast(qaErrorMessage('highlight', res.error));
         return;
       }
       showToast(res.highlightedQuestionId ? 'On air — highlighted.' : 'Highlight cleared.');
@@ -452,12 +348,12 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
     if (!socket || !editing) return;
     const text = editing.text.trim();
     if (!text) {
-      showToast(editErrorMessage('empty_text'));
+      showToast(qaErrorMessage('edit', 'empty_text'));
       return;
     }
     socket.emit('qa:host:edit', { pin, questionId: editing.id, text }, (res: EditAck) => {
       if ('error' in res) {
-        showToast(editErrorMessage(res.error));
+        showToast(qaErrorMessage('edit', res.error));
         return;
       }
       setEditing(null);
@@ -472,12 +368,12 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
     if (!socket) return;
     const text = replyDraft.trim();
     if (!text) {
-      showToast(replyErrorMessage('empty_text'));
+      showToast(qaErrorMessage('reply', 'empty_text'));
       return;
     }
     socket.emit('qa:host:reply', { pin, questionId: q.id, text }, (res: ReplyAck) => {
       if ('error' in res) {
-        showToast(replyErrorMessage(res.error));
+        showToast(qaErrorMessage('reply', res.error));
         return;
       }
       setReplyDraft('');
@@ -491,7 +387,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
     if (!socket || !replyEditing) return;
     const text = replyEditing.text.trim();
     if (!text) {
-      showToast(replyErrorMessage('empty_text'));
+      showToast(qaErrorMessage('reply', 'empty_text'));
       return;
     }
     socket.emit(
@@ -499,7 +395,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
       { pin, questionId: replyEditing.questionId, replyId: replyEditing.replyId, text },
       (res: ReplyAck) => {
         if ('error' in res) {
-          showToast(replyErrorMessage(res.error));
+          showToast(qaErrorMessage('reply', res.error));
           return;
         }
         setReplyEditing(null);
@@ -512,7 +408,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
     if (!socket) return;
     const validated = validateLabelName(labelDraft);
     if (!validated.ok) {
-      showToast(labelErrorMessage(validated.reason));
+      showToast(qaErrorMessage('label', validated.reason));
       return;
     }
     socket.emit(
@@ -520,7 +416,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
       { pin, name: validated.value, participantSelectable: labelSelectable },
       (res: LabelCreateAck) => {
         if ('error' in res) {
-          showToast(labelErrorMessage(res.error));
+          showToast(qaErrorMessage('label', res.error));
           return;
         }
         setLabelDraft('');
@@ -543,7 +439,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
       `qa:host:label:${action}`,
       { pin, questionId: q.id, labelId },
       (res: LabelAssignAck) => {
-        if ('error' in res) showToast(labelErrorMessage(res.error));
+        if ('error' in res) showToast(qaErrorMessage('label', res.error));
       },
     );
   }
@@ -553,7 +449,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
     const questionIds = [...selected];
     socket.emit(`qa:host:${action}`, { pin, questionIds }, (res: ModerationAck) => {
       if ('error' in res) {
-        showToast(moderationErrorMessage(res.error));
+        showToast(qaErrorMessage('moderation', res.error));
         return;
       }
       setSelected(new Set());
@@ -574,7 +470,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
     socket.emit(event, { pin, open }, (res: SessionControlAck) => {
       setControlPending(null);
       if ('error' in res) {
-        showToast(controlErrorMessage(res.error));
+        showToast(qaErrorMessage('control', res.error));
         return;
       }
       showToast(
@@ -601,7 +497,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
       setControlPending(null);
       setConfirmEnd(false);
       if ('error' in res) {
-        showToast(controlErrorMessage(res.error));
+        showToast(qaErrorMessage('control', res.error));
         return;
       }
       showToast('Q&A ended.');
@@ -614,7 +510,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
     socket.emit('qa:host:display-settings', { pin, ...patch }, (res: DisplaySettingsAck) => {
       setDisplaySettingsPending(false);
       if ('error' in res) {
-        showToast(displaySettingsErrorMessage(res.error));
+        showToast(qaErrorMessage('displaySettings', res.error));
         return;
       }
       showToast('Display updated.');
@@ -644,7 +540,7 @@ export default function QAndAControlClient({ pin, sessionId }: { pin: string; se
           <p className="chyron mb-3" style={{ color: 'var(--vermilion)' }}>
             SIGNAL REFUSED
           </p>
-          <p className="font-editorial text-xl mb-4">{attachErrorMessage(attachError)}</p>
+          <p className="font-editorial text-xl mb-4">{qaErrorMessage('attach', attachError)}</p>
           <Link
             href="/host"
             className="ink-border stamp ticker text-[12px] tracking-widest px-4 py-3 inline-block"
