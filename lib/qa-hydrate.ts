@@ -5,6 +5,8 @@ import { createQAState, type QAQuestionEntry, type QAState } from './qa';
 import { loadSessionForHydration, type QASessionWithRelations } from './qa-repo';
 import type { QASessionStatus } from './types';
 
+const inFlightLoads = new Map<string, Promise<QAState | null>>();
+
 // Map a Prisma QASessionStatus to the smaller in-memory state machine.
 // ARCHIVED collapses to ENDED — the live socket treats both the same way:
 // no transitions allowed, view-only.
@@ -88,9 +90,29 @@ export async function loadOrCreateState(
 ): Promise<QAState | null> {
   const cached = states.get(pin);
   if (cached) return cached;
-  const session = await loadSessionForHydration(pin);
-  if (!session) return null;
-  const state = hydrateStateFromSession(session);
-  states.set(pin, state);
-  return state;
+
+  // Serialize concurrent first-time loads for the same PIN: without this, two
+  // sockets connecting to a fresh PIN both miss the cache, both hydrate, and
+  // the second states.set() orphans the first caller's state object.
+  const inFlight = inFlightLoads.get(pin);
+  if (inFlight) return inFlight;
+
+  const load = (async () => {
+    const session = await loadSessionForHydration(pin);
+    if (!session) return null;
+    // Re-check the cache: a prior in-flight load for this PIN may have resolved
+    // and populated it while we awaited the DB.
+    const raced = states.get(pin);
+    if (raced) return raced;
+    const state = hydrateStateFromSession(session);
+    states.set(pin, state);
+    return state;
+  })();
+
+  inFlightLoads.set(pin, load);
+  try {
+    return await load;
+  } finally {
+    inFlightLoads.delete(pin);
+  }
 }

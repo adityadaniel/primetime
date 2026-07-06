@@ -101,6 +101,34 @@ describe('hydrateStateFromSession', () => {
 });
 
 describe('loadOrCreateState', () => {
+  it('hydrates a PIN only once when two callers race', async () => {
+    const cache = new Map<string, WordCloudState>();
+    getSessionByPin.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(
+            () =>
+              resolve({
+                ...baseSession,
+                players: [],
+                submissions: [],
+              }),
+            20,
+          );
+        }),
+    );
+
+    const [a, b] = await Promise.all([
+      loadOrCreateState(cache, '123456'),
+      loadOrCreateState(cache, '123456'),
+    ]);
+
+    expect(getSessionByPin).toHaveBeenCalledTimes(1);
+    expect(a).not.toBeNull();
+    expect(a).toBe(b);
+    expect(cache.size).toBe(1);
+  });
+
   it('returns the cached state when present without hitting Prisma', async () => {
     const cache = new Map<string, WordCloudState>();
     const cached = { pin: '111111' } as unknown as WordCloudState;

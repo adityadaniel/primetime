@@ -258,6 +258,26 @@ describe('hydrateStateFromSession', () => {
 });
 
 describe('loadOrCreateState', () => {
+  it('hydrates a PIN only once when two callers race', async () => {
+    const cache = new Map<string, QAState>();
+    loadSessionForHydration.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => resolve(fullSession), 20);
+        }),
+    );
+
+    const [a, b] = await Promise.all([
+      loadOrCreateState(cache, '654321'),
+      loadOrCreateState(cache, '654321'),
+    ]);
+
+    expect(loadSessionForHydration).toHaveBeenCalledTimes(1);
+    expect(a).not.toBeNull();
+    expect(a).toBe(b);
+    expect(cache.size).toBe(1);
+  });
+
   it('returns the cached state without hitting Prisma', async () => {
     const cache = new Map<string, QAState>();
     const cached = { pin: '111111' } as unknown as QAState;
