@@ -171,6 +171,36 @@ function isTier(v: unknown): v is Tier {
   return v === 'free' || v === 'pro';
 }
 
+function normalizeSocketOrigin(raw?: string | null): string | null {
+  const value = raw?.trim();
+  if (!value) return null;
+
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+function buildSocketAllowedOrigins(): string[] {
+  return Array.from(
+    new Set(
+      ['http://localhost:4321', process.env.NEXT_PUBLIC_SITE_URL, process.env.NEXTAUTH_URL]
+        .map(normalizeSocketOrigin)
+        .filter((origin): origin is string => Boolean(origin)),
+    ),
+  );
+}
+
+function isSocketOriginAllowed(
+  origin: string | undefined,
+  allowedOrigins: readonly string[],
+): boolean {
+  if (!origin) return true;
+  const normalized = normalizeSocketOrigin(origin);
+  return normalized !== null && allowedOrigins.includes(normalized);
+}
+
 function validateQuiz(input: unknown): Quiz {
   if (!input || typeof input !== 'object') throw new Error('quiz must be object');
   const q = input as Record<string, unknown>;
@@ -268,8 +298,15 @@ void app.prepare().then(() => {
     });
   });
 
+  const socketAllowedOrigins = buildSocketAllowedOrigins();
   const io = new Server(httpServer, {
-    cors: { origin: '*' },
+    cors: {
+      origin: socketAllowedOrigins,
+      credentials: true,
+    },
+    allowRequest: (req, callback) => {
+      callback(null, isSocketOriginAllowed(req.headers.origin, socketAllowedOrigins));
+    },
     transports: ['websocket', 'polling'],
   });
 
